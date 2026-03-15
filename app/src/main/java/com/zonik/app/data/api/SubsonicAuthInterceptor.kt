@@ -1,0 +1,50 @@
+package com.zonik.app.data.api
+
+import com.zonik.app.data.repository.SettingsRepository
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import okhttp3.Interceptor
+import okhttp3.Response
+import java.security.MessageDigest
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class SubsonicAuthInterceptor @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) : Interceptor {
+
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val config = runBlocking { settingsRepository.serverConfig.first() }
+            ?: return chain.proceed(chain.request())
+
+        val salt = generateSalt()
+        val token = md5("${config.apiKey}$salt")
+
+        val url = chain.request().url.newBuilder()
+            .addQueryParameter("u", config.username)
+            .addQueryParameter("t", token)
+            .addQueryParameter("s", salt)
+            .addQueryParameter("v", "1.16.1")
+            .addQueryParameter("c", "ZonikApp")
+            .addQueryParameter("f", "json")
+            .build()
+
+        val request = chain.request().newBuilder()
+            .url(url)
+            .build()
+
+        return chain.proceed(request)
+    }
+
+    private fun generateSalt(): String {
+        val chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+        return (1..16).map { chars.random() }.joinToString("")
+    }
+
+    private fun md5(input: String): String {
+        val digest = MessageDigest.getInstance("MD5")
+        val bytes = digest.digest(input.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+}
