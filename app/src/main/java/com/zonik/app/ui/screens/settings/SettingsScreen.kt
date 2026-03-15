@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zonik.app.data.api.AppUpdate
+import com.zonik.app.data.api.UpdateChecker
 import com.zonik.app.data.repository.SettingsRepository
 import com.zonik.app.model.ServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,8 +47,41 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val updateChecker: UpdateChecker
 ) : ViewModel() {
+
+    private val _availableUpdate = MutableStateFlow<AppUpdate?>(null)
+    val availableUpdate: StateFlow<AppUpdate?> = _availableUpdate.asStateFlow()
+
+    private val _isCheckingUpdate = MutableStateFlow(false)
+    val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
+
+    private val _updateProgress = MutableStateFlow<Float?>(null)
+    val updateProgress: StateFlow<Float?> = _updateProgress.asStateFlow()
+
+    init {
+        checkForUpdate()
+    }
+
+    fun checkForUpdate() {
+        viewModelScope.launch {
+            _isCheckingUpdate.value = true
+            _availableUpdate.value = updateChecker.checkForUpdate()
+            _isCheckingUpdate.value = false
+        }
+    }
+
+    fun downloadUpdate() {
+        val update = _availableUpdate.value ?: return
+        viewModelScope.launch {
+            _updateProgress.value = 0f
+            val success = updateChecker.downloadAndInstall(update) { progress ->
+                _updateProgress.value = progress
+            }
+            if (!success) _updateProgress.value = null
+        }
+    }
 
     private val _wifiOnly = MutableStateFlow(true)
     private val _crossfadeEnabled = MutableStateFlow(false)
@@ -432,6 +467,10 @@ fun SettingsScreen(
                 }
             }
 
+            // Updates section
+            SettingsSectionHeader(title = "Updates")
+            UpdateSection(viewModel = viewModel)
+
             // About section
             SettingsSectionHeader(title = "About")
             Card(
@@ -456,6 +495,94 @@ fun SettingsScreen(
 // endregion
 
 // region Components
+
+@Composable
+private fun UpdateSection(viewModel: SettingsViewModel) {
+    val availableUpdate by viewModel.availableUpdate.collectAsState()
+    val isChecking by viewModel.isCheckingUpdate.collectAsState()
+    val updateProgress by viewModel.updateProgress.collectAsState()
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Column {
+            val update = availableUpdate
+            if (update != null) {
+                ListItem(
+                    headlineContent = { Text("Update available: v${update.version}") },
+                    supportingContent = {
+                        if (update.releaseNotes.isNotBlank()) {
+                            Text(update.releaseNotes, maxLines = 3)
+                        }
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.NewReleases,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                )
+                val progress = updateProgress
+                if (progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
+                    )
+                } else {
+                    ListItem(
+                        headlineContent = {
+                            Button(onClick = viewModel::downloadUpdate) {
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Download & Install")
+                            }
+                        }
+                    )
+                }
+            } else {
+                ListItem(
+                    headlineContent = {
+                        if (isChecking) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("Checking for updates...")
+                            }
+                        } else {
+                            Text("You're up to date")
+                        }
+                    },
+                    leadingContent = {
+                        if (!isChecking) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null)
+                        }
+                    },
+                    trailingContent = {
+                        if (!isChecking) {
+                            TextButton(onClick = viewModel::checkForUpdate) {
+                                Text("Check")
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun SettingsSectionHeader(title: String) {

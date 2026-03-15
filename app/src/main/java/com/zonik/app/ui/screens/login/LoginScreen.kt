@@ -12,14 +12,22 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.zonik.app.data.api.SubsonicApi
 import com.zonik.app.data.repository.SettingsRepository
+import com.zonik.app.model.PingResponse
 import com.zonik.app.model.ServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 data class LoginUiState(
@@ -66,6 +74,17 @@ class LoginViewModel @Inject constructor(
                     username = state.username,
                     apiKey = state.apiKey
                 )
+
+                // Test connection before saving
+                val result = testConnection(config)
+                if (result != null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = result
+                    )
+                    return@launch
+                }
+
                 settingsRepository.saveServerConfig(config)
                 _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
             } catch (e: Exception) {
@@ -75,6 +94,57 @@ class LoginViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private suspend fun testConnection(config: ServerConfig): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .build()
+
+                val salt = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }
+                    .joinToString("")
+                val token = md5("${config.apiKey}$salt")
+
+                val url = "${config.url}/rest/ping.view" +
+                    "?u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp&f=json"
+
+                val request = Request.Builder().url(url).build()
+                val response = client.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    return@withContext "Server returned ${response.code}"
+                }
+
+                val body = response.body?.string()
+                    ?: return@withContext "Empty response from server"
+
+                val json = Json { ignoreUnknownKeys = true }
+                val ping = json.decodeFromString<PingResponse>(body)
+
+                if (!ping.response.isOk) {
+                    val error = ping.response.error
+                    return@withContext error?.message ?: "Authentication failed"
+                }
+
+                null // success
+            } catch (e: java.net.UnknownHostException) {
+                "Server not found. Check the URL."
+            } catch (e: java.net.ConnectException) {
+                "Cannot connect to server. Check the URL and port."
+            } catch (e: java.net.SocketTimeoutException) {
+                "Connection timed out. Server may be offline."
+            } catch (e: Exception) {
+                "Connection failed: ${e.message}"
+            }
+        }
+
+    private fun md5(input: String): String {
+        val digest = MessageDigest.getInstance("MD5")
+        val bytes = digest.digest(input.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 }
 
