@@ -50,11 +50,16 @@ Perform a full release of the Zonik Android app. The argument specifies the vers
    - Commit message: `Release v{NEW_VERSION}`
    - Push to origin
 
-8. **Create GitHub release**:
-   ```bash
-   gh release create v{NEW_VERSION} release/zonik-v{NEW_VERSION}-debug.apk \
-     --title "v{NEW_VERSION}" \
-     --generate-notes
-   ```
+8. **Create or update GitHub release**:
+   - First try to create a new release:
+     ```bash
+     gh release create v{NEW_VERSION} release/zonik-v{NEW_VERSION}-debug.apk \
+       --title "v{NEW_VERSION}" \
+       --generate-notes
+     ```
+   - If the release tag already exists, update the existing release APK instead:
+     ```bash
+     gh release upload v{NEW_VERSION} release/zonik-v{NEW_VERSION}-debug.apk --clobber
+     ```
 
 9. **Report**: Print the release URL and new version number.
