@@ -36,12 +36,13 @@ interface ZonikApi {
     @GET("api/jobs/active")
     suspend fun getActiveJobs(): List<JobInfo>
 
-    @GET("api/jobs/")
+    @Headers("Accept: application/json")
+    @GET("api/jobs")
     suspend fun getJobHistory(
         @Query("offset") offset: Int = 0,
         @Query("limit") limit: Int = 50,
         @Query("type") type: String = "download,bulk_download"
-    ): JobHistoryResponse
+    ): List<JobInfo>
 
     @GET("api/jobs/{id}")
     suspend fun getJob(@Path("id") id: String): JobDetailResponse
