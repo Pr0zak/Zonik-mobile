@@ -19,6 +19,7 @@ import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Track
+import com.zonik.app.ui.components.CoverArt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -156,7 +157,7 @@ fun NowPlayingScreen(
                 positionMs = viewModel.getCurrentPosition()
                 durationMs = viewModel.getDuration()
             }
-            delay(500L)
+            delay(200L)
         }
     }
 
@@ -184,14 +185,15 @@ fun NowPlayingScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Large album art placeholder
-            Surface(
+            // Album art
+            CoverArt(
+                coverArtId = track?.coverArt,
+                contentDescription = track?.album,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.large
-            ) {}
+                size = 600
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 

@@ -5,142 +5,245 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.zonik.app.data.DebugLog
+import com.zonik.app.data.api.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// region Data classes
+// region State
 
-data class DownloadSearchResult(
-    val id: String,
-    val title: String,
-    val artist: String,
-    val format: String,
-    val bitrate: Int,
-    val fileSize: Long
-)
-
-enum class DownloadStatus {
-    PENDING, DOWNLOADING, COMPLETED, FAILED
-}
-
-data class DownloadQueueItem(
-    val id: String,
-    val title: String,
-    val artist: String,
-    val status: DownloadStatus,
-    val progress: Float = 0f
+data class DownloadsUiState(
+    val searchQuery: String = "",
+    val searchArtist: String = "",
+    val searchResults: List<DownloadResult> = emptyList(),
+    val isSearching: Boolean = false,
+    val activeTransfers: List<TransferInfo> = emptyList(),
+    val activeJobs: List<JobInfo> = emptyList(),
+    val jobHistory: List<JobInfo> = emptyList(),
+    val isLoadingJobs: Boolean = false,
+    val error: String? = null,
+    val selectedResults: Set<Int> = emptySet()
 )
 
 // endregion
 
 // region ViewModel
 
-data class DownloadsUiState(
-    val searchQuery: String = "",
-    val searchResults: List<DownloadSearchResult> = emptyList(),
-    val isSearching: Boolean = false,
-    val selectedResultIds: Set<String> = emptySet(),
-    val queue: List<DownloadQueueItem> = stubQueue()
-)
-
-private fun stubQueue(): List<DownloadQueueItem> = listOf(
-    DownloadQueueItem("q1", "Echoes", "Pink Floyd", DownloadStatus.COMPLETED),
-    DownloadQueueItem("q2", "Comfortably Numb", "Pink Floyd", DownloadStatus.DOWNLOADING, 0.65f),
-    DownloadQueueItem("q3", "Time", "Pink Floyd", DownloadStatus.PENDING),
-    DownloadQueueItem("q4", "Money", "Pink Floyd", DownloadStatus.FAILED)
-)
-
 @HiltViewModel
-class DownloadsViewModel @Inject constructor() : ViewModel() {
+class DownloadsViewModel @Inject constructor(
+    private val zonikApi: ZonikApi
+) : ViewModel() {
+
+    companion object {
+        private const val TAG = "DownloadsVM"
+    }
 
     private val _uiState = MutableStateFlow(DownloadsUiState())
     val uiState: StateFlow<DownloadsUiState> = _uiState.asStateFlow()
+
+    init {
+        refreshStatus()
+        loadHistory()
+        startAutoRefresh()
+    }
+
+    private fun startAutoRefresh() {
+        viewModelScope.launch {
+            while (true) {
+                delay(3000)
+                try {
+                    val statusResponse = zonikApi.getDownloadStatus()
+                    val activeJobs = zonikApi.getActiveJobs()
+                    _uiState.update {
+                        it.copy(
+                            activeTransfers = statusResponse.transfers,
+                            activeJobs = activeJobs
+                        )
+                    }
+                } catch (_: Exception) {
+                    // Silent refresh failure
+                }
+            }
+        }
+    }
 
     fun onSearchQueryChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
     }
 
+    fun onSearchArtistChanged(artist: String) {
+        _uiState.update { it.copy(searchArtist = artist) }
+    }
+
     fun search() {
-        val query = _uiState.value.searchQuery.trim()
-        if (query.isBlank()) return
+        val state = _uiState.value
+        if (state.searchQuery.isBlank() && state.searchArtist.isBlank()) return
 
-        // Stub: generate fake results based on query
-        _uiState.update { it.copy(isSearching = true) }
+        _uiState.update { it.copy(isSearching = true, error = null, selectedResults = emptySet()) }
 
-        val stubResults = listOf(
-            DownloadSearchResult("r1", "$query - Track 1", "Various Artists", "FLAC", 1411, 35_000_000),
-            DownloadSearchResult("r2", "$query - Track 2", "Unknown Artist", "MP3", 320, 9_500_000),
-            DownloadSearchResult("r3", "$query (Live)", "Various Artists", "FLAC", 1411, 42_000_000),
-            DownloadSearchResult("r4", "$query (Remix)", "DJ Unknown", "MP3", 256, 8_200_000),
-            DownloadSearchResult("r5", "$query - Acoustic", "Singer", "FLAC", 1411, 28_000_000)
-        )
-        _uiState.update {
-            it.copy(
-                searchResults = stubResults,
-                isSearching = false,
-                selectedResultIds = emptySet()
-            )
-        }
-    }
-
-    fun toggleResultSelection(resultId: String) {
-        _uiState.update { state ->
-            val newSelection = state.selectedResultIds.toMutableSet()
-            if (resultId in newSelection) newSelection.remove(resultId) else newSelection.add(resultId)
-            state.copy(selectedResultIds = newSelection)
-        }
-    }
-
-    fun downloadSingle(resultId: String) {
-        // Stub: add to queue
-        val result = _uiState.value.searchResults.find { it.id == resultId } ?: return
-        val item = DownloadQueueItem(
-            id = result.id,
-            title = result.title,
-            artist = result.artist,
-            status = DownloadStatus.PENDING
-        )
-        _uiState.update { it.copy(queue = it.queue + item) }
-    }
-
-    fun downloadSelected() {
-        val selected = _uiState.value.selectedResultIds
-        val results = _uiState.value.searchResults.filter { it.id in selected }
-        val items = results.map { result ->
-            DownloadQueueItem(
-                id = result.id,
-                title = result.title,
-                artist = result.artist,
-                status = DownloadStatus.PENDING
-            )
-        }
-        _uiState.update {
-            it.copy(queue = it.queue + items, selectedResultIds = emptySet())
-        }
-    }
-
-    fun retryDownload(itemId: String) {
-        _uiState.update { state ->
-            state.copy(
-                queue = state.queue.map {
-                    if (it.id == itemId) it.copy(status = DownloadStatus.PENDING, progress = 0f) else it
+        viewModelScope.launch {
+            try {
+                DebugLog.d(TAG, "Searching: artist='${state.searchArtist}' track='${state.searchQuery}'")
+                val response = zonikApi.searchDownloads(
+                    DownloadSearchRequest(
+                        artist = state.searchArtist.trim(),
+                        track = state.searchQuery.trim()
+                    )
+                )
+                DebugLog.d(TAG, "Search returned ${response.results.size} results")
+                _uiState.update {
+                    it.copy(
+                        searchResults = response.results,
+                        isSearching = false
+                    )
                 }
-            )
+            } catch (e: Exception) {
+                DebugLog.e(TAG, "Search failed", e)
+                _uiState.update {
+                    it.copy(
+                        isSearching = false,
+                        error = "Search failed: ${e.message}"
+                    )
+                }
+            }
         }
+    }
+
+    fun triggerDownload(result: DownloadResult) {
+        viewModelScope.launch {
+            try {
+                DebugLog.d(TAG, "Triggering download: ${result.displayName}")
+                zonikApi.triggerDownload(
+                    DownloadTriggerRequest(
+                        artist = _uiState.value.searchArtist.trim(),
+                        track = _uiState.value.searchQuery.trim(),
+                        username = result.username,
+                        filename = result.filename
+                    )
+                )
+                refreshStatus()
+            } catch (e: Exception) {
+                DebugLog.e(TAG, "Download trigger failed", e)
+                _uiState.update { it.copy(error = "Download failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun triggerBulkDownload() {
+        val state = _uiState.value
+        val selected = state.selectedResults.mapNotNull { idx ->
+            state.searchResults.getOrNull(idx)
+        }
+        if (selected.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                DebugLog.d(TAG, "Bulk downloading ${selected.size} tracks")
+                val tracks = selected.map { result ->
+                    BulkDownloadTrack(
+                        artist = state.searchArtist.trim(),
+                        track = result.displayName
+                    )
+                }
+                zonikApi.bulkDownload(BulkDownloadRequest(tracks = tracks))
+                _uiState.update { it.copy(selectedResults = emptySet()) }
+                refreshStatus()
+            } catch (e: Exception) {
+                DebugLog.e(TAG, "Bulk download failed", e)
+                _uiState.update { it.copy(error = "Bulk download failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun refreshStatus() {
+        viewModelScope.launch {
+            try {
+                val statusResponse = zonikApi.getDownloadStatus()
+                val activeJobs = zonikApi.getActiveJobs()
+                _uiState.update {
+                    it.copy(
+                        activeTransfers = statusResponse.transfers,
+                        activeJobs = activeJobs,
+                        error = null
+                    )
+                }
+            } catch (e: Exception) {
+                DebugLog.e(TAG, "Status refresh failed", e)
+                _uiState.update { it.copy(error = "Status refresh failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun loadHistory() {
+        _uiState.update { it.copy(isLoadingJobs = true) }
+        viewModelScope.launch {
+            try {
+                val response = zonikApi.getJobHistory()
+                _uiState.update {
+                    it.copy(
+                        jobHistory = response.jobs,
+                        isLoadingJobs = false
+                    )
+                }
+            } catch (e: Exception) {
+                DebugLog.e(TAG, "History load failed", e)
+                _uiState.update {
+                    it.copy(
+                        isLoadingJobs = false,
+                        error = "History load failed: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleSelection(index: Int) {
+        _uiState.update { state ->
+            val newSelection = state.selectedResults.toMutableSet()
+            if (index in newSelection) newSelection.remove(index) else newSelection.add(index)
+            state.copy(selectedResults = newSelection)
+        }
+    }
+
+    fun cancelTransfer(transfer: TransferInfo) {
+        viewModelScope.launch {
+            try {
+                DebugLog.d(TAG, "Cancelling transfer: ${transfer.displayName}")
+                zonikApi.cancelTransfer(
+                    CancelTransferRequest(
+                        username = transfer.username,
+                        filename = transfer.filename
+                    )
+                )
+                refreshStatus()
+            } catch (e: Exception) {
+                DebugLog.e(TAG, "Cancel transfer failed", e)
+                _uiState.update { it.copy(error = "Cancel failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun dismissError() {
+        _uiState.update { it.copy(error = null) }
     }
 }
 
@@ -150,7 +253,8 @@ class DownloadsViewModel @Inject constructor() : ViewModel() {
 
 private enum class DownloadsTab(val label: String) {
     SEARCH("Search"),
-    QUEUE("Queue")
+    ACTIVE("Active"),
+    HISTORY("History")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -163,15 +267,43 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Downloads") })
+            TopAppBar(
+                title = { Text("Downloads") },
+                actions = {
+                    if (selectedTab == 1) {
+                        IconButton(onClick = { viewModel.refreshStatus() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                    }
+                    if (selectedTab == 2) {
+                        IconButton(onClick = { viewModel.loadHistory() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                    }
+                }
+            )
         },
         floatingActionButton = {
-            if (selectedTab == 0 && uiState.selectedResultIds.isNotEmpty()) {
+            if (selectedTab == 0 && uiState.selectedResults.isNotEmpty()) {
                 ExtendedFloatingActionButton(
-                    onClick = viewModel::downloadSelected,
+                    onClick = viewModel::triggerBulkDownload,
                     icon = { Icon(Icons.Default.Download, contentDescription = null) },
-                    text = { Text("Download Selected (${uiState.selectedResultIds.size})") }
+                    text = { Text("Download Selected (${uiState.selectedResults.size})") }
                 )
+            }
+        },
+        snackbarHost = {
+            uiState.error?.let { error ->
+                Snackbar(
+                    action = {
+                        TextButton(onClick = { viewModel.dismissError() }) {
+                            Text("Dismiss")
+                        }
+                    },
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(error)
+                }
             }
         }
     ) { padding ->
@@ -193,17 +325,26 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
             when (tabs[selectedTab]) {
                 DownloadsTab.SEARCH -> SearchTab(
                     query = uiState.searchQuery,
+                    artist = uiState.searchArtist,
                     onQueryChanged = viewModel::onSearchQueryChanged,
+                    onArtistChanged = viewModel::onSearchArtistChanged,
                     onSearch = viewModel::search,
                     results = uiState.searchResults,
                     isSearching = uiState.isSearching,
-                    selectedIds = uiState.selectedResultIds,
-                    onToggleSelection = viewModel::toggleResultSelection,
-                    onDownloadSingle = viewModel::downloadSingle
+                    selectedIndices = uiState.selectedResults,
+                    onToggleSelection = viewModel::toggleSelection,
+                    onDownloadSingle = { result -> viewModel.triggerDownload(result) }
                 )
-                DownloadsTab.QUEUE -> QueueTab(
-                    queue = uiState.queue,
-                    onRetry = viewModel::retryDownload
+
+                DownloadsTab.ACTIVE -> ActiveTab(
+                    transfers = uiState.activeTransfers,
+                    activeJobs = uiState.activeJobs,
+                    onCancel = viewModel::cancelTransfer
+                )
+
+                DownloadsTab.HISTORY -> HistoryTab(
+                    history = uiState.jobHistory,
+                    isLoading = uiState.isLoadingJobs
                 )
             }
         }
@@ -217,40 +358,67 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
 @Composable
 private fun SearchTab(
     query: String,
+    artist: String,
     onQueryChanged: (String) -> Unit,
+    onArtistChanged: (String) -> Unit,
     onSearch: () -> Unit,
-    results: List<DownloadSearchResult>,
+    results: List<DownloadResult>,
     isSearching: Boolean,
-    selectedIds: Set<String>,
-    onToggleSelection: (String) -> Unit,
-    onDownloadSingle: (String) -> Unit
+    selectedIndices: Set<Int>,
+    onToggleSelection: (Int) -> Unit,
+    onDownloadSingle: (DownloadResult) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // Search bar
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChanged,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Search Soulseek...") },
+                value = artist,
+                onValueChange = onArtistChanged,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Artist") },
                 singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                 trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { onQueryChanged("") }) {
+                    if (artist.isNotEmpty()) {
+                        IconButton(onClick = { onArtistChanged("") }) {
                             Icon(Icons.Default.Clear, contentDescription = "Clear")
                         }
                     }
                 }
             )
-            FilledTonalButton(onClick = onSearch, enabled = query.isNotBlank()) {
-                Text("Search")
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChanged,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Track title") },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.MusicNote, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { onQueryChanged("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                        }
+                    }
+                )
+                FilledTonalButton(
+                    onClick = onSearch,
+                    enabled = query.isNotBlank() || artist.isNotBlank()
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Search")
+                }
             }
         }
 
@@ -263,6 +431,7 @@ private fun SearchTab(
                     CircularProgressIndicator()
                 }
             }
+
             results.isEmpty() -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -284,20 +453,36 @@ private fun SearchTab(
                     }
                 }
             }
-            else -> {
-                val isMultiSelect = selectedIds.isNotEmpty()
 
+            else -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
-                    items(results, key = { it.id }) { result ->
-                        SearchResultItem(
-                            result = result,
-                            isSelected = result.id in selectedIds,
-                            isMultiSelect = isMultiSelect,
-                            onToggleSelection = { onToggleSelection(result.id) },
-                            onDownload = { onDownloadSingle(result.id) }
+                    itemsIndexed(results) { index, result ->
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = result.displayName,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = "${result.username} \u00b7 ${result.format} \u00b7 ${result.sizeMb} \u00b7 ${result.bitRate ?: "?"}kbps",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            trailingContent = {
+                                Checkbox(
+                                    checked = index in selectedIndices,
+                                    onCheckedChange = { onToggleSelection(index) }
+                                )
+                            },
+                            modifier = Modifier.clickable { onDownloadSingle(result) }
                         )
                     }
                 }
@@ -306,92 +491,17 @@ private fun SearchTab(
     }
 }
 
-@Composable
-private fun SearchResultItem(
-    result: DownloadSearchResult,
-    isSelected: Boolean,
-    isMultiSelect: Boolean,
-    onToggleSelection: () -> Unit,
-    onDownload: () -> Unit
-) {
-    ListItem(
-        headlineContent = {
-            Text(
-                text = result.title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        supportingContent = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = result.artist,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            text = result.format,
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    },
-                    modifier = Modifier.height(24.dp)
-                )
-                Text(
-                    text = "${result.bitrate}k",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = formatFileSize(result.fileSize),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        leadingContent = if (isMultiSelect) {
-            {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onToggleSelection() }
-                )
-            }
-        } else null,
-        trailingContent = {
-            IconButton(onClick = onDownload) {
-                Icon(Icons.Default.Download, contentDescription = "Download")
-            }
-        },
-        modifier = Modifier.clickable(onClick = onToggleSelection)
-    )
-}
-
-private fun formatFileSize(bytes: Long): String {
-    return when {
-        bytes >= 1_000_000_000 -> "%.1f GB".format(bytes / 1_000_000_000.0)
-        bytes >= 1_000_000 -> "%.1f MB".format(bytes / 1_000_000.0)
-        bytes >= 1_000 -> "%.0f KB".format(bytes / 1_000.0)
-        else -> "$bytes B"
-    }
-}
-
 // endregion
 
-// region Queue Tab
+// region Active Tab
 
 @Composable
-private fun QueueTab(
-    queue: List<DownloadQueueItem>,
-    onRetry: (String) -> Unit
+private fun ActiveTab(
+    transfers: List<TransferInfo>,
+    activeJobs: List<JobInfo>,
+    onCancel: (TransferInfo) -> Unit
 ) {
-    if (queue.isEmpty()) {
+    if (transfers.isEmpty() && activeJobs.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -405,7 +515,7 @@ private fun QueueTab(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Download queue is empty",
+                    text = "No active downloads",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -418,84 +528,90 @@ private fun QueueTab(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 4.dp)
     ) {
-        items(queue, key = { it.id }) { item ->
-            QueueItemRow(item = item, onRetry = { onRetry(item.id) })
+        if (transfers.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Transfers",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            items(transfers, key = { "${it.username}/${it.filename}" }) { transfer ->
+                TransferItem(transfer = transfer, onCancel = { onCancel(transfer) })
+            }
+        }
+
+        if (activeJobs.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Active Jobs",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            items(activeJobs, key = { it.id }) { job ->
+                ListItem(
+                    headlineContent = { Text(job.type) },
+                    supportingContent = {
+                        Text(
+                            text = "${job.status} ${job.progress?.let { p -> job.total?.let { t -> "($p/$t)" } } ?: ""}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    leadingContent = {
+                        Icon(Icons.Default.Work, contentDescription = null)
+                    }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun QueueItemRow(
-    item: DownloadQueueItem,
-    onRetry: () -> Unit
+private fun TransferItem(
+    transfer: TransferInfo,
+    onCancel: () -> Unit
 ) {
     Column {
         ListItem(
             headlineContent = {
                 Text(
-                    text = item.title,
+                    text = transfer.displayName,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             },
             supportingContent = {
-                Column {
-                    Text(
-                        text = item.artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = when (item.status) {
-                            DownloadStatus.PENDING -> "Pending"
-                            DownloadStatus.DOWNLOADING -> "Downloading..."
-                            DownloadStatus.COMPLETED -> "Completed"
-                            DownloadStatus.FAILED -> "Failed"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = when (item.status) {
-                            DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.primary
-                            DownloadStatus.FAILED -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                }
-            },
-            leadingContent = {
-                Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = MaterialTheme.shapes.small,
-                    color = when (item.status) {
-                        DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.primaryContainer
-                        DownloadStatus.FAILED -> MaterialTheme.colorScheme.errorContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = when (item.status) {
-                                DownloadStatus.PENDING -> Icons.Default.HourglassEmpty
-                                DownloadStatus.DOWNLOADING -> Icons.Default.Download
-                                DownloadStatus.COMPLETED -> Icons.Default.Check
-                                DownloadStatus.FAILED -> Icons.Default.ErrorOutline
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TransferStateBadge(state = transfer.state)
+                    if (transfer.state.equals("Transferring", ignoreCase = true)) {
+                        Text(
+                            text = buildString {
+                                if (transfer.speedMbps.isNotEmpty()) append(transfer.speedMbps)
+                                append(" \u00b7 ${transfer.progress.toInt()}%")
+                                transfer.etaSeconds?.let { append(" \u00b7 ETA ${it}s") }
                             },
-                            contentDescription = null,
-                            tint = when (item.status) {
-                                DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.onPrimaryContainer
-                                DownloadStatus.FAILED -> MaterialTheme.colorScheme.onErrorContainer
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    transfer.error?.let { err ->
+                        Text(
+                            text = err,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             },
             trailingContent = {
-                if (item.status == DownloadStatus.FAILED) {
-                    IconButton(onClick = onRetry) {
+                val isActive = transfer.state.equals("Queued", ignoreCase = true) ||
+                        transfer.state.equals("Transferring", ignoreCase = true)
+                if (isActive) {
+                    IconButton(onClick = onCancel) {
                         Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Retry",
+                            Icons.Default.Cancel,
+                            contentDescription = "Cancel",
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
@@ -503,14 +619,139 @@ private fun QueueItemRow(
             }
         )
 
-        AnimatedVisibility(visible = item.status == DownloadStatus.DOWNLOADING) {
+        AnimatedVisibility(visible = transfer.state.equals("Transferring", ignoreCase = true)) {
             LinearProgressIndicator(
-                progress = { item.progress },
+                progress = { transfer.progress / 100f },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 8.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun TransferStateBadge(state: String) {
+    val (containerColor, contentColor) = when (state.lowercase()) {
+        "queued" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        "transferring" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+        "completed" -> Color(0xFF2E7D32) to Color.White
+        "failed", "denied" -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    SuggestionChip(
+        onClick = {},
+        label = { Text(state, style = MaterialTheme.typography.labelSmall) },
+        colors = SuggestionChipDefaults.suggestionChipColors(
+            containerColor = containerColor,
+            labelColor = contentColor
+        ),
+        modifier = Modifier.height(24.dp)
+    )
+}
+
+// endregion
+
+// region History Tab
+
+@Composable
+private fun HistoryTab(
+    history: List<JobInfo>,
+    isLoading: Boolean
+) {
+    when {
+        isLoading -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+
+        history.isEmpty() -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No download history",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        else -> {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                items(history, key = { it.id }) { job ->
+                    val statusColor = when (job.status.lowercase()) {
+                        "completed", "complete" -> Color(0xFF2E7D32)
+                        "failed", "error" -> MaterialTheme.colorScheme.error
+                        "running", "in_progress" -> Color(0xFFED6C02)
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = job.type.replace("_", " ").replaceFirstChar { it.uppercase() },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        supportingContent = {
+                            Column {
+                                Text(
+                                    text = job.status.replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = statusColor
+                                )
+                                job.createdAt?.let { date ->
+                                    Text(
+                                        text = date,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        },
+                        leadingContent = {
+                            Surface(
+                                modifier = Modifier.size(40.dp),
+                                shape = MaterialTheme.shapes.small,
+                                color = statusColor.copy(alpha = 0.12f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = when (job.status.lowercase()) {
+                                            "completed", "complete" -> Icons.Default.Check
+                                            "failed", "error" -> Icons.Default.ErrorOutline
+                                            "running", "in_progress" -> Icons.Default.Sync
+                                            else -> Icons.Default.Schedule
+                                        },
+                                        contentDescription = null,
+                                        tint = statusColor
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+            }
         }
     }
 }

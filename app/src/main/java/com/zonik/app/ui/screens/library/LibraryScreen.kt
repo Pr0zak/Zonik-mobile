@@ -1,6 +1,8 @@
 package com.zonik.app.ui.screens.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -8,8 +10,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,7 +39,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    private val libraryRepository: LibraryRepository
+    private val libraryRepository: LibraryRepository,
+    private val playbackManager: PlaybackManager
 ) : ViewModel() {
 
     val artists = libraryRepository.getArtists()
@@ -65,6 +67,32 @@ class LibraryViewModel @Inject constructor(
     init {
         loadGenres()
         loadPlaylists()
+    }
+
+    fun playTrack(track: Track) {
+        playbackManager.playTracks(listOf(track), 0)
+    }
+
+    fun playAllTracks() {
+        val allTracks = tracks.value
+        if (allTracks.isNotEmpty()) {
+            playbackManager.playTracks(allTracks, startIndex = 0)
+        }
+    }
+
+    fun shuffleAllTracks() {
+        val allTracks = tracks.value
+        if (allTracks.isNotEmpty()) {
+            playbackManager.playTracks(allTracks.shuffled(), startIndex = 0)
+        }
+    }
+
+    fun playNext(track: Track) {
+        playbackManager.playNext(track)
+    }
+
+    fun addToQueue(track: Track) {
+        playbackManager.addToQueue(track)
     }
 
     private fun loadGenres() {
@@ -95,9 +123,9 @@ class LibraryViewModel @Inject constructor(
 }
 
 private enum class LibraryTab(val label: String) {
-    ARTISTS("Artists"),
-    ALBUMS("Albums"),
     TRACKS("Tracks"),
+    ALBUMS("Albums"),
+    ARTISTS("Artists"),
     GENRES("Genres"),
     PLAYLISTS("Playlists")
 }
@@ -149,7 +177,14 @@ fun LibraryScreen(
                     albums = albums,
                     onAlbumClick = onNavigateToAlbum
                 )
-                LibraryTab.TRACKS -> TracksTab(tracks = tracks)
+                LibraryTab.TRACKS -> TracksTab(
+                    tracks = tracks,
+                    onPlayTrack = viewModel::playTrack,
+                    onPlayAll = viewModel::playAllTracks,
+                    onShuffleAll = viewModel::shuffleAllTracks,
+                    onPlayNext = viewModel::playNext,
+                    onAddToQueue = viewModel::addToQueue
+                )
                 LibraryTab.GENRES -> GenresTab(
                     genres = genres,
                     isLoading = isLoadingGenres
@@ -318,8 +353,16 @@ private fun GenresTab(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TracksTab(tracks: List<Track>) {
+private fun TracksTab(
+    tracks: List<Track>,
+    onPlayTrack: (Track) -> Unit,
+    onPlayAll: () -> Unit,
+    onShuffleAll: () -> Unit,
+    onPlayNext: (Track) -> Unit,
+    onAddToQueue: (Track) -> Unit
+) {
     if (tracks.isEmpty()) {
         EmptyState(message = "No tracks found")
         return
@@ -329,32 +372,139 @@ private fun TracksTab(tracks: List<Track>) {
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
+        // Play All / Shuffle button row
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = onPlayAll,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Play All")
+                }
+                FilledTonalButton(
+                    onClick = onShuffleAll,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Shuffle")
+                }
+            }
+        }
+
         items(tracks, key = { it.id }) { track ->
-            ListItem(
-                headlineContent = {
-                    Text(
-                        text = track.title,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+            var showMenu by remember { mutableStateOf(false) }
+
+            Box {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = track.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = "${track.artist} · ${track.album}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingContent = {
+                        CoverArt(
+                            coverArtId = track.coverArt,
+                            contentDescription = track.title,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    },
+                    trailingContent = {
+                        Column(horizontalAlignment = Alignment.End) {
+                            val min = track.duration / 60
+                            val sec = track.duration % 60
+                            Text(
+                                text = "%d:%02d".format(min, sec),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            track.suffix?.uppercase()?.let { fmt ->
+                                Surface(
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                ) {
+                                    Text(
+                                        text = fmt,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.combinedClickable(
+                        onClick = { onPlayTrack(track) },
+                        onLongClick = { showMenu = true }
                     )
-                },
-                supportingContent = {
-                    Text(
-                        text = "${track.artist} \u00b7 ${track.album}",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                )
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Play") },
+                        onClick = {
+                            showMenu = false
+                            onPlayTrack(track)
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        }
                     )
-                },
-                trailingContent = {
-                    val min = track.duration / 60
-                    val sec = track.duration % 60
-                    Text(
-                        text = "%d:%02d".format(min, sec),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    DropdownMenuItem(
+                        text = { Text("Play Next") },
+                        onClick = {
+                            showMenu = false
+                            onPlayNext(track)
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.QueuePlayNext, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Add to Queue") },
+                        onClick = {
+                            showMenu = false
+                            onAddToQueue(track)
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.AddToQueue, contentDescription = null)
+                        }
                     )
                 }
-            )
+            }
+        }
+
+        // Bottom spacing for mini player
+        item {
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }

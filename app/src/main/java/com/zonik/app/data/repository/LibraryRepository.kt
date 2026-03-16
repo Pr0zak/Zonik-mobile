@@ -33,6 +33,11 @@ class LibraryRepository @Inject constructor(
             entities.map { it.toDomain() }
         }
 
+    fun getRecentTracks(limit: Int = 20): Flow<List<Track>> =
+        database.trackDao().getRecent(limit).map { entities ->
+            entities.map { it.toDomain() }
+        }
+
     fun getAllTracks(): Flow<List<Track>> =
         database.trackDao().getAll().map { entities ->
             entities.map { it.toDomain() }

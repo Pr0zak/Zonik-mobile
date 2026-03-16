@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,6 +21,7 @@ import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Album
 import com.zonik.app.model.Artist
 import com.zonik.app.model.Track
+import com.zonik.app.ui.components.CoverArt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -296,11 +295,10 @@ private fun ArtistRow(artist: Artist, onClick: () -> Unit) {
             Text(text = "${artist.albumCount} album${if (artist.albumCount != 1) "s" else ""}")
         },
         leadingContent = {
-            Icon(
-                Icons.Default.Person,
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            CoverArt(
+                coverArtId = artist.coverArt,
+                contentDescription = artist.name,
+                modifier = Modifier.size(40.dp)
             )
         },
         modifier = Modifier.clickable(onClick = onClick)
@@ -317,19 +315,11 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
             Text(text = album.artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         leadingContent = {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.small
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.Album,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            CoverArt(
+                coverArtId = album.coverArt,
+                contentDescription = album.name,
+                modifier = Modifier.size(40.dp)
+            )
         },
         modifier = Modifier.clickable(onClick = onClick)
     )

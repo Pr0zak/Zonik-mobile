@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
@@ -41,6 +42,9 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     val recentAlbums = libraryRepository.getRecentAlbums()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val recentTracks = libraryRepository.getRecentTracks(limit = 10)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val recentlyPlayed = playbackManager.recentlyPlayed
@@ -93,8 +97,12 @@ class HomeViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(
+    onNavigateToLibraryTracks: (() -> Unit)? = null,
+    viewModel: HomeViewModel = hiltViewModel()
+) {
     val recentAlbums by viewModel.recentAlbums.collectAsState()
+    val recentTracks by viewModel.recentTracks.collectAsState()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
 
@@ -155,6 +163,20 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 }
             }
 
+            // All Tracks button
+            if (onNavigateToLibraryTracks != null) {
+                OutlinedButton(
+                    onClick = onNavigateToLibraryTracks,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.MusicNote, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("All Tracks")
+                }
+            }
+
             // Recently Added
             Text(
                 text = "Recently Added",
@@ -191,6 +213,53 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     items(recentAlbums, key = { it.id }) { album ->
                         AlbumCard(album = album)
                     }
+                }
+            }
+
+            // Recent Tracks
+            if (recentTracks.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Recent Tracks",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+
+                recentTracks.forEach { track ->
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = track.title,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = "${track.artist} \u00b7 ${track.album}",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        leadingContent = {
+                            CoverArt(
+                                coverArtId = track.coverArt,
+                                contentDescription = track.title,
+                                modifier = Modifier.size(48.dp)
+                            )
+                        },
+                        trailingContent = {
+                            val min = track.duration / 60
+                            val sec = track.duration % 60
+                            Text(
+                                text = "%d:%02d".format(min, sec),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        modifier = Modifier.clickable { viewModel.playTrack(track) }
+                    )
                 }
             }
 

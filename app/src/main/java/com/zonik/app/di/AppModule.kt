@@ -3,6 +3,7 @@ package com.zonik.app.di
 import android.content.Context
 import com.zonik.app.data.api.SubsonicApi
 import com.zonik.app.data.api.SubsonicAuthInterceptor
+import com.zonik.app.data.api.ZonikApi
 import com.zonik.app.data.db.ZonikDatabase
 import com.zonik.app.data.repository.SettingsRepository
 import dagger.Module
@@ -91,6 +92,20 @@ object AppModule {
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(SubsonicApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideZonikApi(
+        client: OkHttpClient,
+        json: Json
+    ): ZonikApi {
+        return Retrofit.Builder()
+            .baseUrl("http://localhost/")
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+            .create(ZonikApi::class.java)
     }
 
     @Provides

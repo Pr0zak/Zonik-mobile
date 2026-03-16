@@ -225,7 +225,17 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(MainTab.Home.route) {
-                HomeScreen()
+                HomeScreen(
+                    onNavigateToLibraryTracks = {
+                        tabNavController.navigate(MainTab.Library.route) {
+                            popUpTo(tabNavController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
             composable(MainTab.Library.route) {
                 LibraryScreen(

@@ -9,7 +9,9 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
@@ -26,8 +28,11 @@ import com.zonik.app.model.Genre
 import com.zonik.app.model.Playlist
 import com.zonik.app.model.Track
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import java.security.MessageDigest
 import javax.inject.Inject
 
 @OptIn(UnstableApi::class)
@@ -36,6 +41,7 @@ class ZonikMediaService : MediaLibraryService() {
 
     @Inject lateinit var libraryRepository: LibraryRepository
     @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var okHttpClient: OkHttpClient
 
     private var mediaLibrarySession: MediaLibrarySession? = null
 
@@ -73,7 +79,11 @@ class ZonikMediaService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
 
+        val dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
         val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -121,7 +131,25 @@ class ZonikMediaService : MediaLibraryService() {
     private fun coverArtUri(coverArtId: String?): Uri? {
         if (coverArtId == null) return null
         val serverUrl = getServerUrl() ?: return null
-        return Uri.parse("$serverUrl/rest/getCoverArt.view?id=$coverArtId&size=300")
+        return Uri.parse(buildAuthenticatedUrl(
+            "$serverUrl/rest/getCoverArt.view?id=$coverArtId&size=300"
+        ))
+    }
+
+    private fun buildAuthenticatedUrl(baseUrl: String): String {
+        val config = runBlocking {
+            settingsRepository.serverConfig.first()
+        } ?: return baseUrl
+        val salt = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }.joinToString("")
+        val token = md5("${config.apiKey}$salt")
+        val separator = if (baseUrl.contains('?')) '&' else '?'
+        return "${baseUrl}${separator}u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp&f=json"
+    }
+
+    private fun md5(input: String): String {
+        val digest = MessageDigest.getInstance("MD5")
+        val bytes = digest.digest(input.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     private fun gridExtras(): Bundle = Bundle().apply {

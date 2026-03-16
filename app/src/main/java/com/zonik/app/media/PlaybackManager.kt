@@ -15,6 +15,7 @@ import com.zonik.app.model.Track
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.flow.*
+import java.security.MessageDigest
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -137,7 +138,7 @@ class PlaybackManager @Inject constructor(
         val bitrateParam = if (bitrate > 0) "&maxBitRate=$bitrate" else ""
         val streamUrl = "${serverUrl.trimEnd('/')}/rest/stream.view?id=${track.id}${bitrateParam}&estimateContentLength=true"
         val artUrl = track.coverArt?.let {
-            "${serverUrl.trimEnd('/')}/rest/getCoverArt.view?id=$it&size=600"
+            buildArtworkUrl(it, serverUrl)
         }
 
         return MediaItem.Builder()
@@ -153,6 +154,21 @@ class PlaybackManager @Inject constructor(
                     .build()
             )
             .build()
+    }
+
+    private fun buildArtworkUrl(coverArtId: String, serverUrl: String): String {
+        val config = kotlinx.coroutines.runBlocking {
+            settingsRepository.serverConfig.first()
+        } ?: return ""
+        val salt = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }.joinToString("")
+        val token = md5("${config.apiKey}$salt")
+        return "${serverUrl.trimEnd('/')}/rest/getCoverArt.view?id=$coverArtId&size=600&u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp&f=json"
+    }
+
+    private fun md5(input: String): String {
+        val digest = MessageDigest.getInstance("MD5")
+        val bytes = digest.digest(input.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     private fun updateCurrentTrack(mediaItem: MediaItem?) {
