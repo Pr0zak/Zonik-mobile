@@ -73,6 +73,18 @@ class PlaybackManager @Inject constructor(
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 DebugLog.e("Playback", "Player error: ${error.errorCodeName} - ${error.message}")
+                DebugLog.e("Playback", "Error cause: ${error.cause?.message}")
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                val state = when (playbackState) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "UNKNOWN($playbackState)"
+                }
+                DebugLog.d("Playback", "State: $state")
             }
         })
     }
