@@ -219,12 +219,13 @@ class PlaybackManager @Inject constructor(
     }
 
     fun skipToIndex(index: Int) {
-        if (index in _queue.value.indices) {
-            updateCurrentTrackByIndex(index)
-        }
         val ctrl = controller ?: return
         if (index in 0 until ctrl.mediaItemCount) {
-            ctrl.seekTo(index, 0)
+            _pendingStartIndex = -1  // Clear any pending correction
+            ctrl.seekToDefaultPosition(index)
+        }
+        if (index in _queue.value.indices) {
+            updateCurrentTrackByIndex(index)
         }
     }
 
