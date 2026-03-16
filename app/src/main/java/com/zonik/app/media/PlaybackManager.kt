@@ -151,11 +151,23 @@ class PlaybackManager @Inject constructor(
     }
 
     fun skipNext() {
-        controller?.seekToNextMediaItem()
+        val ctrl = controller
+        if (ctrl == null) {
+            DebugLog.w("Playback", "skipNext: controller is null")
+            return
+        }
+        DebugLog.d("Playback", "skipNext: index=${ctrl.currentMediaItemIndex}, count=${ctrl.mediaItemCount}")
+        ctrl.seekToNext()
     }
 
     fun skipPrevious() {
-        controller?.seekToPreviousMediaItem()
+        val ctrl = controller
+        if (ctrl == null) {
+            DebugLog.w("Playback", "skipPrevious: controller is null")
+            return
+        }
+        DebugLog.d("Playback", "skipPrevious: index=${ctrl.currentMediaItemIndex}, count=${ctrl.mediaItemCount}")
+        ctrl.seekToPrevious()
     }
 
     fun setShuffleEnabled(enabled: Boolean) {
