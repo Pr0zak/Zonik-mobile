@@ -113,18 +113,19 @@ class LibraryRepository @Inject constructor(
         return response.response.randomSongs?.song?.map { it.toDomain() } ?: emptyList()
     }
 
-    suspend fun syncArtists() {
+    suspend fun syncArtists(): Int {
         val response = api.getArtists()
         val artists = response.response.artists?.index?.flatMap { index ->
             index.artist.map { it.toDomain() }
-        } ?: return
+        } ?: return 0
 
         val entities = artists.map { ArtistEntity.fromDomain(it) }
         database.artistDao().upsertAll(entities)
         database.artistDao().deleteNotIn(entities.map { it.id })
+        return entities.size
     }
 
-    suspend fun syncAlbums() {
+    suspend fun syncAlbums(onProgress: (fetched: Int) -> Unit = {}): Int {
         val allAlbums = mutableListOf<SubsonicAlbum>()
         var offset = 0
         while (true) {
@@ -133,11 +134,53 @@ class LibraryRepository @Inject constructor(
             if (albums.isEmpty()) break
             allAlbums.addAll(albums)
             offset += albums.size
+            onProgress(allAlbums.size)
         }
 
         val entities = allAlbums.map { AlbumEntity.fromDomain(it.toDomain()) }
         database.albumDao().upsertAll(entities)
         database.albumDao().deleteNotIn(entities.map { it.id })
+        return entities.size
+    }
+
+    suspend fun syncPlaylists(): Int {
+        val playlists = getPlaylists()
+        return playlists.size
+    }
+
+    suspend fun syncAlbumTracks(albumId: String): Int {
+        val response = api.getAlbum(albumId)
+        val tracks = response.response.album?.song?.map { it.toDomain() } ?: return 0
+        database.trackDao().upsertAll(tracks.map { TrackEntity.fromDomain(it) })
+        return tracks.size
+    }
+
+    suspend fun syncAllTracks(onProgress: (albumsDone: Int, totalAlbums: Int, tracksSoFar: Int) -> Unit = { _, _, _ -> }): Int {
+        // Get all album IDs from local DB
+        val response = api.getArtists()
+        val allAlbumIds = mutableListOf<String>()
+
+        // Collect album IDs from all artists
+        response.response.artists?.index?.forEach { index ->
+            index.artist.forEach { artist ->
+                try {
+                    val artistResponse = api.getArtist(artist.id)
+                    artistResponse.response.artist?.album?.forEach { album ->
+                        allAlbumIds.add(album.id)
+                    }
+                } catch (_: Exception) { }
+            }
+        }
+
+        var totalTracks = 0
+        allAlbumIds.forEachIndexed { i, albumId ->
+            try {
+                val count = syncAlbumTracks(albumId)
+                totalTracks += count
+                onProgress(i + 1, allAlbumIds.size, totalTracks)
+            } catch (_: Exception) { }
+        }
+        return totalTracks
     }
 
     suspend fun fullSync() {

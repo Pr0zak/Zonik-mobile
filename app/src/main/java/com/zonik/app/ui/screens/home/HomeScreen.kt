@@ -177,11 +177,20 @@ private fun SyncBanner(syncState: SyncState) {
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = syncState.status,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                Column {
+                    Text(
+                        text = syncState.phase,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    if (syncState.detail.isNotEmpty()) {
+                        Text(
+                            text = syncState.detail,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             }
         }
     }
