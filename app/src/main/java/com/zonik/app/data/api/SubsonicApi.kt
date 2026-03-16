@@ -29,8 +29,11 @@ interface SubsonicApi {
     suspend fun search3(
         @Query("query") query: String,
         @Query("artistCount") artistCount: Int = 20,
+        @Query("artistOffset") artistOffset: Int = 0,
         @Query("albumCount") albumCount: Int = 20,
-        @Query("songCount") songCount: Int = 50
+        @Query("albumOffset") albumOffset: Int = 0,
+        @Query("songCount") songCount: Int = 50,
+        @Query("songOffset") songOffset: Int = 0
     ): SearchResponse
 
     @GET("rest/getRandomSongs.view")

@@ -31,51 +31,48 @@ class SyncManager @Inject constructor(
         if (_syncState.value.isSyncing) return
 
         _syncState.value = SyncState(isSyncing = true, phase = "Syncing artists...")
-        DebugLog.d("Sync", "Starting full sync")
+        DebugLog.d("Sync", "Starting full sync (search3 method)")
 
         try {
-            // Artists
-            val artistCount = libraryRepository.syncArtists()
+            // Artists via search3 empty query
+            val artistCount = libraryRepository.syncArtists { fetched ->
+                _syncState.value = _syncState.value.copy(
+                    detail = "$fetched artists fetched..."
+                )
+            }
             DebugLog.d("Sync", "Artists synced: $artistCount")
+
+            // Albums via search3 empty query
             _syncState.value = _syncState.value.copy(
                 phase = "Syncing albums...",
-                detail = "$artistCount artists synced",
                 artistCount = artistCount
             )
-
-            // Albums
-            var albumCount = 0
-            libraryRepository.syncAlbums { fetched ->
-                albumCount = fetched
+            val albumCount = libraryRepository.syncAlbums { fetched ->
                 _syncState.value = _syncState.value.copy(
                     detail = "$artistCount artists \u00b7 $fetched albums fetched..."
                 )
             }
+            DebugLog.d("Sync", "Albums synced: $albumCount")
+
+            // Tracks via search3 empty query (bulk, not per-album)
             _syncState.value = _syncState.value.copy(
                 phase = "Syncing tracks...",
-                detail = "$artistCount artists \u00b7 $albumCount albums",
                 albumCount = albumCount
             )
-
-            // Tracks (per album)
-            var trackCount = 0
-            libraryRepository.syncAllTracks { albumsDone, totalAlbums, tracks ->
-                trackCount = tracks
+            val trackCount = libraryRepository.syncAllTracks { fetched ->
                 _syncState.value = _syncState.value.copy(
-                    detail = "Albums $albumsDone/$totalAlbums \u00b7 $tracks tracks"
+                    detail = "$artistCount artists \u00b7 $albumCount albums \u00b7 $fetched tracks fetched..."
                 )
             }
-            _syncState.value = _syncState.value.copy(
-                phase = "Syncing playlists...",
-                detail = "$artistCount artists \u00b7 $albumCount albums \u00b7 $trackCount tracks",
-                trackCount = trackCount
-            )
+            DebugLog.d("Sync", "Tracks synced: $trackCount")
 
             // Playlists
-            val playlistCount = libraryRepository.syncPlaylists()
             _syncState.value = _syncState.value.copy(
-                playlistCount = playlistCount
+                phase = "Syncing playlists...",
+                trackCount = trackCount
             )
+            val playlistCount = libraryRepository.syncPlaylists()
+            DebugLog.d("Sync", "Playlists synced: $playlistCount")
 
             settingsRepository.updateLastSyncTime(System.currentTimeMillis())
 
@@ -90,12 +87,11 @@ class SyncManager @Inject constructor(
                 lastSyncResult = "Sync complete: $summary"
             )
         } catch (e: Exception) {
+            DebugLog.e("Sync", "Sync failed", e)
             _syncState.value = _syncState.value.copy(
                 isSyncing = false,
                 error = e.message ?: "Sync failed",
-                lastSyncResult = "Sync failed: ${e.message}".also {
-                    DebugLog.e("Sync", "Sync failed", e)
-                }
+                lastSyncResult = "Sync failed: ${e.message}"
             )
         }
     }

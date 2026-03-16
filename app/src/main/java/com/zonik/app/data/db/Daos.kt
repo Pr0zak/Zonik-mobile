@@ -47,6 +47,9 @@ interface AlbumDao {
 
 @Dao
 interface TrackDao {
+    @Query("SELECT * FROM tracks ORDER BY title COLLATE NOCASE")
+    fun getAll(): Flow<List<TrackEntity>>
+
     @Query("SELECT * FROM tracks WHERE albumId = :albumId ORDER BY track")
     fun getByAlbum(albumId: String): Flow<List<TrackEntity>>
 

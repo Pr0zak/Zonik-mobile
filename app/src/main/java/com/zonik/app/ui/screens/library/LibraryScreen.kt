@@ -25,6 +25,7 @@ import com.zonik.app.model.Album
 import com.zonik.app.model.Artist
 import com.zonik.app.model.Genre
 import com.zonik.app.model.Playlist
+import com.zonik.app.model.Track
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -43,6 +44,9 @@ class LibraryViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val albums = libraryRepository.getAlbums()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val tracks = libraryRepository.getAllTracks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _genres = MutableStateFlow<List<Genre>>(emptyList())
@@ -92,6 +96,7 @@ class LibraryViewModel @Inject constructor(
 private enum class LibraryTab(val label: String) {
     ARTISTS("Artists"),
     ALBUMS("Albums"),
+    TRACKS("Tracks"),
     GENRES("Genres"),
     PLAYLISTS("Playlists")
 }
@@ -105,6 +110,7 @@ fun LibraryScreen(
 ) {
     val artists by viewModel.artists.collectAsState()
     val albums by viewModel.albums.collectAsState()
+    val tracks by viewModel.tracks.collectAsState()
     val genres by viewModel.genres.collectAsState()
     val isLoadingGenres by viewModel.isLoadingGenres.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
@@ -123,7 +129,7 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            TabRow(selectedTabIndex = selectedTab) {
+            ScrollableTabRow(selectedTabIndex = selectedTab, edgePadding = 0.dp) {
                 tabs.forEachIndexed { index, tab ->
                     Tab(
                         selected = selectedTab == index,
@@ -142,6 +148,7 @@ fun LibraryScreen(
                     albums = albums,
                     onAlbumClick = onNavigateToAlbum
                 )
+                LibraryTab.TRACKS -> TracksTab(tracks = tracks)
                 LibraryTab.GENRES -> GenresTab(
                     genres = genres,
                     isLoading = isLoadingGenres
@@ -320,6 +327,47 @@ private fun GenresTab(
                     Text(
                         text = "${genre.songCount} song${if (genre.songCount != 1) "s" else ""} \u00b7 " +
                             "${genre.albumCount} album${if (genre.albumCount != 1) "s" else ""}"
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TracksTab(tracks: List<Track>) {
+    if (tracks.isEmpty()) {
+        EmptyState(message = "No tracks found")
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 8.dp)
+    ) {
+        items(tracks, key = { it.id }) { track ->
+            ListItem(
+                headlineContent = {
+                    Text(
+                        text = track.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                supportingContent = {
+                    Text(
+                        text = "${track.artist} \u00b7 ${track.album}",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                trailingContent = {
+                    val min = track.duration / 60
+                    val sec = track.duration % 60
+                    Text(
+                        text = "%d:%02d".format(min, sec),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             )
