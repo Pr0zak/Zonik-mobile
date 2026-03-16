@@ -79,6 +79,7 @@ class ZonikMediaService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
 
+        com.zonik.app.data.DebugLog.d("MediaService", "onCreate — setting up ExoPlayer with OkHttpDataSource")
         val dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
@@ -93,6 +94,27 @@ class ZonikMediaService : MediaLibraryService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .build()
+
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                com.zonik.app.data.DebugLog.e("MediaService", "ExoPlayer error: ${error.errorCodeName} - ${error.message}")
+                com.zonik.app.data.DebugLog.e("MediaService", "Cause: ${error.cause?.javaClass?.simpleName}: ${error.cause?.message}")
+                error.cause?.cause?.let {
+                    com.zonik.app.data.DebugLog.e("MediaService", "Root cause: ${it.javaClass.simpleName}: ${it.message}")
+                }
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                val state = when (playbackState) {
+                    androidx.media3.common.Player.STATE_IDLE -> "IDLE"
+                    androidx.media3.common.Player.STATE_BUFFERING -> "BUFFERING"
+                    androidx.media3.common.Player.STATE_READY -> "READY"
+                    androidx.media3.common.Player.STATE_ENDED -> "ENDED"
+                    else -> "UNKNOWN"
+                }
+                com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer state: $state")
+            }
+        })
 
         val callback = BrowseTreeCallback()
 
