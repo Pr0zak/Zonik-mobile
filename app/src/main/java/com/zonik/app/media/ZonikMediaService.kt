@@ -287,6 +287,27 @@ class ZonikMediaService : MediaLibraryService() {
 
     private inner class BrowseTreeCallback : MediaLibrarySession.Callback {
 
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>
+        ): ListenableFuture<MutableList<MediaItem>> {
+            // Resolve media items from controller — set the URI from requestMetadata or mediaId
+            val resolved = mediaItems.map { item ->
+                if (item.localConfiguration != null) {
+                    // Already has a URI, pass through
+                    item
+                } else {
+                    // Build from mediaId or requestMetadata
+                    item.buildUpon()
+                        .setUri(item.requestMetadata.mediaUri ?: android.net.Uri.parse(item.mediaId))
+                        .build()
+                }
+            }.toMutableList()
+            com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: ${resolved.size} items, first URI: ${resolved.firstOrNull()?.localConfiguration?.uri}")
+            return Futures.immediateFuture(resolved)
+        }
+
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
