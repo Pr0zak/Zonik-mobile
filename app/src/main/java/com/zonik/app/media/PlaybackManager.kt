@@ -12,6 +12,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.zonik.app.data.DebugLog
 import com.zonik.app.data.repository.SettingsRepository
+import com.zonik.app.model.ServerConfig
 import com.zonik.app.model.Track
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.google.common.util.concurrent.MoreExecutors
@@ -122,7 +123,8 @@ class PlaybackManager @Inject constructor(
             DebugLog.e("Playback", "playTracks called but controller is null!")
             return
         }
-        val serverUrl = getServerUrl()
+        val config = getServerConfig() ?: return
+        val serverUrl = config.url
         _queue.value = tracks
         // Set current track immediately for instant UI update (don't wait for ExoPlayer callback)
         if (startIndex in tracks.indices) {
@@ -130,7 +132,7 @@ class PlaybackManager @Inject constructor(
         }
 
         val mediaItems = tracks.map { track ->
-            buildMediaItem(track, serverUrl)
+            buildMediaItem(track, serverUrl, config)
         }
 
         _playbackRequested.tryEmit(Unit)
@@ -148,9 +150,9 @@ class PlaybackManager @Inject constructor(
 
     fun playNext(track: Track) {
         val ctrl = controller ?: return
-        val serverUrl = getServerUrl()
+        val config = getServerConfig() ?: return
         val nextIndex = ctrl.currentMediaItemIndex + 1
-        ctrl.addMediaItem(nextIndex, buildMediaItem(track, serverUrl))
+        ctrl.addMediaItem(nextIndex, buildMediaItem(track, config.url, config))
 
         val updatedQueue = _queue.value.toMutableList()
         updatedQueue.add(nextIndex, track)
@@ -159,8 +161,8 @@ class PlaybackManager @Inject constructor(
 
     fun addToQueue(track: Track) {
         val ctrl = controller ?: return
-        val serverUrl = getServerUrl()
-        ctrl.addMediaItem(buildMediaItem(track, serverUrl))
+        val config = getServerConfig() ?: return
+        ctrl.addMediaItem(buildMediaItem(track, config.url, config))
 
         _queue.value = _queue.value + track
     }
@@ -210,15 +212,14 @@ class PlaybackManager @Inject constructor(
         controller = null
     }
 
-    private fun buildMediaItem(track: Track, serverUrl: String): MediaItem {
+    private fun buildMediaItem(track: Track, serverUrl: String, config: ServerConfig): MediaItem {
         val bitrate = getMaxBitRate()
         val bitrateParam = if (bitrate > 0) "&maxBitRate=$bitrate" else ""
-        val authParams = buildAuthParams()
+        val authParams = buildAuthParamsFromConfig(config)
         val streamUrl = "${serverUrl.trimEnd('/')}/rest/stream.view?id=${track.id}${bitrateParam}&estimateContentLength=true$authParams"
         val artUrl = track.coverArt?.let {
-            buildArtworkUrl(it, serverUrl)
+            "${serverUrl.trimEnd('/')}/rest/getCoverArt.view?id=$it&size=600$authParams"
         }
-        DebugLog.d("Playback", "Built stream URL with auth: ${streamUrl.take(120)}...")
 
         return MediaItem.Builder()
             .setMediaId(track.id)
@@ -240,23 +241,10 @@ class PlaybackManager @Inject constructor(
             .build()
     }
 
-    private fun buildAuthParams(): String {
-        val config = kotlinx.coroutines.runBlocking {
-            settingsRepository.serverConfig.first()
-        } ?: return ""
+    private fun buildAuthParamsFromConfig(config: ServerConfig): String {
         val salt = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }.joinToString("")
         val token = md5("${config.apiKey}$salt")
-        // Note: no f=json here — stream/getCoverArt return raw binary, not JSON
         return "&u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp"
-    }
-
-    private fun buildArtworkUrl(coverArtId: String, serverUrl: String): String {
-        val config = kotlinx.coroutines.runBlocking {
-            settingsRepository.serverConfig.first()
-        } ?: return ""
-        val salt = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }.joinToString("")
-        val token = md5("${config.apiKey}$salt")
-        return "${serverUrl.trimEnd('/')}/rest/getCoverArt.view?id=$coverArtId&size=600&u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp"
     }
 
     private fun md5(input: String): String {
@@ -278,9 +266,9 @@ class PlaybackManager @Inject constructor(
         addToRecentlyPlayed(track)
     }
 
-    private fun getServerUrl(): String {
+    private fun getServerConfig(): ServerConfig? {
         return kotlinx.coroutines.runBlocking {
-            settingsRepository.serverConfig.first()?.url ?: ""
+            settingsRepository.serverConfig.first()
         }
     }
 

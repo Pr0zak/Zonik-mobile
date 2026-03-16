@@ -139,14 +139,15 @@ fun HomeScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(28.dp)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF1A1A2E))
+                                .background(Color(0xFF1A1A2E)),
+                            contentAlignment = Alignment.Center
                         ) {
                             Image(
-                                painter = painterResource(R.drawable.ic_launcher_foreground),
+                                painter = painterResource(R.drawable.ic_logo_z),
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))
