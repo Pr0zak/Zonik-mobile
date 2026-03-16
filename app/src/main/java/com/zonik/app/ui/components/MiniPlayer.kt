@@ -63,7 +63,7 @@ fun MiniPlayer(
         while (isActive) {
             position = viewModel.getCurrentPosition()
             duration = viewModel.getDuration()
-            delay(500)
+            delay(200)
         }
     }
 

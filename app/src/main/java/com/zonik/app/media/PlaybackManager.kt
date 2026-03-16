@@ -15,7 +15,12 @@ import com.zonik.app.data.repository.SettingsRepository
 import com.zonik.app.model.Track
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.google.common.util.concurrent.MoreExecutors
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import java.security.MessageDigest
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -41,6 +46,9 @@ class PlaybackManager @Inject constructor(
 
     private val _recentlyPlayed = MutableStateFlow<List<Track>>(emptyList())
     val recentlyPlayed: StateFlow<List<Track>> = _recentlyPlayed.asStateFlow()
+
+    private val _playbackRequested = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val playbackRequested: Flow<Unit> = _playbackRequested
 
     suspend fun connect() {
         if (controller != null) return
@@ -97,11 +105,16 @@ class PlaybackManager @Inject constructor(
         }
         val serverUrl = getServerUrl()
         _queue.value = tracks
+        // Set current track immediately for instant UI update (don't wait for ExoPlayer callback)
+        if (startIndex in tracks.indices) {
+            _currentTrack.value = tracks[startIndex]
+        }
 
         val mediaItems = tracks.map { track ->
             buildMediaItem(track, serverUrl)
         }
 
+        _playbackRequested.tryEmit(Unit)
         DebugLog.d("Playback", "Playing ${tracks.size} tracks from index $startIndex")
         DebugLog.d("Playback", "Stream URL: ${mediaItems.firstOrNull()?.localConfiguration?.uri}")
         ctrl.setMediaItems(mediaItems, startIndex, 0)

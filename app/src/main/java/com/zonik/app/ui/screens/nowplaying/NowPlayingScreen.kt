@@ -190,14 +190,14 @@ fun NowPlayingScreen(
         } catch (_: Exception) {}
     }
 
-    // Position polling
+    // Position polling — 100ms for smooth seek bar
     LaunchedEffect(isPlaying, currentTrack) {
         while (true) {
             if (!isSeeking) {
                 positionMs = viewModel.getCurrentPosition()
                 durationMs = viewModel.getDuration()
             }
-            delay(200L)
+            delay(100L)
         }
     }
 
