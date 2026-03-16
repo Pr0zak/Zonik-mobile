@@ -6,18 +6,18 @@
     android:viewportHeight="108">
     <!-- Bold Z letterform -->
     <path
-        android:fillColor="#00BFA5"
+        android:fillColor="#7C4DFF"
         android:pathData="M33,30 L75,30 L75,40 L50,66 L75,66 L75,78 L33,78 L33,68 L58,42 L33,42 Z"/>
     <!-- Sound wave accent arc 1 -->
     <path
         android:fillColor="#00000000"
         android:strokeWidth="2.5"
-        android:strokeColor="#4DD0E1"
+        android:strokeColor="#00E5FF"
         android:pathData="M78,48 Q82,54 78,60"/>
     <!-- Sound wave accent arc 2 -->
     <path
         android:fillColor="#00000000"
         android:strokeWidth="2"
-        android:strokeColor="#4DD0E1"
+        android:strokeColor="#00E5FF"
         android:pathData="M83,44 Q89,54 83,64"/>
 </vector>
