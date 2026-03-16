@@ -88,6 +88,17 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    val githubToken: Flow<String?> = dataStore.data.map { prefs ->
+        prefs[GITHUB_TOKEN]
+    }
+
+    suspend fun setGithubToken(token: String?) {
+        dataStore.edit { prefs ->
+            if (token != null) prefs[GITHUB_TOKEN] = token
+            else prefs.remove(GITHUB_TOKEN)
+        }
+    }
+
     suspend fun clearAll() {
         dataStore.edit { it.clear() }
     }
@@ -102,5 +113,6 @@ class SettingsRepository @Inject constructor(
         private val SYNC_INTERVAL = intPreferencesKey("sync_interval")
         private val SCROBBLING_ENABLED = booleanPreferencesKey("scrobbling_enabled")
         private val LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
+        private val GITHUB_TOKEN = stringPreferencesKey("github_token")
     }
 }
