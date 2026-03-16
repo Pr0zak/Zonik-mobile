@@ -31,7 +31,6 @@ import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SyncManager
 import com.zonik.app.data.repository.SyncState
 import com.zonik.app.media.PlaybackManager
-import com.zonik.app.model.Album
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -47,9 +46,6 @@ class HomeViewModel @Inject constructor(
     private val playbackManager: PlaybackManager,
     private val syncManager: SyncManager
 ) : ViewModel() {
-
-    val recentAlbums = libraryRepository.getRecentAlbums()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val recentTracks = libraryRepository.getRecentTracks(limit = 10)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -127,7 +123,6 @@ fun HomeScreen(
     onNavigateToAlbum: ((String) -> Unit)? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val recentAlbums by viewModel.recentAlbums.collectAsState()
     val recentTracks by viewModel.recentTracks.collectAsState()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
@@ -225,52 +220,8 @@ fun HomeScreen(
                 }
             }
 
-            // Recently Added
-            Text(
-                text = "Recently Added",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-
-            if (recentAlbums.isEmpty() && !syncState.isSyncing) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "No albums yet",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedButton(onClick = viewModel::syncNow) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Sync Library")
-                        }
-                    }
-                }
-            } else {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(recentAlbums, key = { it.id }) { album ->
-                        AlbumCard(
-                            album = album,
-                            onClick = { onNavigateToAlbum?.invoke(album.id) }
-                        )
-                    }
-                }
-            }
-
             // Recent Tracks
             if (recentTracks.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Text(
                     text = "Recent Tracks",
                     style = MaterialTheme.typography.titleLarge,
@@ -285,6 +236,27 @@ fun HomeScreen(
                         onAddToQueue = { viewModel.addToQueue(track) },
                         onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(track) }
                     )
+                }
+            } else if (!syncState.isSyncing) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No tracks yet",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(onClick = viewModel::syncNow) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Sync Library")
+                        }
+                    }
                 }
             }
 
@@ -521,38 +493,6 @@ private fun TrackListItemWithMenu(
                         tint = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                     )
                 }
-            )
-        }
-    }
-}
-
-@Composable
-fun AlbumCard(album: Album, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.width(150.dp)
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            CoverArt(
-                coverArtId = album.coverArt,
-                contentDescription = album.name,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = album.name,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1
-            )
-            Text(
-                text = album.artist,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
             )
         }
     }
