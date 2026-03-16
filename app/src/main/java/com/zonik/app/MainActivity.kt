@@ -47,8 +47,12 @@ import androidx.compose.animation.slideOutVertically
 import com.zonik.app.ui.theme.ZonikTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -64,6 +68,13 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val syncState = syncManager.syncState
+
+    // Emits when a new track starts playing (for auto-showing Now Playing)
+    // drop(1) skips the initial null state
+    val playbackStarted: Flow<Unit> = playbackManager.currentTrack
+        .drop(1)
+        .filter { it != null }
+        .map { }
 
     init {
         viewModelScope.launch {
@@ -106,6 +117,14 @@ fun ZonikApp(viewModel: MainViewModel = hiltViewModel()) {
     val rootNavController = rememberNavController()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     var showNowPlaying by remember { mutableStateOf(false) }
+
+    // Auto-show Now Playing when a track starts playing
+    val syncState by viewModel.syncState.collectAsState()
+    LaunchedEffect(Unit) {
+        viewModel.playbackStarted.collect {
+            showNowPlaying = true
+        }
+    }
 
     val startDestination = if (isLoggedIn) Screen.Main.route else Screen.Login.route
 
