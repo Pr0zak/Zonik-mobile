@@ -66,9 +66,9 @@ class PlaybackManager @Inject constructor(
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                DebugLog.d("Playback", "Track transition: ${mediaItem?.mediaId} reason=$reason")
-                updateCurrentTrack(mediaItem)
-                addToRecentlyPlayed(mediaItem)
+                val index = controller?.currentMediaItemIndex ?: -1
+                DebugLog.d("Playback", "Track transition: mediaId='${mediaItem?.mediaId}' index=$index reason=$reason")
+                updateCurrentTrackByIndex(index)
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -216,12 +216,17 @@ class PlaybackManager @Inject constructor(
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun updateCurrentTrack(mediaItem: MediaItem?) {
-        if (mediaItem == null) {
+    private fun updateCurrentTrackByIndex(index: Int) {
+        val queue = _queue.value
+        if (index < 0 || index >= queue.size) {
+            DebugLog.w("Playback", "Invalid track index: $index (queue size: ${queue.size})")
             _currentTrack.value = null
             return
         }
-        _currentTrack.value = _queue.value.find { it.id == mediaItem.mediaId }
+        val track = queue[index]
+        DebugLog.d("Playback", "Now playing: ${track.title} by ${track.artist}")
+        _currentTrack.value = track
+        addToRecentlyPlayed(track)
     }
 
     private fun getServerUrl(): String {
@@ -244,9 +249,7 @@ class PlaybackManager @Inject constructor(
         return bitrate
     }
 
-    private fun addToRecentlyPlayed(mediaItem: MediaItem?) {
-        if (mediaItem == null) return
-        val track = _queue.value.find { it.id == mediaItem.mediaId } ?: return
+    private fun addToRecentlyPlayed(track: Track) {
         val current = _recentlyPlayed.value.toMutableList()
         current.removeAll { it.id == track.id }
         current.add(0, track)
