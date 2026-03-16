@@ -424,21 +424,23 @@ ArtistDetailScreen — albums by artist
 - **Theme:** system / light / dark
 - **About:** version, server info, licenses
 
-## 7. Implemented Features (v0.2.3)
+## 7. Implemented Features (v0.2.4)
 - Library sync via search3 empty query (Symfonium approach, ~2s for 1724 tracks)
 - FLAC/MP3 streaming with ExoPlayer + DefaultHttpDataSource
 - Smart bitrate switching (Wi-Fi vs cellular)
 - Shuffle Mix and True Random playback modes
-- Symfonium-style Now Playing: blurred album art background, Palette-based adaptive colors
-- Auto-show Now Playing on track start with slide animation
-- Mini player with progress bar, cover art, controls
-- Cover art everywhere (Coil + auth-aware ImageLoader)
-- Soulseek download search/trigger via Zonik native API
-- Self-update from GitHub releases
-- Debug log upload to private GitHub Gists
-- Custom dark theme (deep dark + purple/teal accents)
-- Track-centric library (Tracks tab first)
-- Connection verification on login (ping + auth test)
+- Symfonium-style Now Playing: blurred album art background, Palette-based adaptive colors, accent-colored seek bar and play button
+- Instant Now Playing on track tap (250ms slide-up, shows before buffering completes)
+- Mini player with thin progress bar, cover art, controls (200ms position polling)
+- Cover art everywhere (Coil + auth-aware ImageLoader + 250MB disk cache)
+- Soulseek download search/trigger/cancel via Zonik native API (3 tabs: Search/Active/History)
+- Self-update from GitHub releases with download progress
+- Debug log upload to private GitHub Gists (Settings > Debug)
+- Custom dark theme (deep dark #0A0A0F + purple #7C4DFF / teal #03DAC6 accents)
+- Track-centric library (Tracks tab first, 5 tabs: Tracks/Albums/Artists/Genres/Playlists)
+- Connection verification on login (ping + auth test with clear error messages)
+- Android Auto: MediaLibraryService with 4-tab browse tree, voice search
+- Reusable TrackListItem with format badge, context menu, currently-playing highlight
 
 ## 8. Future Features
 - Offline downloads (pin albums/playlists for offline playback)

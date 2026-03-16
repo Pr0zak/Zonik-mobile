@@ -99,7 +99,10 @@ app/src/main/java/com/zonik/app/
 - `PlaybackManager` connects via `MediaController`, tracks queue locally
 - Track transitions identified by `currentMediaItemIndex` (mediaId lost in IPC)
 - Smart bitrate: auto-detects Wi-Fi vs cellular, applies configured max bitrate
-- Now Playing auto-shows on track start via `currentTrack` flow observation
+- Now Playing auto-shows instantly on tap via `playbackRequested` SharedFlow (emits before buffering)
+- `currentTrack` set immediately in `playTracks()` for instant UI update
+- Slide animation: 250ms up / 200ms down
+- Seek bar polling: 100ms (Now Playing), 200ms (MiniPlayer)
 
 ## Android Auto
 - MediaLibraryService with MediaLibrarySession.Callback
@@ -108,6 +111,7 @@ app/src/main/java/com/zonik/app/
 - Voice search with empty query handling
 - Browse tree works without Activity; rebuilds from scratch on force-stop
 - Cover art URIs include baked-in auth params (fetched by system UI)
+- **Sideloaded APK setup**: user must enable Developer Mode in Android Auto settings (tap version 10x), then enable "Unknown sources" in developer settings
 
 ## API Notes
 - Subsonic API at `{server}/rest/{endpoint}.view`
@@ -132,9 +136,12 @@ app/src/main/java/com/zonik/app/
 ## Known Gotchas
 - Media3 strips `localConfiguration` (URI) during controller↔service IPC — must use `requestMetadata.mediaUri`
 - Media3 `mediaId` becomes empty after IPC — track by queue index not mediaId
-- `onAddMediaItems` callback MUST be implemented or setMediaItems silently does nothing
-- Stream URLs must NOT include `f=json` (server returns binary audio, not JSON)
+- `onAddMediaItems` callback MUST be implemented or setMediaItems silently does nothing (ExoPlayer goes BUFFERING→ENDED with no error)
+- ExoPlayer uses `DefaultHttpDataSource`, NOT our OkHttpClient — auth must be baked into stream URLs
+- Stream/cover art URLs must NOT include `f=json` (server returns binary audio/image, not JSON)
 - Zonik `/api/jobs` returns HTML without `Accept: application/json` header
 - Job history response is `{"items": [...]}` not a raw array
 - `cleartext` HTTP must be allowed via `network_security_config.xml` for local servers
 - Coil ImageLoader must use the auth-aware OkHttpClient for cover art (configured in ZonikApplication)
+- Android Auto requires Developer Mode + Unknown Sources for sideloaded APKs
+- DataStore emits on any field change — don't use `collect` on `isLoggedIn` to trigger sync (causes infinite loop); use `first()` instead
