@@ -503,9 +503,12 @@ fun NowPlayingScreen(
                 // Cast button — uses AndroidView to wrap MediaRouteButton from Cast SDK
                 androidx.compose.ui.viewinterop.AndroidView(
                     factory = { ctx ->
-                        androidx.mediarouter.app.MediaRouteButton(ctx).apply {
+                        // MediaRouteButton requires a non-translucent theme background.
+                        // Wrap in a ContextThemeWrapper with a solid dark background.
+                        val themedCtx = android.view.ContextThemeWrapper(ctx, androidx.appcompat.R.style.Theme_AppCompat)
+                        androidx.mediarouter.app.MediaRouteButton(themedCtx).apply {
                             try {
-                                com.google.android.gms.cast.framework.CastButtonFactory.setUpMediaRouteButton(ctx, this)
+                                com.google.android.gms.cast.framework.CastButtonFactory.setUpMediaRouteButton(themedCtx, this)
                             } catch (e: Exception) {
                                 com.zonik.app.data.DebugLog.w("NowPlaying", "Cast button setup failed: ${e.message}")
                             }
