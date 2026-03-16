@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import javax.inject.Inject
 
 // region State
@@ -41,7 +43,10 @@ data class DownloadsUiState(
     val jobHistory: List<JobInfo> = emptyList(),
     val isLoadingJobs: Boolean = false,
     val error: String? = null,
-    val selectedResults: Set<Int> = emptySet()
+    val selectedResults: Set<Int> = emptySet(),
+    val expandedJobId: String? = null,
+    val jobDetail: JobDetailResponse? = null,
+    val isLoadingDetail: Boolean = false
 )
 
 // endregion
@@ -242,6 +247,24 @@ class DownloadsViewModel @Inject constructor(
         }
     }
 
+    fun toggleJobDetail(jobId: String) {
+        val current = _uiState.value.expandedJobId
+        if (current == jobId) {
+            _uiState.update { it.copy(expandedJobId = null, jobDetail = null) }
+            return
+        }
+        _uiState.update { it.copy(expandedJobId = jobId, isLoadingDetail = true, jobDetail = null) }
+        viewModelScope.launch {
+            try {
+                val detail = zonikApi.getJob(jobId)
+                _uiState.update { it.copy(jobDetail = detail, isLoadingDetail = false) }
+            } catch (e: Exception) {
+                DebugLog.e(TAG, "Job detail load failed", e)
+                _uiState.update { it.copy(isLoadingDetail = false) }
+            }
+        }
+    }
+
     fun dismissError() {
         _uiState.update { it.copy(error = null) }
     }
@@ -269,6 +292,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         topBar = {
             TopAppBar(
                 title = { Text("Downloads") },
+                windowInsets = WindowInsets(0),
                 actions = {
                     if (selectedTab == 1) {
                         IconButton(onClick = { viewModel.refreshStatus() }) {
@@ -344,7 +368,11 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
 
                 DownloadsTab.HISTORY -> HistoryTab(
                     history = uiState.jobHistory,
-                    isLoading = uiState.isLoadingJobs
+                    isLoading = uiState.isLoadingJobs,
+                    expandedJobId = uiState.expandedJobId,
+                    jobDetail = uiState.jobDetail,
+                    isLoadingDetail = uiState.isLoadingDetail,
+                    onToggleJob = viewModel::toggleJobDetail
                 )
             }
         }
@@ -655,10 +683,66 @@ private fun TransferStateBadge(state: String) {
 
 // region History Tab
 
+private fun formatJobDate(isoDate: String): String {
+    return try {
+        val cleaned = isoDate.replace("T", " ").substringBefore(".")
+        cleaned
+    } catch (_: Exception) {
+        isoDate
+    }
+}
+
+private fun parseResultMessage(resultJson: String?): String? {
+    if (resultJson == null) return null
+    return try {
+        val obj = JSONObject(resultJson)
+        obj.optString("message", null as String?) ?: obj.optString("error", null as String?)
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private data class TrackEntry(
+    val artist: String,
+    val track: String,
+    val status: String
+)
+
+private fun parseTracks(tracksJson: String?): List<TrackEntry> {
+    if (tracksJson == null) return emptyList()
+    return try {
+        val arr = JSONArray(tracksJson)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            TrackEntry(
+                artist = obj.optString("artist", ""),
+                track = obj.optString("track", ""),
+                status = obj.optString("status", "")
+            )
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun parseLogEntries(logJson: String?): List<String> {
+    if (logJson == null) return emptyList()
+    return try {
+        val arr = JSONArray(logJson)
+        (0 until arr.length()).map { arr.getString(it) }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
 @Composable
 private fun HistoryTab(
     history: List<JobInfo>,
-    isLoading: Boolean
+    isLoading: Boolean,
+    expandedJobId: String?,
+    jobDetail: JobDetailResponse?,
+    isLoadingDetail: Boolean,
+    onToggleJob: (String) -> Unit
 ) {
     when {
         isLoading -> {
@@ -704,52 +788,212 @@ private fun HistoryTab(
                         "running", "in_progress" -> Color(0xFFED6C02)
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
+                    val isExpanded = expandedJobId == job.id
+                    val headline = job.description?.takeIf { it.isNotBlank() }
+                        ?: job.type.replace("_", " ").replaceFirstChar { it.uppercase() }
 
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = job.type.replace("_", " ").replaceFirstChar { it.uppercase() },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        supportingContent = {
-                            Column {
+                    Column {
+                        ListItem(
+                            headlineContent = {
                                 Text(
-                                    text = job.status.replaceFirstChar { it.uppercase() },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = statusColor
+                                    text = headline,
+                                    maxLines = if (isExpanded) 3 else 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                job.createdAt?.let { date ->
-                                    Text(
-                                        text = date,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                            },
+                            supportingContent = {
+                                Column {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = job.status.replaceFirstChar { it.uppercase() },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = statusColor
+                                        )
+                                        if (job.progress != null && job.total != null && job.total > 0) {
+                                            Text(
+                                                text = "(${job.progress}/${job.total})",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Text(
+                                            text = "\u00b7",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = job.type.replace("_", " "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    job.startedAt?.let { date ->
+                                        Text(
+                                            text = formatJobDate(date),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
-                            }
-                        },
-                        leadingContent = {
-                            Surface(
-                                modifier = Modifier.size(40.dp),
-                                shape = MaterialTheme.shapes.small,
-                                color = statusColor.copy(alpha = 0.12f)
+                            },
+                            leadingContent = {
+                                Surface(
+                                    modifier = Modifier.size(40.dp),
+                                    shape = MaterialTheme.shapes.small,
+                                    color = statusColor.copy(alpha = 0.12f)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = when (job.status.lowercase()) {
+                                                "completed", "complete" -> Icons.Default.Check
+                                                "failed", "error" -> Icons.Default.ErrorOutline
+                                                "running", "in_progress" -> Icons.Default.Sync
+                                                else -> Icons.Default.Schedule
+                                            },
+                                            contentDescription = null,
+                                            tint = statusColor
+                                        )
+                                    }
+                                }
+                            },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (isExpanded) "Collapse" else "Expand"
+                                )
+                            },
+                            modifier = Modifier.clickable { onToggleJob(job.id) }
+                        )
+
+                        AnimatedVisibility(visible = isExpanded) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 72.dp, end = 16.dp, bottom = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = when (job.status.lowercase()) {
-                                            "completed", "complete" -> Icons.Default.Check
-                                            "failed", "error" -> Icons.Default.ErrorOutline
-                                            "running", "in_progress" -> Icons.Default.Sync
-                                            else -> Icons.Default.Schedule
-                                        },
-                                        contentDescription = null,
-                                        tint = statusColor
+                                if (isLoadingDetail) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
                                     )
+                                } else if (jobDetail != null && jobDetail.id == job.id) {
+                                    // Duration
+                                    if (jobDetail.startedAt != null && jobDetail.finishedAt != null) {
+                                        Text(
+                                            text = "${formatJobDate(jobDetail.startedAt)} \u2192 ${formatJobDate(jobDetail.finishedAt)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    // Result message
+                                    parseResultMessage(jobDetail.result)?.let { msg ->
+                                        Text(
+                                            text = msg,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (msg.contains("error", ignoreCase = true) || msg.contains("fail", ignoreCase = true))
+                                                MaterialTheme.colorScheme.error
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    // Tracks list
+                                    val tracks = parseTracks(jobDetail.tracks)
+                                    if (tracks.isNotEmpty()) {
+                                        Text(
+                                            text = "Tracks (${tracks.size}):",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                            shape = MaterialTheme.shapes.small,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.padding(8.dp)) {
+                                                tracks.forEach { entry ->
+                                                    val trackStatusColor = when (entry.status.lowercase()) {
+                                                        "completed", "complete", "imported" -> Color(0xFF2E7D32)
+                                                        "failed", "error" -> MaterialTheme.colorScheme.error
+                                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                    }
+                                                    val trackStatusIcon = when (entry.status.lowercase()) {
+                                                        "completed", "complete", "imported" -> "\u2713"
+                                                        "failed", "error" -> "\u2717"
+                                                        else -> "\u2022"
+                                                    }
+                                                    Row(
+                                                        modifier = Modifier.padding(vertical = 2.dp),
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = trackStatusIcon,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = trackStatusColor
+                                                        )
+                                                        Text(
+                                                            text = if (entry.artist.isNotBlank()) "${entry.artist} \u2014 ${entry.track}" else entry.track,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurface,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier.weight(1f)
+                                                        )
+                                                        if (entry.status.isNotBlank()) {
+                                                            Text(
+                                                                text = entry.status,
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = trackStatusColor
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Log entries
+                                    val logEntries = parseLogEntries(jobDetail.log)
+                                    if (logEntries.isNotEmpty()) {
+                                        Text(
+                                            text = "Log:",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                            shape = MaterialTheme.shapes.small,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.padding(8.dp)) {
+                                                logEntries.forEach { line ->
+                                                    Text(
+                                                        text = line,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (tracks.isEmpty() && logEntries.isEmpty() && parseResultMessage(jobDetail.result) == null) {
+                                        Text(
+                                            text = "No additional details",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
-                    )
+
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    }
                 }
             }
         }

@@ -151,11 +151,15 @@ data class TransferInfo(
 data class JobInfo(
     val id: String = "",
     val type: String = "",
+    val card: String? = null,
     val status: String = "",
     val progress: Int? = null,
     val total: Int? = null,
-    @SerialName("created_at") val createdAt: String? = null,
-    val result: String? = null
+    val description: String? = null,
+    val result: String? = null,
+    val tracks: String? = null,
+    @SerialName("started_at") val startedAt: String? = null,
+    @SerialName("finished_at") val finishedAt: String? = null
 )
 
 @Serializable
@@ -169,6 +173,11 @@ data class JobDetailResponse(
     val id: String = "",
     val type: String = "",
     val status: String = "",
+    val progress: Int? = null,
+    val total: Int? = null,
     val result: String? = null,
-    val log: List<String> = emptyList()
+    val log: String? = null,
+    val tracks: String? = null,
+    @SerialName("started_at") val startedAt: String? = null,
+    @SerialName("finished_at") val finishedAt: String? = null
 )
