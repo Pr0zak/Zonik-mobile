@@ -7,10 +7,10 @@ A native Android music player app that streams music from a self-hosted [Zonik](
 
 ## Tech Stack
 - **Language:** Kotlin
-- **UI:** Jetpack Compose + Material 3 + custom dark theme
+- **UI:** Jetpack Compose + Material 3 + custom dark theme (teal/cyan accents)
 - **Playback:** AndroidX Media3 (ExoPlayer) + MediaLibraryService
 - **Networking:** Retrofit + OkHttp + Kotlinx Serialization
-- **Local DB:** Room + Paging 3
+- **Local DB:** Room (v2) + Paging 3
 - **DI:** Hilt (KSP)
 - **Image Loading:** Coil + AndroidX Palette (album art color extraction)
 - **Background:** WorkManager
@@ -57,13 +57,14 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 - Media3 IPC: `requestMetadata.mediaUri` carries stream URL across controller↔service boundary (`localConfiguration` is stripped during IPC)
 - Track identification after IPC: use `currentMediaItemIndex` not `mediaId` (mediaId lost in IPC)
 - Keep UI state in ViewModels using StateFlow
+- All track lists support long-press context menus (Play, Play Next, Add to Queue, Mark for Deletion)
 
 ## Project Structure
 ```
 app/src/main/java/com/zonik/app/
   data/
     api/          # SubsonicApi, SubsonicAuthInterceptor, ZonikApi, UpdateChecker, LogUploader
-    db/           # Room entities, DAOs, ZonikDatabase
+    db/           # Room entities, DAOs, ZonikDatabase (v2)
     repository/   # LibraryRepository, SettingsRepository, SyncManager
     DebugLog.kt   # In-memory debug log buffer (500 entries)
   di/             # AppModule (Hilt — OkHttpClient, Retrofit, Room, dynamic base URL)
@@ -78,31 +79,39 @@ app/src/main/java/com/zonik/app/
       TrackListItem.kt  # Unified track row with format badge and context menu
     navigation/   # Screen/MainTab route definitions
     screens/
-      home/       # HomeScreen — recent albums, recent tracks, shuffle/random, recently played
+      home/       # HomeScreen — app icon in top bar, recent albums, recent tracks, shuffle/random, recently played
       library/    # LibraryScreen (5 tabs: Tracks/Albums/Artists/Genres/Playlists), AlbumDetail, ArtistDetail
       search/     # SearchScreen — debounced search across library
       downloads/  # DownloadsScreen — Soulseek search/active transfers/job history (real Zonik API)
       playlists/  # PlaylistsScreen
       nowplaying/ # NowPlayingScreen — Symfonium-style with blurred background, Palette colors
       login/      # LoginScreen — connection test (ping + auth verification)
-      settings/   # SettingsScreen — server, sync, playback, Last.fm, cache, updates, debug logs
-    theme/        # ZonikTheme — custom dark color scheme (deep dark + purple/teal accents)
+      settings/   # SettingsScreen — server, sync, playback, Last.fm, cache, updates, debug logs, dynamic version display
+    theme/        # ZonikTheme — custom dark color scheme (deep dark + teal/cyan accents)
     util/         # FormatUtils (duration, file size formatting)
   MainActivity.kt     # Main activity, nav host, bottom nav, Now Playing overlay with slide animation
   ZonikApplication.kt # Hilt app, notification channels, WorkManager, Coil ImageLoader
 ```
 
 ## Playback Architecture
-- ExoPlayer in `ZonikMediaService` with `DefaultHttpDataSource` (not OkHttpDataSource)
-- Auth params baked into stream URLs (ExoPlayer doesn't go through OkHttp interceptors)
+- ExoPlayer in `ZonikMediaService` with `OkHttpDataSource` (clean client without auth interceptor)
+- Auth params baked into stream URLs (ExoPlayer doesn't go through app's OkHttp interceptors)
 - `onAddMediaItems` resolves URIs from `requestMetadata.mediaUri` (survives IPC)
 - `PlaybackManager` connects via `MediaController`, tracks queue locally
 - Track transitions identified by `currentMediaItemIndex` (mediaId lost in IPC)
+- Skip next/previous: use `seekToNext()` / `seekToPrevious()` (NOT `seekToNextMediaItem()` — command availability issues)
+- Media3 calls `onAddMediaItems` per-item (not batched) — `_pendingStartIndex` + explicit `seekTo` corrects playlist start position
 - Smart bitrate: auto-detects Wi-Fi vs cellular, applies configured max bitrate
 - Now Playing auto-shows instantly on tap via `playbackRequested` SharedFlow (emits before buffering)
 - `currentTrack` set immediately in `playTracks()` for instant UI update
 - Slide animation: 250ms up / 200ms down
 - Seek bar polling: 100ms (Now Playing), 200ms (MiniPlayer)
+
+## Track Management
+- **Mark for Deletion**: tracks can be marked/unmarked via long-press context menu on any track list
+- Marked tracks show red title text as visual indicator
+- `markedForDeletion` flag stored in Room DB, preserved across library syncs
+- Available on: HomeScreen, LibraryScreen, AlbumDetailScreen, SearchScreen, TrackListItem component
 
 ## Android Auto
 - MediaLibraryService with MediaLibrarySession.Callback
@@ -136,8 +145,10 @@ app/src/main/java/com/zonik/app/
 ## Known Gotchas
 - Media3 strips `localConfiguration` (URI) during controller↔service IPC — must use `requestMetadata.mediaUri`
 - Media3 `mediaId` becomes empty after IPC — track by queue index not mediaId
+- Media3 calls `onAddMediaItems` once per item (not batched) — causes wrong start index; fixed with `_pendingStartIndex` guard + explicit `seekTo(startIndex)` after play
 - `onAddMediaItems` callback MUST be implemented or setMediaItems silently does nothing (ExoPlayer goes BUFFERING→ENDED with no error)
-- ExoPlayer uses `DefaultHttpDataSource`, NOT our OkHttpClient — auth must be baked into stream URLs
+- Use `seekToNext()` / `seekToPrevious()` not `seekToNextMediaItem()` / `seekToPreviousMediaItem()` — the MediaItem variants require `COMMAND_SEEK_TO_NEXT_MEDIA_ITEM` which may not be available on the MediaController after playlist changes
+- ExoPlayer uses `OkHttpDataSource` with a clean client (no auth interceptor) — auth must be baked into stream URLs
 - Stream/cover art URLs must NOT include `f=json` (server returns binary audio/image, not JSON)
 - Zonik `/api/jobs` returns HTML without `Accept: application/json` header
 - Job history response is `{"items": [...]}` not a raw array
@@ -145,3 +156,5 @@ app/src/main/java/com/zonik/app/
 - Coil ImageLoader must use the auth-aware OkHttpClient for cover art (configured in ZonikApplication)
 - Android Auto requires Developer Mode + Unknown Sources for sideloaded APKs
 - DataStore emits on any field change — don't use `collect` on `isLoggedIn` to trigger sync (causes infinite loop); use `first()` instead
+- Room DB uses `fallbackToDestructiveMigration()` — bump version number when changing entities (no manual migration needed)
+- `markedForDeletion` flag must be preserved during sync — `syncAllTracks` and `getAlbumDetail` read existing marked IDs before upserting

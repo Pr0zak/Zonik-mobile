@@ -1,12 +1,13 @@
 package com.zonik.app.ui.screens.search
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -112,6 +113,24 @@ class SearchViewModel @Inject constructor(
 
     fun playTrack(track: Track) {
         playbackManager.playTracks(listOf(track), 0)
+    }
+
+    fun playNext(track: Track) {
+        playbackManager.playNext(track)
+    }
+
+    fun addToQueue(track: Track) {
+        playbackManager.addToQueue(track)
+    }
+
+    fun toggleMarkForDeletion(track: Track) {
+        viewModelScope.launch {
+            if (track.markedForDeletion) {
+                libraryRepository.unmarkForDeletion(track.id)
+            } else {
+                libraryRepository.markForDeletion(track.id)
+            }
+        }
     }
 }
 
@@ -222,7 +241,10 @@ fun SearchScreen(
                         tracks = uiState.tracks,
                         onArtistClick = { onNavigateToArtist(it.id) },
                         onAlbumClick = { onNavigateToAlbum(it.id) },
-                        onTrackClick = { viewModel.playTrack(it) }
+                        onTrackClick = { viewModel.playTrack(it) },
+                        onPlayNext = { viewModel.playNext(it) },
+                        onAddToQueue = { viewModel.addToQueue(it) },
+                        onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(it) }
                     )
                 }
             }
@@ -237,7 +259,10 @@ private fun SearchResults(
     tracks: List<Track>,
     onArtistClick: (Artist) -> Unit,
     onAlbumClick: (Album) -> Unit,
-    onTrackClick: (Track) -> Unit
+    onTrackClick: (Track) -> Unit,
+    onPlayNext: (Track) -> Unit,
+    onAddToQueue: (Track) -> Unit,
+    onToggleMarkForDeletion: (Track) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -269,7 +294,13 @@ private fun SearchResults(
                 SectionHeader(title = "Tracks")
             }
             items(tracks, key = { "track-${it.id}" }) { track ->
-                TrackRow(track = track, onClick = { onTrackClick(track) })
+                TrackRow(
+                    track = track,
+                    onClick = { onTrackClick(track) },
+                    onPlayNext = { onPlayNext(track) },
+                    onAddToQueue = { onAddToQueue(track) },
+                    onToggleMarkForDeletion = { onToggleMarkForDeletion(track) }
+                )
             }
         }
     }
@@ -325,30 +356,87 @@ private fun AlbumRow(album: Album, onClick: () -> Unit) {
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TrackRow(track: Track, onClick: () -> Unit) {
-    ListItem(
-        headlineContent = {
-            Text(text = track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        supportingContent = {
-            Text(text = track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        leadingContent = {
-            Icon(
-                Icons.Default.MusicNote,
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+private fun TrackRow(
+    track: Track,
+    onClick: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onToggleMarkForDeletion: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box {
+        ListItem(
+            headlineContent = {
+                Text(
+                    text = track.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (track.markedForDeletion) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurface
+                )
+            },
+            supportingContent = {
+                Text(text = track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
+            leadingContent = {
+                Icon(
+                    Icons.Default.MusicNote,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            trailingContent = {
+                Text(
+                    text = formatDuration(track.duration),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            modifier = Modifier.combinedClickable(
+                onClick = onClick,
+                onLongClick = { showMenu = true }
             )
-        },
-        trailingContent = {
-            Text(
-                text = formatDuration(track.duration),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Play") },
+                onClick = { showMenu = false; onClick() },
+                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
             )
-        },
-        modifier = Modifier.clickable(onClick = onClick)
-    )
+            DropdownMenuItem(
+                text = { Text("Play Next") },
+                onClick = { showMenu = false; onPlayNext() },
+                leadingIcon = { Icon(Icons.Default.QueuePlayNext, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("Add to Queue") },
+                onClick = { showMenu = false; onAddToQueue() },
+                leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        if (track.markedForDeletion) "Unmark for Deletion" else "Mark for Deletion",
+                        color = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                onClick = { showMenu = false; onToggleMarkForDeletion() },
+                leadingIcon = {
+                    Icon(
+                        if (track.markedForDeletion) Icons.Default.RestoreFromTrash else Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        tint = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            )
+        }
+    }
 }

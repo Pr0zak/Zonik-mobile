@@ -156,8 +156,8 @@ fun NowPlayingScreen(
     var showDetails by remember { mutableStateOf(false) }
 
     // Palette colors extracted from cover art
-    var dominantColor by remember { mutableStateOf(Color(0xFF1A1A2E)) }
-    var accentColor by remember { mutableStateOf(Color(0xFF7C4DFF)) }
+    var dominantColor by remember { mutableStateOf(Color(0xFF0B0E11)) }
+    var accentColor by remember { mutableStateOf(Color(0xFF00BFA5)) }
 
     val animatedDominant by animateColorAsState(
         targetValue = dominantColor,

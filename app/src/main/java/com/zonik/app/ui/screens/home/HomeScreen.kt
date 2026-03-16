@@ -1,18 +1,21 @@
 package com.zonik.app.ui.screens.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Casino
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import com.zonik.app.R
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,6 +98,24 @@ class HomeViewModel @Inject constructor(
     fun playTrack(track: Track) {
         playbackManager.playTracks(listOf(track))
     }
+
+    fun playNext(track: Track) {
+        playbackManager.playNext(track)
+    }
+
+    fun addToQueue(track: Track) {
+        playbackManager.addToQueue(track)
+    }
+
+    fun toggleMarkForDeletion(track: Track) {
+        viewModelScope.launch {
+            if (track.markedForDeletion) {
+                libraryRepository.unmarkForDeletion(track.id)
+            } else {
+                libraryRepository.markForDeletion(track.id)
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,7 +133,19 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Zonik") },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(R.mipmap.ic_launcher),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Zonik")
+                    }
+                },
                 actions = {
                     if (syncState.isSyncing) {
                         CircularProgressIndicator(
@@ -236,38 +269,12 @@ fun HomeScreen(
                 )
 
                 recentTracks.forEach { track ->
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = track.title,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        supportingContent = {
-                            Text(
-                                text = "${track.artist} \u00b7 ${track.album}",
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        leadingContent = {
-                            CoverArt(
-                                coverArtId = track.coverArt,
-                                contentDescription = track.title,
-                                modifier = Modifier.size(48.dp)
-                            )
-                        },
-                        trailingContent = {
-                            val min = track.duration / 60
-                            val sec = track.duration % 60
-                            Text(
-                                text = "%d:%02d".format(min, sec),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        modifier = Modifier.clickable { viewModel.playTrack(track) }
+                    TrackListItemWithMenu(
+                        track = track,
+                        onPlay = { viewModel.playTrack(track) },
+                        onPlayNext = { viewModel.playNext(track) },
+                        onAddToQueue = { viewModel.addToQueue(track) },
+                        onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(track) }
                     )
                 }
             }
@@ -415,6 +422,96 @@ private fun RecentlyPlayedCard(track: Track, onClick: () -> Unit, modifier: Modi
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TrackListItemWithMenu(
+    track: Track,
+    onPlay: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onToggleMarkForDeletion: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box {
+        ListItem(
+            headlineContent = {
+                Text(
+                    text = track.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (track.markedForDeletion) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurface
+                )
+            },
+            supportingContent = {
+                Text(
+                    text = "${track.artist} \u00b7 ${track.album}",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            leadingContent = {
+                CoverArt(
+                    coverArtId = track.coverArt,
+                    contentDescription = track.title,
+                    modifier = Modifier.size(48.dp)
+                )
+            },
+            trailingContent = {
+                val min = track.duration / 60
+                val sec = track.duration % 60
+                Text(
+                    text = "%d:%02d".format(min, sec),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            modifier = Modifier.combinedClickable(
+                onClick = onPlay,
+                onLongClick = { showMenu = true }
+            )
+        )
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Play") },
+                onClick = { showMenu = false; onPlay() },
+                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("Play Next") },
+                onClick = { showMenu = false; onPlayNext() },
+                leadingIcon = { Icon(Icons.Default.QueuePlayNext, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("Add to Queue") },
+                onClick = { showMenu = false; onAddToQueue() },
+                leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        if (track.markedForDeletion) "Unmark for Deletion" else "Mark for Deletion",
+                        color = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                onClick = { showMenu = false; onToggleMarkForDeletion() },
+                leadingIcon = {
+                    Icon(
+                        if (track.markedForDeletion) Icons.Default.RestoreFromTrash else Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        tint = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
+                }
             )
         }
     }

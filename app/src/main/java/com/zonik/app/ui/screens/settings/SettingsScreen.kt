@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -506,9 +507,15 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
             ) {
+                val context = LocalContext.current
+                val versionName = remember {
+                    try {
+                        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+                    } catch (_: Exception) { "unknown" }
+                }
                 ListItem(
                     headlineContent = { Text("App version") },
-                    supportingContent = { Text("Zonik v0.1.0") },
+                    supportingContent = { Text("Zonik v$versionName") },
                     leadingContent = {
                         Icon(Icons.Default.Info, contentDescription = null)
                     }
