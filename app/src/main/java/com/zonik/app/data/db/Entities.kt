@@ -76,9 +76,10 @@ data class TrackEntity(
     val suffix: String? = null,
     val contentType: String? = null,
     val path: String? = null,
-    val starred: Boolean = false
+    val starred: Boolean = false,
+    val markedForDeletion: Boolean = false
 ) {
-    fun toDomain() = Track(id, title, artist, artistId, album, albumId, coverArt, duration, track, year, genre, bitRate, size, suffix, contentType, path, starred)
+    fun toDomain() = Track(id, title, artist, artistId, album, albumId, coverArt, duration, track, year, genre, bitRate, size, suffix, contentType, path, starred, markedForDeletion)
 
     companion object {
         fun fromDomain(track: Track) = TrackEntity(
@@ -98,7 +99,8 @@ data class TrackEntity(
             suffix = track.suffix,
             contentType = track.contentType,
             path = track.path,
-            starred = track.starred
+            starred = track.starred,
+            markedForDeletion = track.markedForDeletion
         )
     }
 }

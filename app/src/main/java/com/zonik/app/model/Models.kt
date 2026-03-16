@@ -43,7 +43,8 @@ data class Track(
     val suffix: String? = null,
     val contentType: String? = null,
     val path: String? = null,
-    val starred: Boolean = false
+    val starred: Boolean = false,
+    val markedForDeletion: Boolean = false
 )
 
 @Serializable

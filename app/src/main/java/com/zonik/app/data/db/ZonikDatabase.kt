@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         TrackEntity::class,
         PendingScrobbleEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class ZonikDatabase : RoomDatabase() {

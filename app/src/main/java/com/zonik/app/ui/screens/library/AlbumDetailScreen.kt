@@ -100,6 +100,20 @@ class AlbumDetailViewModel @Inject constructor(
         playbackManager.addToQueue(track)
     }
 
+    fun toggleMarkForDeletion(track: Track) {
+        viewModelScope.launch {
+            if (track.markedForDeletion) {
+                libraryRepository.unmarkForDeletion(track.id)
+            } else {
+                libraryRepository.markForDeletion(track.id)
+            }
+            // Refresh tracks to reflect the change
+            _tracks.value = _tracks.value.map {
+                if (it.id == track.id) it.copy(markedForDeletion = !track.markedForDeletion) else it
+            }
+        }
+    }
+
     fun star() {
         viewModelScope.launch {
             val currentAlbum = _album.value ?: return@launch
@@ -185,6 +199,7 @@ fun AlbumDetailScreen(
                     onPlayNext = viewModel::playNext,
                     onAddToQueue = viewModel::addToQueue,
                     onGoToArtist = onNavigateToArtist,
+                    onToggleMarkForDeletion = viewModel::toggleMarkForDeletion,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -204,6 +219,7 @@ private fun AlbumDetailContent(
     onPlayNext: (Track) -> Unit,
     onAddToQueue: (Track) -> Unit,
     onGoToArtist: (String) -> Unit,
+    onToggleMarkForDeletion: (Track) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -233,7 +249,8 @@ private fun AlbumDetailContent(
                 onAddToQueue = { onAddToQueue(track) },
                 onGoToArtist = {
                     track.artistId?.let { artistId -> onGoToArtist(artistId) }
-                }
+                },
+                onToggleMarkForDeletion = { onToggleMarkForDeletion(track) }
             )
         }
 
@@ -348,7 +365,8 @@ private fun TrackItem(
     onClick: () -> Unit,
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
-    onGoToArtist: () -> Unit
+    onGoToArtist: () -> Unit,
+    onToggleMarkForDeletion: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -358,7 +376,9 @@ private fun TrackItem(
                 Text(
                     text = track.title,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (track.markedForDeletion) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurface
                 )
             },
             supportingContent = {
@@ -431,6 +451,25 @@ private fun TrackItem(
                 },
                 leadingIcon = {
                     Icon(Icons.Default.Person, contentDescription = null)
+                }
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        if (track.markedForDeletion) "Unmark for Deletion" else "Mark for Deletion",
+                        color = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                onClick = {
+                    showMenu = false
+                    onToggleMarkForDeletion()
+                },
+                leadingIcon = {
+                    Icon(
+                        if (track.markedForDeletion) Icons.Default.RestoreFromTrash else Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        tint = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
                 }
             )
         }

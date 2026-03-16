@@ -95,6 +95,16 @@ class LibraryViewModel @Inject constructor(
         playbackManager.addToQueue(track)
     }
 
+    fun toggleMarkForDeletion(track: Track) {
+        viewModelScope.launch {
+            if (track.markedForDeletion) {
+                libraryRepository.unmarkForDeletion(track.id)
+            } else {
+                libraryRepository.markForDeletion(track.id)
+            }
+        }
+    }
+
     private fun loadGenres() {
         viewModelScope.launch {
             _isLoadingGenres.value = true
@@ -183,7 +193,8 @@ fun LibraryScreen(
                     onPlayAll = viewModel::playAllTracks,
                     onShuffleAll = viewModel::shuffleAllTracks,
                     onPlayNext = viewModel::playNext,
-                    onAddToQueue = viewModel::addToQueue
+                    onAddToQueue = viewModel::addToQueue,
+                    onToggleMarkForDeletion = viewModel::toggleMarkForDeletion
                 )
                 LibraryTab.GENRES -> GenresTab(
                     genres = genres,
@@ -361,7 +372,8 @@ private fun TracksTab(
     onPlayAll: () -> Unit,
     onShuffleAll: () -> Unit,
     onPlayNext: (Track) -> Unit,
-    onAddToQueue: (Track) -> Unit
+    onAddToQueue: (Track) -> Unit,
+    onToggleMarkForDeletion: (Track) -> Unit
 ) {
     if (tracks.isEmpty()) {
         EmptyState(message = "No tracks found")
@@ -416,7 +428,9 @@ private fun TracksTab(
                         Text(
                             text = track.title,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (track.markedForDeletion) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurface
                         )
                     },
                     supportingContent = {
@@ -496,6 +510,25 @@ private fun TracksTab(
                         },
                         leadingIcon = {
                             Icon(Icons.Default.AddToQueue, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (track.markedForDeletion) "Unmark for Deletion" else "Mark for Deletion",
+                                color = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onToggleMarkForDeletion(track)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (track.markedForDeletion) Icons.Default.RestoreFromTrash else Icons.Default.DeleteOutline,
+                                contentDescription = null,
+                                tint = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     )
                 }

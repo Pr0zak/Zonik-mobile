@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,6 +28,7 @@ fun TrackListItem(
     onAddToQueue: (() -> Unit)? = null,
     onGoToAlbum: (() -> Unit)? = null,
     onGoToArtist: (() -> Unit)? = null,
+    onToggleMarkForDeletion: (() -> Unit)? = null,
     currentlyPlayingId: String? = null,
     showAlbum: Boolean = true,
     modifier: Modifier = Modifier
@@ -41,10 +44,10 @@ fun TrackListItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = if (isCurrentlyPlaying) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isCurrentlyPlaying) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
+                    color = when {
+                        track.markedForDeletion -> MaterialTheme.colorScheme.error
+                        isCurrentlyPlaying -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurface
                     }
                 )
             },
@@ -150,6 +153,27 @@ fun TrackListItem(
                     onClick = {
                         showMenu = false
                         onGoToArtist()
+                    }
+                )
+            }
+            if (onToggleMarkForDeletion != null) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (track.markedForDeletion) "Unmark for Deletion" else "Mark for Deletion",
+                            color = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    onClick = {
+                        showMenu = false
+                        onToggleMarkForDeletion()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            if (track.markedForDeletion) Icons.Default.RestoreFromTrash else Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            tint = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 )
             }

@@ -62,6 +62,18 @@ interface TrackDao {
     @Upsert
     suspend fun upsertAll(tracks: List<TrackEntity>)
 
+    @Query("UPDATE tracks SET markedForDeletion = :marked WHERE id = :id")
+    suspend fun setMarkedForDeletion(id: String, marked: Boolean)
+
+    @Query("SELECT * FROM tracks WHERE markedForDeletion = 1 ORDER BY artist COLLATE NOCASE, album COLLATE NOCASE, track")
+    fun getMarkedForDeletion(): Flow<List<TrackEntity>>
+
+    @Query("SELECT COUNT(*) FROM tracks WHERE markedForDeletion = 1")
+    fun markedForDeletionCount(): Flow<Int>
+
+    @Query("SELECT id FROM tracks WHERE markedForDeletion = 1")
+    suspend fun getMarkedForDeletionIds(): List<String>
+
     @Query("DELETE FROM tracks")
     suspend fun deleteAll()
 }

@@ -62,9 +62,13 @@ class LibraryRepository @Inject constructor(
             duration = albumDetail.duration,
             genre = albumDetail.genre
         )
-        val tracks = albumDetail.song.map { it.toDomain() }
+        // Preserve markedForDeletion flags when caching
+        val existingMarked = database.trackDao().getMarkedForDeletionIds().toSet()
+        val tracks = albumDetail.song.map { song ->
+            val track = song.toDomain()
+            if (track.id in existingMarked) track.copy(markedForDeletion = true) else track
+        }
 
-        // Cache tracks
         database.trackDao().upsertAll(tracks.map { TrackEntity.fromDomain(it) })
 
         return album to tracks
@@ -112,6 +116,22 @@ class LibraryRepository @Inject constructor(
         val response = api.getPlaylist(playlistId)
         return response.response.playlist?.entry?.map { it.toDomain() } ?: emptyList()
     }
+
+    suspend fun markForDeletion(id: String) {
+        database.trackDao().setMarkedForDeletion(id, true)
+    }
+
+    suspend fun unmarkForDeletion(id: String) {
+        database.trackDao().setMarkedForDeletion(id, false)
+    }
+
+    fun getTracksMarkedForDeletion(): Flow<List<Track>> =
+        database.trackDao().getMarkedForDeletion().map { entities ->
+            entities.map { it.toDomain() }
+        }
+
+    fun markedForDeletionCount(): Flow<Int> =
+        database.trackDao().markedForDeletionCount()
 
     suspend fun star(id: String) { api.star(id = id) }
     suspend fun unstar(id: String) { api.unstar(id = id) }
@@ -190,7 +210,12 @@ class LibraryRepository @Inject constructor(
             onProgress(allTracks.size)
         }
 
-        val entities = allTracks.map { TrackEntity.fromDomain(it.toDomain()) }
+        // Preserve markedForDeletion flags from existing local tracks
+        val existingMarked = database.trackDao().getMarkedForDeletionIds()
+        val entities = allTracks.map { subsonicTrack ->
+            val entity = TrackEntity.fromDomain(subsonicTrack.toDomain())
+            if (entity.id in existingMarked) entity.copy(markedForDeletion = true) else entity
+        }
         database.trackDao().upsertAll(entities)
         return entities.size
     }
