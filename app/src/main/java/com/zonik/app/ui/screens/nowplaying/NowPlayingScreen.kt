@@ -1,31 +1,49 @@
 package com.zonik.app.ui.screens.nowplaying
 
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.palette.graphics.Palette
+import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
 import com.zonik.app.ui.util.formatDurationMs
 import com.zonik.app.ui.util.formatFileSize
+import com.zonik.app.ui.util.formatDuration
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -115,8 +133,6 @@ class NowPlayingViewModel @Inject constructor(
     }
 }
 
-// --- Helpers (moved to FormatUtils) ---
-
 // --- Screen ---
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -139,6 +155,41 @@ fun NowPlayingScreen(
     var seekPosition by remember { mutableFloatStateOf(0f) }
     var showDetails by remember { mutableStateOf(false) }
 
+    // Palette colors extracted from cover art
+    var dominantColor by remember { mutableStateOf(Color(0xFF1A1A2E)) }
+    var accentColor by remember { mutableStateOf(Color(0xFF7C4DFF)) }
+
+    val animatedDominant by animateColorAsState(
+        targetValue = dominantColor,
+        animationSpec = tween(800),
+        label = "dominantColor"
+    )
+    val animatedAccent by animateColorAsState(
+        targetValue = accentColor,
+        animationSpec = tween(800),
+        label = "accentColor"
+    )
+
+    // Extract palette from cover art
+    val context = LocalContext.current
+    LaunchedEffect(currentTrack?.coverArt) {
+        val coverArtId = currentTrack?.coverArt ?: return@LaunchedEffect
+        val imageUrl = "http://localhost/rest/getCoverArt.view?id=$coverArtId&size=300"
+        try {
+            val request = ImageRequest.Builder(context)
+                .data(imageUrl)
+                .allowHardware(false)
+                .build()
+            val result = context.imageLoader.execute(request)
+            if (result is SuccessResult) {
+                val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@LaunchedEffect
+                val palette = Palette.from(bitmap).generate()
+                dominantColor = Color(palette.getDarkMutedColor(0xFF1A1A2E.toInt()))
+                accentColor = Color(palette.getVibrantColor(0xFF7C4DFF.toInt()))
+            }
+        } catch (_: Exception) {}
+    }
+
     // Position polling
     LaunchedEffect(isPlaying, currentTrack) {
         while (true) {
@@ -152,87 +203,142 @@ fun NowPlayingScreen(
 
     val track = currentTrack
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Now Playing", maxLines = 1) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Collapse")
-                    }
-                }
+    // Full screen with blurred background
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        // Blurred album art background
+        if (track?.coverArt != null) {
+            CoverArt(
+                coverArtId = track.coverArt,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(80.dp),
+                size = 150
+            )
+            // Dark overlay for readability
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                animatedDominant.copy(alpha = 0.7f),
+                                Color.Black.copy(alpha = 0.85f),
+                                Color.Black.copy(alpha = 0.95f)
+                            )
+                        )
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                animatedDominant.copy(alpha = 0.5f),
+                                Color.Black
+                            )
+                        )
+                    )
             )
         }
-    ) { padding ->
-        val gradientColors = listOf(
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-            MaterialTheme.colorScheme.surface
-        )
 
+        // Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(gradientColors))
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            // Top bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Collapse",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                Text(
+                    text = "Now Playing",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+                IconButton(onClick = { showDetails = !showDetails }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "More",
+                        tint = Color.White
+                    )
+                }
+            }
 
-            // Album art
+            Spacer(modifier = Modifier.weight(0.5f))
+
+            // Album art — large, centered, rounded
             CoverArt(
                 coverArtId = track?.coverArt,
                 contentDescription = track?.album,
                 modifier = Modifier
-                    .padding(horizontal = 32.dp)
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(16.dp)),
+                    .clip(RoundedCornerShape(12.dp)),
                 size = 600
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.weight(0.5f))
 
-            // Track title
+            // Track info
             Text(
                 text = track?.title ?: "",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Start,
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Artist
             Text(
                 text = track?.artist ?: "",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = animatedAccent,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Start,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // Album
             Text(
                 text = track?.album ?: "",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color.White.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Start,
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Seek bar
+            // Seek bar — thin, accent colored
             val sliderValue = if (isSeeking) {
                 seekPosition
             } else if (durationMs > 0) {
@@ -253,34 +359,37 @@ fun NowPlayingScreen(
                     positionMs = seekMs
                     isSeeking = false
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = animatedAccent,
+                    activeTrackColor = animatedAccent,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+                )
             )
 
-            // Position / Duration labels
+            // Time labels
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val displayPosition = if (isSeeking) {
-                    (seekPosition * durationMs).toLong()
-                } else {
-                    positionMs
-                }
+                val displayPos = if (isSeeking) (seekPosition * durationMs).toLong() else positionMs
                 Text(
-                    text = formatDurationMs(displayPosition),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = formatDurationMs(displayPos),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.6f)
                 )
                 Text(
                     text = formatDurationMs(durationMs),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.6f)
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Primary controls: Shuffle, Previous, Play/Pause, Next, Repeat
+            // Primary controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -288,41 +397,48 @@ fun NowPlayingScreen(
             ) {
                 IconButton(onClick = { viewModel.toggleShuffle() }) {
                     Icon(
-                        imageVector = Icons.Default.Shuffle,
+                        Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (shuffleEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        tint = if (shuffleEnabled) animatedAccent else Color.White.copy(alpha = 0.5f)
                     )
                 }
 
-                IconButton(onClick = { viewModel.skipPrevious() }) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Previous",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-
-                LargeFloatingActionButton(
-                    onClick = { viewModel.togglePlayPause() },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                IconButton(
+                    onClick = { viewModel.skipPrevious() },
+                    modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        Icons.Default.SkipPrevious,
+                        contentDescription = "Previous",
+                        tint = Color.White,
                         modifier = Modifier.size(36.dp)
                     )
                 }
 
-                IconButton(onClick = { viewModel.skipNext() }) {
+                // Play/Pause — large circle
+                FloatingActionButton(
+                    onClick = { viewModel.togglePlayPause() },
+                    shape = CircleShape,
+                    containerColor = animatedAccent,
+                    contentColor = Color.Black,
+                    modifier = Modifier.size(72.dp)
+                ) {
                     Icon(
-                        imageVector = Icons.Default.SkipNext,
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { viewModel.skipNext() },
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SkipNext,
                         contentDescription = "Next",
-                        modifier = Modifier.size(32.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
                     )
                 }
 
@@ -333,18 +449,14 @@ fun NowPlayingScreen(
                             else -> Icons.Default.Repeat
                         },
                         contentDescription = "Repeat",
-                        tint = if (repeatState != RepeatState.OFF) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        tint = if (repeatState != RepeatState.OFF) animatedAccent else Color.White.copy(alpha = 0.5f)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Secondary controls: Star, Speed, Timer, Queue
+            // Secondary controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -353,104 +465,67 @@ fun NowPlayingScreen(
                 IconButton(onClick = { viewModel.toggleStar() }) {
                     Icon(
                         imageVector = if (isStarred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = if (isStarred) "Unstar" else "Star",
-                        tint = if (isStarred) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        contentDescription = "Favorite",
+                        tint = if (isStarred) animatedAccent else Color.White.copy(alpha = 0.5f)
                     )
                 }
 
-                TextButton(onClick = { viewModel.cyclePlaybackSpeed() }) {
-                    Icon(
-                        imageVector = Icons.Default.Speed,
-                        contentDescription = "Playback Speed",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "${playbackSpeed}x")
-                }
-
-                IconButton(onClick = { /* TODO: Sleep timer */ }) {
-                    Icon(
-                        imageVector = Icons.Default.Timer,
-                        contentDescription = "Sleep Timer",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                // Format badge
+                if (track?.suffix != null || track?.bitRate != null) {
+                    Surface(
+                        color = Color.White.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = listOfNotNull(
+                                track.suffix?.uppercase(),
+                                track.bitRate?.let { "${it}k" }
+                            ).joinToString(" "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
 
                 IconButton(onClick = onOpenQueue) {
                     Icon(
-                        imageVector = Icons.Default.QueueMusic,
+                        Icons.AutoMirrored.Filled.QueueMusic,
                         contentDescription = "Queue",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = Color.White.copy(alpha = 0.5f)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Song details (collapsible)
-            if (track != null) {
-                Surface(
-                    onClick = { showDetails = !showDetails },
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+            // Collapsible song details
+            AnimatedVisibility(visible = showDetails) {
+                if (track != null) {
+                    Surface(
+                        color = Color.White.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                text = "Song Details",
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                            Icon(
-                                imageVector = if (showDetails) {
-                                    Icons.Default.KeyboardArrowUp
-                                } else {
-                                    Icons.Default.KeyboardArrowDown
-                                },
-                                contentDescription = if (showDetails) "Collapse" else "Expand"
-                            )
-                        }
-
-                        AnimatedVisibility(visible = showDetails) {
-                            Column(
-                                modifier = Modifier.padding(top = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                track.bitRate?.let { bitRate ->
-                                    DetailRow(label = "Bitrate", value = "$bitRate kbps")
-                                }
-                                track.suffix?.let { format ->
-                                    DetailRow(label = "Format", value = format.uppercase())
-                                }
-                                track.size?.let { size ->
-                                    val formatted = com.zonik.app.ui.util.formatFileSize(size)
-                                    if (formatted.isNotEmpty()) {
-                                        DetailRow(label = "File Size", value = formatted)
-                                    }
-                                }
-                                track.duration.let { duration ->
-                                    if (duration > 0) {
-                                        DetailRow(
-                                            label = "Duration",
-                                            value = com.zonik.app.ui.util.formatDuration(duration)
-                                        )
-                                    }
-                                }
+                            track.bitRate?.let { DetailRow("Bitrate", "$it kbps") }
+                            track.suffix?.let { DetailRow("Format", it.uppercase()) }
+                            track.size?.let {
+                                val s = formatFileSize(it)
+                                if (s.isNotEmpty()) DetailRow("Size", s)
                             }
+                            if (track.duration > 0) DetailRow("Duration", formatDuration(track.duration))
+                            track.genre?.let { DetailRow("Genre", it) }
+                            track.year?.let { DetailRow("Year", it.toString()) }
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -461,14 +536,7 @@ private fun DetailRow(label: String, value: String) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall
-        )
+        Text(label, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f))
+        Text(value, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
     }
 }
