@@ -1,8 +1,10 @@
 package com.zonik.app.ui.screens.nowplaying
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -10,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -20,6 +24,8 @@ import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
+import com.zonik.app.ui.util.formatDurationMs
+import com.zonik.app.ui.util.formatFileSize
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -109,24 +115,7 @@ class NowPlayingViewModel @Inject constructor(
     }
 }
 
-// --- Helpers ---
-
-fun formatDuration(ms: Long): String {
-    if (ms <= 0) return "0:00"
-    val totalSeconds = ms / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%d:%02d".format(minutes, seconds)
-}
-
-fun formatFileSize(bytes: Long?): String {
-    if (bytes == null || bytes <= 0) return ""
-    return when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
-        else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
-    }
-}
+// --- Helpers (moved to FormatUtils) ---
 
 // --- Screen ---
 
@@ -175,9 +164,15 @@ fun NowPlayingScreen(
             )
         }
     ) { padding ->
+        val gradientColors = listOf(
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+            MaterialTheme.colorScheme.surface
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Brush.verticalGradient(gradientColors))
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
@@ -190,8 +185,10 @@ fun NowPlayingScreen(
                 coverArtId = track?.coverArt,
                 contentDescription = track?.album,
                 modifier = Modifier
+                    .padding(horizontal = 32.dp)
                     .fillMaxWidth()
-                    .aspectRatio(1f),
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(16.dp)),
                 size = 600
             )
 
@@ -270,12 +267,12 @@ fun NowPlayingScreen(
                     positionMs
                 }
                 Text(
-                    text = formatDuration(displayPosition),
+                    text = formatDurationMs(displayPosition),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = formatDuration(durationMs),
+                    text = formatDurationMs(durationMs),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -309,7 +306,7 @@ fun NowPlayingScreen(
                     )
                 }
 
-                FloatingActionButton(
+                LargeFloatingActionButton(
                     onClick = { viewModel.togglePlayPause() },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -317,7 +314,7 @@ fun NowPlayingScreen(
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
 
@@ -434,7 +431,7 @@ fun NowPlayingScreen(
                                     DetailRow(label = "Format", value = format.uppercase())
                                 }
                                 track.size?.let { size ->
-                                    val formatted = formatFileSize(size)
+                                    val formatted = com.zonik.app.ui.util.formatFileSize(size)
                                     if (formatted.isNotEmpty()) {
                                         DetailRow(label = "File Size", value = formatted)
                                     }
@@ -443,7 +440,7 @@ fun NowPlayingScreen(
                                     if (duration > 0) {
                                         DetailRow(
                                             label = "Duration",
-                                            value = formatDuration(duration.toLong() * 1000)
+                                            value = com.zonik.app.ui.util.formatDuration(duration)
                                         )
                                     }
                                 }

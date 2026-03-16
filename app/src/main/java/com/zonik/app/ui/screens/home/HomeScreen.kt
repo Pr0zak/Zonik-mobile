@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shuffle
@@ -29,6 +30,7 @@ import com.zonik.app.model.Album
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -99,6 +101,7 @@ class HomeViewModel @Inject constructor(
 @Composable
 fun HomeScreen(
     onNavigateToLibraryTracks: (() -> Unit)? = null,
+    onNavigateToAlbum: ((String) -> Unit)? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val recentAlbums by viewModel.recentAlbums.collectAsState()
@@ -136,7 +139,10 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             // Sync status banner
-            SyncBanner(syncState = syncState)
+            SyncBanner(
+                syncState = syncState,
+                onDismiss = {}
+            )
 
             // Quick actions
             Row(
@@ -211,7 +217,10 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(recentAlbums, key = { it.id }) { album ->
-                        AlbumCard(album = album)
+                        AlbumCard(
+                            album = album,
+                            onClick = { onNavigateToAlbum?.invoke(album.id) }
+                        )
                     }
                 }
             }
@@ -292,7 +301,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SyncBanner(syncState: SyncState) {
+private fun SyncBanner(syncState: SyncState, onDismiss: () -> Unit) {
     if (syncState.isSyncing) {
         Surface(
             color = MaterialTheme.colorScheme.primaryContainer,
@@ -341,16 +350,37 @@ private fun SyncBanner(syncState: SyncState) {
     }
 
     if (!syncState.isSyncing && syncState.error == null && syncState.lastSyncResult != null) {
-        Surface(
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = syncState.lastSyncResult,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
+        var dismissed by remember(syncState.lastSyncResult) { mutableStateOf(false) }
+
+        LaunchedEffect(syncState.lastSyncResult) {
+            delay(8000)
+            dismissed = true
+        }
+
+        if (!dismissed) {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = syncState.lastSyncResult,
+                        modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    IconButton(onClick = { dismissed = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -391,8 +421,9 @@ private fun RecentlyPlayedCard(track: Track, onClick: () -> Unit, modifier: Modi
 }
 
 @Composable
-fun AlbumCard(album: Album, modifier: Modifier = Modifier) {
+fun AlbumCard(album: Album, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
     Card(
+        onClick = onClick,
         modifier = modifier.width(150.dp)
     ) {
         Column(modifier = Modifier.padding(8.dp)) {

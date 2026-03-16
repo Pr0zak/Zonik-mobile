@@ -12,76 +12,127 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
 import com.zonik.app.media.PlaybackManager
+import com.zonik.app.model.Track
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import javax.inject.Inject
+
+@HiltViewModel
+class MiniPlayerViewModel @Inject constructor(
+    private val playbackManager: PlaybackManager
+) : ViewModel() {
+
+    val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
+    val isPlaying: StateFlow<Boolean> = playbackManager.isPlaying
+
+    fun getCurrentPosition(): Long = playbackManager.getCurrentPosition()
+    fun getDuration(): Long = playbackManager.getDuration()
+
+    fun togglePlayPause() {
+        playbackManager.togglePlayPause()
+    }
+
+    fun skipNext() {
+        playbackManager.skipNext()
+    }
+}
 
 @Composable
 fun MiniPlayer(
     onClick: () -> Unit = {},
-    playbackManager: PlaybackManager? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: MiniPlayerViewModel = hiltViewModel()
 ) {
-    // If no playback manager provided, don't render
-    if (playbackManager == null) return
-
-    val currentTrack by playbackManager.currentTrack.collectAsState()
-    val isPlaying by playbackManager.isPlaying.collectAsState()
+    val currentTrack by viewModel.currentTrack.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
 
     val track = currentTrack ?: return
+
+    // Poll playback position while playing
+    var position by remember { mutableStateOf(0L) }
+    var duration by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(isPlaying, track) {
+        while (isActive) {
+            position = viewModel.getCurrentPosition()
+            duration = viewModel.getDuration()
+            delay(500)
+        }
+    }
+
+    val progress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(64.dp)
             .clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 3.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CoverArt(
-                coverArtId = track.coverArt,
-                contentDescription = track.title,
-                modifier = Modifier.size(48.dp),
-                size = 150
+        Column {
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             )
 
-            Column(
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp)
+                    .fillMaxWidth()
+                    .height(62.dp)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                CoverArt(
+                    coverArtId = track.coverArt,
+                    contentDescription = track.title,
+                    modifier = Modifier.size(48.dp),
+                    size = 150
                 )
-                Text(
-                    text = track.artist,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
 
-            IconButton(onClick = { playbackManager.togglePlayPause() }) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play"
-                )
-            }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                ) {
+                    Text(
+                        text = track.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = track.artist,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
-            IconButton(onClick = { playbackManager.skipNext() }) {
-                Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = "Next"
-                )
+                IconButton(onClick = { viewModel.togglePlayPause() }) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play"
+                    )
+                }
+
+                IconButton(onClick = { viewModel.skipNext() }) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Next"
+                    )
+                }
             }
         }
     }

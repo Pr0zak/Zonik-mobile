@@ -41,6 +41,9 @@ import com.zonik.app.ui.screens.nowplaying.NowPlayingScreen
 import com.zonik.app.ui.screens.playlists.PlaylistsScreen
 import com.zonik.app.ui.screens.search.SearchScreen
 import com.zonik.app.ui.screens.settings.SettingsScreen
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import com.zonik.app.ui.theme.ZonikTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -150,10 +153,12 @@ fun ZonikApp(viewModel: MainViewModel = hiltViewModel()) {
             }
         }
 
-        if (showNowPlaying) {
-            NowPlayingScreen(
-                onBack = { showNowPlaying = false }
-            )
+        AnimatedVisibility(
+            visible = showNowPlaying,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it })
+        ) {
+            NowPlayingScreen(onBack = { showNowPlaying = false })
         }
     }
 }
@@ -234,6 +239,9 @@ fun MainScreen(
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onNavigateToAlbum = { albumId ->
+                        rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
                     }
                 )
             }
