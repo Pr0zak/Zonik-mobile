@@ -171,6 +171,14 @@ class ZonikMediaService : MediaLibraryService() {
         ))
     }
 
+    private fun buildStreamUrlForTrack(trackId: String): String {
+        val config = runBlocking { settingsRepository.serverConfig.first() }
+            ?: return "http://localhost/rest/stream.view?id=$trackId"
+        val salt = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }.joinToString("")
+        val token = md5("${config.apiKey}$salt")
+        return "${config.url.trimEnd('/')}/rest/stream.view?id=$trackId&estimateContentLength=true&u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp"
+    }
+
     private fun buildAuthenticatedUrl(baseUrl: String): String {
         val config = runBlocking {
             settingsRepository.serverConfig.first()
@@ -292,16 +300,20 @@ class ZonikMediaService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>
         ): ListenableFuture<MutableList<MediaItem>> {
-            // Resolve media items from controller — set the URI from requestMetadata or mediaId
+            // Media3 strips localConfiguration (URI) during controller→service IPC.
+            // Reconstruct the stream URL from requestMetadata.mediaUri (set by PlaybackManager).
+            // If that's also null, the mediaId is a track ID — build the stream URL from it.
             val resolved = mediaItems.map { item ->
-                if (item.localConfiguration != null) {
-                    // Already has a URI, pass through
-                    item
+                val uri = item.requestMetadata.mediaUri
+                    ?: item.localConfiguration?.uri
+                if (uri != null) {
+                    item.buildUpon().setUri(uri).build()
                 } else {
-                    // Build from mediaId or requestMetadata
-                    item.buildUpon()
-                        .setUri(item.requestMetadata.mediaUri ?: android.net.Uri.parse(item.mediaId))
-                        .build()
+                    // Fallback: build stream URL from mediaId (track ID)
+                    val trackId = item.mediaId
+                    val streamUrl = buildStreamUrlForTrack(trackId)
+                    com.zonik.app.data.DebugLog.d("MediaService", "Built stream URL for track $trackId: ${streamUrl.take(80)}...")
+                    item.buildUpon().setUri(streamUrl).build()
                 }
             }.toMutableList()
             com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: ${resolved.size} items, first URI: ${resolved.firstOrNull()?.localConfiguration?.uri}")

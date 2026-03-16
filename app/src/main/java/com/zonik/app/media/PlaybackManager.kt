@@ -174,6 +174,11 @@ class PlaybackManager @Inject constructor(
         return MediaItem.Builder()
             .setMediaId(track.id)
             .setUri(streamUrl)
+            .setRequestMetadata(
+                MediaItem.RequestMetadata.Builder()
+                    .setMediaUri(Uri.parse(streamUrl))
+                    .build()
+            )
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(track.title)
