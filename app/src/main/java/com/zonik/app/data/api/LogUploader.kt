@@ -53,7 +53,7 @@ class LogUploader @Inject constructor(
             val appVersion = "App: Zonik v${getAppVersion()}"
             val header = "=== Zonik Debug Logs ===\n$timestamp\n$deviceInfo\n$appVersion\n${"=".repeat(40)}\n\n"
 
-            val logs = header + DebugLog.getAll()
+            val logs = header + DebugLog.getPersistedLogs()
 
             val gistBody = GistRequest(
                 description = "Zonik debug logs - $timestamp",

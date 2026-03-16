@@ -29,6 +29,7 @@ class ZonikApplication : Application(), Configuration.Provider, ImageLoaderFacto
 
     override fun onCreate() {
         super.onCreate()
+        com.zonik.app.data.DebugLog.init(this)
         createNotificationChannels()
     }
 

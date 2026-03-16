@@ -37,6 +37,21 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class TrackSort(val label: String) {
+    TITLE("Title"),
+    ARTIST("Artist"),
+    ALBUM("Album"),
+    DURATION("Duration"),
+    RECENT("Recently Added")
+}
+
+enum class AlbumSort(val label: String) {
+    NAME("Name"),
+    ARTIST("Artist"),
+    YEAR("Year"),
+    RECENT("Recently Added")
+}
+
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
@@ -51,6 +66,43 @@ class LibraryViewModel @Inject constructor(
 
     val tracks = libraryRepository.getAllTracks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _trackSort = MutableStateFlow(TrackSort.RECENT)
+    val trackSort: StateFlow<TrackSort> = _trackSort.asStateFlow()
+
+    private val _trackSortAsc = MutableStateFlow(false)
+    val trackSortAsc: StateFlow<Boolean> = _trackSortAsc.asStateFlow()
+
+    private val _trackFormatFilter = MutableStateFlow<String?>(null)
+    val trackFormatFilter: StateFlow<String?> = _trackFormatFilter.asStateFlow()
+
+    private val _albumSort = MutableStateFlow(AlbumSort.RECENT)
+    val albumSort: StateFlow<AlbumSort> = _albumSort.asStateFlow()
+
+    private val _albumSortAsc = MutableStateFlow(false)
+    val albumSortAsc: StateFlow<Boolean> = _albumSortAsc.asStateFlow()
+
+    fun setTrackSort(sort: TrackSort) {
+        if (_trackSort.value == sort) {
+            _trackSortAsc.value = !_trackSortAsc.value
+        } else {
+            _trackSort.value = sort
+            _trackSortAsc.value = sort != TrackSort.RECENT
+        }
+    }
+
+    fun setTrackFormatFilter(format: String?) {
+        _trackFormatFilter.value = format
+    }
+
+    fun setAlbumSort(sort: AlbumSort) {
+        if (_albumSort.value == sort) {
+            _albumSortAsc.value = !_albumSortAsc.value
+        } else {
+            _albumSort.value = sort
+            _albumSortAsc.value = sort != AlbumSort.RECENT
+        }
+    }
 
     private val _genres = MutableStateFlow<List<Genre>>(emptyList())
     val genres: StateFlow<List<Genre>> = _genres.asStateFlow()
@@ -102,6 +154,29 @@ class LibraryViewModel @Inject constructor(
             } else {
                 libraryRepository.markForDeletion(track.id)
             }
+        }
+    }
+
+    fun playGenre(genre: String) {
+        viewModelScope.launch {
+            try {
+                val tracks = libraryRepository.getRandomSongs(count = 100, genre = genre)
+                if (tracks.isNotEmpty()) {
+                    playbackManager.setShuffleEnabled(true)
+                    playbackManager.playTracks(tracks)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun playPlaylist(playlistId: String) {
+        viewModelScope.launch {
+            try {
+                val tracks = libraryRepository.getPlaylistTracks(playlistId)
+                if (tracks.isNotEmpty()) {
+                    playbackManager.playTracks(tracks)
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -185,24 +260,22 @@ fun LibraryScreen(
                 )
                 LibraryTab.ALBUMS -> AlbumsTab(
                     albums = albums,
-                    onAlbumClick = onNavigateToAlbum
+                    onAlbumClick = onNavigateToAlbum,
+                    viewModel = viewModel
                 )
                 LibraryTab.TRACKS -> TracksTab(
                     tracks = tracks,
-                    onPlayTrack = viewModel::playTrack,
-                    onPlayAll = viewModel::playAllTracks,
-                    onShuffleAll = viewModel::shuffleAllTracks,
-                    onPlayNext = viewModel::playNext,
-                    onAddToQueue = viewModel::addToQueue,
-                    onToggleMarkForDeletion = viewModel::toggleMarkForDeletion
+                    viewModel = viewModel
                 )
                 LibraryTab.GENRES -> GenresTab(
                     genres = genres,
-                    isLoading = isLoadingGenres
+                    isLoading = isLoadingGenres,
+                    onPlayGenre = viewModel::playGenre
                 )
                 LibraryTab.PLAYLISTS -> PlaylistsTab(
                     playlists = playlists,
-                    isLoading = isLoadingPlaylists
+                    isLoading = isLoadingPlaylists,
+                    onPlayPlaylist = viewModel::playPlaylist
                 )
             }
         }
@@ -250,28 +323,69 @@ private fun ArtistsTab(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AlbumsTab(
     albums: List<Album>,
-    onAlbumClick: (String) -> Unit
+    onAlbumClick: (String) -> Unit,
+    viewModel: LibraryViewModel
 ) {
+    val albumSort by viewModel.albumSort.collectAsState()
+    val albumSortAsc by viewModel.albumSortAsc.collectAsState()
+
     if (albums.isEmpty()) {
         EmptyState(message = "No albums found")
         return
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(albums, key = { it.id }) { album ->
-            AlbumGridCard(
-                album = album,
-                onClick = { onAlbumClick(album.id) }
-            )
+    val sortedAlbums = remember(albums, albumSort, albumSortAsc) {
+        val sorted = when (albumSort) {
+            AlbumSort.NAME -> albums.sortedBy { it.name.lowercase() }
+            AlbumSort.ARTIST -> albums.sortedBy { it.artist.lowercase() }
+            AlbumSort.YEAR -> albums.sortedBy { it.year ?: 0 }
+            AlbumSort.RECENT -> albums
+        }
+        if (albumSortAsc || albumSort == AlbumSort.RECENT && albumSortAsc) sorted else sorted.reversed()
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        FlowRow(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            AlbumSort.entries.forEach { sort ->
+                val selected = albumSort == sort
+                FilterChip(
+                    selected = selected,
+                    onClick = { viewModel.setAlbumSort(sort) },
+                    label = { Text(sort.label, style = MaterialTheme.typography.labelSmall) },
+                    trailingIcon = if (selected) {
+                        {
+                            Icon(
+                                if (albumSortAsc) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    } else null
+                )
+            }
+        }
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(sortedAlbums, key = { it.id }) { album ->
+                AlbumGridCard(
+                    album = album,
+                    onClick = { onAlbumClick(album.id) }
+                )
+            }
         }
     }
 }
@@ -323,7 +437,8 @@ private fun AlbumGridCard(
 @Composable
 private fun GenresTab(
     genres: List<Genre>,
-    isLoading: Boolean
+    isLoading: Boolean,
+    onPlayGenre: (String) -> Unit
 ) {
     if (isLoading) {
         Box(
@@ -355,71 +470,154 @@ private fun GenresTab(
                 },
                 supportingContent = {
                     Text(
-                        text = "${genre.songCount} song${if (genre.songCount != 1) "s" else ""} \u00b7 " +
+                        text = "${genre.songCount} song${if (genre.songCount != 1) "s" else ""} · " +
                             "${genre.albumCount} album${if (genre.albumCount != 1) "s" else ""}"
                     )
-                }
+                },
+                trailingContent = {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                modifier = Modifier.clickable { onPlayGenre(genre.name) }
             )
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TracksTab(
     tracks: List<Track>,
-    onPlayTrack: (Track) -> Unit,
-    onPlayAll: () -> Unit,
-    onShuffleAll: () -> Unit,
-    onPlayNext: (Track) -> Unit,
-    onAddToQueue: (Track) -> Unit,
-    onToggleMarkForDeletion: (Track) -> Unit
+    viewModel: LibraryViewModel
 ) {
+    val trackSort by viewModel.trackSort.collectAsState()
+    val trackSortAsc by viewModel.trackSortAsc.collectAsState()
+    val formatFilter by viewModel.trackFormatFilter.collectAsState()
+
     if (tracks.isEmpty()) {
         EmptyState(message = "No tracks found")
         return
     }
 
+    // Get available formats for filter chips
+    val formats = remember(tracks) {
+        tracks.mapNotNull { it.suffix?.uppercase() }.distinct().sorted()
+    }
+
+    // Apply filter and sort
+    val sortedTracks = remember(tracks, trackSort, trackSortAsc, formatFilter) {
+        val filtered = if (formatFilter != null) {
+            tracks.filter { it.suffix?.uppercase() == formatFilter }
+        } else tracks
+
+        val sorted = when (trackSort) {
+            TrackSort.TITLE -> filtered.sortedBy { it.title.lowercase() }
+            TrackSort.ARTIST -> filtered.sortedBy { it.artist.lowercase() }
+            TrackSort.ALBUM -> filtered.sortedWith(compareBy({ it.album.lowercase() }, { it.track ?: 0 }))
+            TrackSort.DURATION -> filtered.sortedBy { it.duration }
+            TrackSort.RECENT -> filtered // Already in recent order from DB
+        }
+        if (trackSortAsc || trackSort == TrackSort.RECENT && trackSortAsc) sorted else sorted.reversed()
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp)
+        contentPadding = PaddingValues(vertical = 4.dp)
     ) {
-        // Play All / Shuffle button row
+        // Play All / Shuffle row
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilledTonalButton(
-                    onClick = onPlayAll,
+                    onClick = { viewModel.playAllTracks() },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Play All")
                 }
                 FilledTonalButton(
-                    onClick = onShuffleAll,
+                    onClick = { viewModel.shuffleAllTracks() },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Shuffle")
                 }
             }
         }
 
-        items(tracks, key = { it.id }) { track ->
+        // Sort chips
+        item {
+            FlowRow(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                TrackSort.entries.forEach { sort ->
+                    val selected = trackSort == sort
+                    FilterChip(
+                        selected = selected,
+                        onClick = { viewModel.setTrackSort(sort) },
+                        label = { Text(sort.label, style = MaterialTheme.typography.labelSmall) },
+                        trailingIcon = if (selected) {
+                            {
+                                Icon(
+                                    if (trackSortAsc) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        } else null
+                    )
+                }
+            }
+        }
+
+        // Format filter chips
+        if (formats.size > 1) {
+            item {
+                FlowRow(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    FilterChip(
+                        selected = formatFilter == null,
+                        onClick = { viewModel.setTrackFormatFilter(null) },
+                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
+                    )
+                    formats.forEach { fmt ->
+                        FilterChip(
+                            selected = formatFilter == fmt,
+                            onClick = {
+                                viewModel.setTrackFormatFilter(if (formatFilter == fmt) null else fmt)
+                            },
+                            label = { Text(fmt, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Track count
+        item {
+            Text(
+                text = "${sortedTracks.size} tracks",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+
+        items(sortedTracks, key = { it.id }) { track ->
             var showMenu by remember { mutableStateOf(false) }
 
             Box {
@@ -473,7 +671,7 @@ private fun TracksTab(
                         }
                     },
                     modifier = Modifier.combinedClickable(
-                        onClick = { onPlayTrack(track) },
+                        onClick = { viewModel.playTrack(track) },
                         onLongClick = { showMenu = true }
                     )
                 )
@@ -484,33 +682,18 @@ private fun TracksTab(
                 ) {
                     DropdownMenuItem(
                         text = { Text("Play") },
-                        onClick = {
-                            showMenu = false
-                            onPlayTrack(track)
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        }
+                        onClick = { showMenu = false; viewModel.playTrack(track) },
+                        leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
                     )
                     DropdownMenuItem(
                         text = { Text("Play Next") },
-                        onClick = {
-                            showMenu = false
-                            onPlayNext(track)
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.QueuePlayNext, contentDescription = null)
-                        }
+                        onClick = { showMenu = false; viewModel.playNext(track) },
+                        leadingIcon = { Icon(Icons.Default.QueuePlayNext, contentDescription = null) }
                     )
                     DropdownMenuItem(
                         text = { Text("Add to Queue") },
-                        onClick = {
-                            showMenu = false
-                            onAddToQueue(track)
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.AddToQueue, contentDescription = null)
-                        }
+                        onClick = { showMenu = false; viewModel.addToQueue(track) },
+                        leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
                     )
                     DropdownMenuItem(
                         text = {
@@ -519,10 +702,7 @@ private fun TracksTab(
                                 color = if (!track.markedForDeletion) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                             )
                         },
-                        onClick = {
-                            showMenu = false
-                            onToggleMarkForDeletion(track)
-                        },
+                        onClick = { showMenu = false; viewModel.toggleMarkForDeletion(track) },
                         leadingIcon = {
                             Icon(
                                 if (track.markedForDeletion) Icons.Default.RestoreFromTrash else Icons.Default.DeleteOutline,
@@ -535,7 +715,6 @@ private fun TracksTab(
             }
         }
 
-        // Bottom spacing for mini player
         item {
             Spacer(modifier = Modifier.height(80.dp))
         }
@@ -545,7 +724,8 @@ private fun TracksTab(
 @Composable
 private fun PlaylistsTab(
     playlists: List<Playlist>,
-    isLoading: Boolean
+    isLoading: Boolean,
+    onPlayPlaylist: (String) -> Unit
 ) {
     if (isLoading) {
         Box(
@@ -579,7 +759,22 @@ private fun PlaylistsTab(
                     Text(
                         text = "${playlist.songCount} track${if (playlist.songCount != 1) "s" else ""}"
                     )
-                }
+                },
+                leadingContent = {
+                    CoverArt(
+                        coverArtId = playlist.coverArt,
+                        contentDescription = playlist.name,
+                        modifier = Modifier.size(48.dp)
+                    )
+                },
+                trailingContent = {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                modifier = Modifier.clickable { onPlayPlaylist(playlist.id) }
             )
         }
     }

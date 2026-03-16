@@ -11,7 +11,11 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.zonik.app.data.DebugLog
+import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SettingsRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.zonik.app.model.ServerConfig
 import com.zonik.app.model.Track
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -32,8 +36,10 @@ import javax.inject.Singleton
 @Singleton
 class PlaybackManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val libraryRepository: LibraryRepository
 ) {
+    private val scope = CoroutineScope(Dispatchers.IO)
     private var controller: MediaController? = null
 
     // Tracks expected start index during playlist setup to work around Media3
@@ -55,6 +61,9 @@ class PlaybackManager @Inject constructor(
 
     private val _playbackRequested = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val playbackRequested: Flow<Unit> = _playbackRequested
+
+    // Scrobble tracking — scrobble once when track plays >50%
+    private var scrobbledTrackId: String? = null
 
     suspend fun connect() {
         if (controller != null) return
@@ -81,7 +90,9 @@ class PlaybackManager @Inject constructor(
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val index = controller?.currentMediaItemIndex ?: -1
-                DebugLog.d("Playback", "Track transition: mediaId='${mediaItem?.mediaId}' index=$index reason=$reason pendingStart=$_pendingStartIndex")
+                val metaTitle = mediaItem?.mediaMetadata?.title?.toString()
+                val metaArtist = mediaItem?.mediaMetadata?.artist?.toString()
+                DebugLog.d("Playback", "Track transition: title='$metaTitle' artist='$metaArtist' index=$index reason=$reason pendingStart=$_pendingStartIndex")
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED && _pendingStartIndex >= 0) {
                     // Media3 processes onAddMediaItems per-item, causing a spurious
                     // PLAYLIST_CHANGED transition to the wrong index. Correct it.
@@ -95,6 +106,14 @@ class PlaybackManager @Inject constructor(
                         updateCurrentTrackByIndex(index)
                     }
                     return
+                }
+                // Match by metadata first (more reliable than index after shuffle/IPC)
+                if (metaTitle != null) {
+                    val match = findTrackByMetadata(metaTitle, metaArtist)
+                    if (match != null) {
+                        setCurrentTrack(match)
+                        return
+                    }
                 }
                 updateCurrentTrackByIndex(index)
             }
@@ -204,8 +223,30 @@ class PlaybackManager @Inject constructor(
         controller?.repeatMode = mode
     }
 
-    fun getCurrentPosition(): Long = controller?.currentPosition ?: 0L
+    fun getCurrentPosition(): Long {
+        val pos = controller?.currentPosition ?: 0L
+        checkScrobble(pos)
+        return pos
+    }
     fun getDuration(): Long = controller?.duration ?: 0L
+
+    private fun checkScrobble(positionMs: Long) {
+        val track = _currentTrack.value ?: return
+        if (track.id == scrobbledTrackId) return
+        val duration = controller?.duration ?: 0L
+        if (duration <= 0) return
+        if (positionMs > duration / 2) {
+            scrobbledTrackId = track.id
+            scope.launch {
+                try {
+                    libraryRepository.scrobble(track.id)
+                    DebugLog.d("Playback", "Scrobbled: ${track.title}")
+                } catch (e: Exception) {
+                    DebugLog.w("Playback", "Scrobble failed: ${e.message}")
+                }
+            }
+        }
+    }
 
     fun release() {
         controller?.release()
@@ -253,6 +294,18 @@ class PlaybackManager @Inject constructor(
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
+    private fun findTrackByMetadata(title: String, artist: String?): Track? {
+        val queue = _queue.value
+        return queue.find { it.title == title && (artist == null || it.artist == artist) }
+    }
+
+    private fun setCurrentTrack(track: Track) {
+        DebugLog.d("Playback", "Now playing: ${track.title} by ${track.artist}")
+        _currentTrack.value = track
+        scrobbledTrackId = null
+        addToRecentlyPlayed(track)
+    }
+
     private fun updateCurrentTrackByIndex(index: Int) {
         val queue = _queue.value
         if (index < 0 || index >= queue.size) {
@@ -260,10 +313,7 @@ class PlaybackManager @Inject constructor(
             _currentTrack.value = null
             return
         }
-        val track = queue[index]
-        DebugLog.d("Playback", "Now playing: ${track.title} by ${track.artist}")
-        _currentTrack.value = track
-        addToRecentlyPlayed(track)
+        setCurrentTrack(queue[index])
     }
 
     private fun getServerConfig(): ServerConfig? {

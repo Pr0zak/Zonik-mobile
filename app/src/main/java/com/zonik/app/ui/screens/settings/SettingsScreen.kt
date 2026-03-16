@@ -729,7 +729,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
                 headlineContent = {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(onClick = {
-                            val logs = DebugLog.getAll()
+                            val logs = DebugLog.getPersistedLogs()
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("Zonik Logs", logs))
                             copied = true

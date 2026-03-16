@@ -7,6 +7,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -144,6 +146,7 @@ fun NowPlayingScreen(
 ) {
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val queue by viewModel.queue.collectAsState()
     val shuffleEnabled by viewModel.shuffleEnabled.collectAsState()
     val repeatState by viewModel.repeatState.collectAsState()
     val isStarred by viewModel.isStarred.collectAsState()
@@ -154,6 +157,7 @@ fun NowPlayingScreen(
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
     var showDetails by remember { mutableStateOf(false) }
+    var showQueue by remember { mutableStateOf(false) }
 
     // Palette colors extracted from cover art
     var dominantColor by remember { mutableStateOf(Color(0xFF0B0E11)) }
@@ -488,11 +492,11 @@ fun NowPlayingScreen(
                     }
                 }
 
-                IconButton(onClick = onOpenQueue) {
+                IconButton(onClick = { showQueue = !showQueue }) {
                     Icon(
                         Icons.AutoMirrored.Filled.QueueMusic,
                         contentDescription = "Queue",
-                        tint = Color.White.copy(alpha = 0.5f)
+                        tint = if (showQueue) animatedAccent else Color.White.copy(alpha = 0.5f)
                     )
                 }
             }
@@ -526,6 +530,62 @@ fun NowPlayingScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Queue bottom sheet
+        if (showQueue) {
+            ModalBottomSheet(
+                onDismissRequest = { showQueue = false },
+                containerColor = Color(0xFF1A1F24)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Queue (${queue.size} tracks)",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp),
+                        contentPadding = PaddingValues(bottom = 32.dp)
+                    ) {
+                        itemsIndexed(queue, key = { index, t -> "$index-${t.id}" }) { index, queueTrack ->
+                            val isCurrent = queueTrack.id == track?.id
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        text = queueTrack.title,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (isCurrent) animatedAccent else Color.White,
+                                        style = if (isCurrent) MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                                                else MaterialTheme.typography.bodyLarge
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        text = "${queueTrack.artist} · ${queueTrack.album}",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = Color.White.copy(alpha = 0.5f)
+                                    )
+                                },
+                                leadingContent = {
+                                    Text(
+                                        text = "${index + 1}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (isCurrent) animatedAccent else Color.White.copy(alpha = 0.4f)
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
