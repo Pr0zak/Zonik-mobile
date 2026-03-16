@@ -154,6 +154,7 @@ fun HomeScreen(
                         Text("Zonik")
                     }
                 },
+                windowInsets = WindowInsets(0),
                 actions = {
                     if (syncState.isSyncing) {
                         CircularProgressIndicator(
