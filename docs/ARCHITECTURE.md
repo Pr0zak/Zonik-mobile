@@ -250,14 +250,21 @@ Available on long-press of any track throughout the app:
 ### 4.2 Key Components
 
 #### Media Service (`ZonikMediaService`)
-- Extends `MediaSessionService` (only one per app)
-- Hosts ExoPlayer instance with `SimpleCache` + `CacheDataSource` for stream caching
-- Publishes MediaSession for system integration + Android Auto
-- Implements `MediaLibraryService.Callback` for browsable media tree
+- Extends `MediaLibraryService` (only one per app)
+- Hosts ExoPlayer with `DefaultHttpDataSource` (auth baked into URLs, not via OkHttp interceptor)
+- `onAddMediaItems` resolves URIs from `requestMetadata.mediaUri` (survives Media3 IPC)
+- Publishes `MediaLibrarySession` for system integration + Android Auto
+- Implements browse tree callback with 4 root tabs
 - Handles audio focus, becoming noisy (headphone unplug)
-- Implements `onPlaybackResumption()` for system media card after reboot
-- Uses `onConnect()` to gate capabilities per controller (Auto, Wear, other apps)
-- Release `MediaController` in `onStop()`, not `onDestroy()`
+- `WAKE_MODE_NETWORK` for streaming over Wi-Fi
+
+#### Playback Manager (`PlaybackManager`)
+- Connects to MediaService via `MediaController`
+- Builds stream URLs with baked-in auth params (ExoPlayer doesn't use OkHttp)
+- Sets `requestMetadata.mediaUri` so stream URL survives IPC
+- Tracks current track by `currentMediaItemIndex` (mediaId lost in IPC)
+- Smart bitrate: auto-detects Wi-Fi vs cellular network
+- Recently played tracking (last 20 tracks)
 
 #### Subsonic API Client (`SubsonicApi`)
 - Retrofit interface for all `/rest` endpoints
@@ -417,14 +424,37 @@ ArtistDetailScreen — albums by artist
 - **Theme:** system / light / dark
 - **About:** version, server info, licenses
 
-## 7. Future Features (Not in Initial Scope)
+## 7. Implemented Features (v0.2.3)
+- Library sync via search3 empty query (Symfonium approach, ~2s for 1724 tracks)
+- FLAC/MP3 streaming with ExoPlayer + DefaultHttpDataSource
+- Smart bitrate switching (Wi-Fi vs cellular)
+- Shuffle Mix and True Random playback modes
+- Symfonium-style Now Playing: blurred album art background, Palette-based adaptive colors
+- Auto-show Now Playing on track start with slide animation
+- Mini player with progress bar, cover art, controls
+- Cover art everywhere (Coil + auth-aware ImageLoader)
+- Soulseek download search/trigger via Zonik native API
+- Self-update from GitHub releases
+- Debug log upload to private GitHub Gists
+- Custom dark theme (deep dark + purple/teal accents)
+- Track-centric library (Tracks tab first)
+- Connection verification on login (ping + auth test)
+
+## 8. Future Features
 - Offline downloads (pin albums/playlists for offline playback)
 - Zonik native API features (AI playlists, vibe search, discovery)
-- Lyrics display (OpenSubsonic `getLyricsBySongId` — check server capability first)
+- Lyrics display (OpenSubsonic `getLyricsBySongId`)
 - Equalizer (system EQ integration or custom multi-band)
 - Chromecast / DLNA casting
 - Wear OS companion
-- Queue editing with drag-to-reorder
+- Queue screen with drag-to-reorder
 - Smart/dynamic playlists (filter by genre, year, rating, play count)
 - Listening stats (top artists, genres, hours played)
 - Playlist import/export (M3U, XSPF)
+- Sleep timer with gradual volume fade
+- Collapsing toolbar on Album/Artist detail screens
+- Fast scroll sidebar (A-Z) for Artists
+- Genre/Playlist detail navigation (tap to browse tracks)
+- Last.fm scrobbling integration
+- Crossfade between tracks
+- ReplayGain volume normalization

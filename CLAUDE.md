@@ -7,12 +7,12 @@ A native Android music player app that streams music from a self-hosted [Zonik](
 
 ## Tech Stack
 - **Language:** Kotlin
-- **UI:** Jetpack Compose + Material 3 (dynamic color)
+- **UI:** Jetpack Compose + Material 3 + custom dark theme
 - **Playback:** AndroidX Media3 (ExoPlayer) + MediaLibraryService
 - **Networking:** Retrofit + OkHttp + Kotlinx Serialization
 - **Local DB:** Room + Paging 3
 - **DI:** Hilt (KSP)
-- **Image Loading:** Coil + AndroidX Palette
+- **Image Loading:** Coil + AndroidX Palette (album art color extraction)
 - **Background:** WorkManager
 - **Build:** Gradle 8.11.1 (Kotlin DSL), version catalogs
 - **Min SDK:** 26 (Android 8.0)
@@ -24,6 +24,7 @@ A native Android music player app that streams music from a self-hosted [Zonik](
 - `/build [debug|release]` — build the APK
 - `/version` — show current version; `/version bump patch|minor|major` or `/version set X.Y.Z`
 - `/release [patch|minor|major]` — bump version, build, commit, push, create GitHub release
+- `/update-release` — rebuild APK and update current GitHub release (hotfix, no version bump)
 
 ## Build & Run
 ```bash
@@ -40,65 +41,100 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 
 ## Architecture
 - MVVM with Repository pattern
-- Single-activity, Compose Navigation with bottom nav (5 tabs)
+- Single-activity, Compose Navigation with bottom nav (5 tabs: Home, Library, Search, Downloads, Settings)
 - MediaLibraryService for background playback + Android Auto browse tree
-- Two API layers: OpenSubsonic (`/rest`) for playback, Zonik native (`/api`) for downloads & extended features
-- Download search via Zonik native API (Soulseek backend)
-- Last.fm scrobbling via Last.fm API v2 (direct from app)
+- Two API layers: OpenSubsonic (`/rest`) for playback/library, Zonik native (`/api`) for downloads
+- Fast library sync via `search3` empty query (Symfonium approach) — bulk fetches all artists/albums/tracks
 - Self-update checker queries GitHub releases API
+- Debug log upload to private GitHub Gists
 
 ## Key Conventions
 - Package: `com.zonik.app`
 - Use coroutines + Flow for async work
 - All network calls go through repository layer
-- Subsonic auth uses token auth (md5(apiKey + salt)) passed as query params
+- Subsonic auth: token auth `md5(apiKey + salt)` as query params
+- Stream/cover art URLs: auth baked directly into URL (not via interceptor) because ExoPlayer uses its own HTTP stack
+- Media3 IPC: `requestMetadata.mediaUri` carries stream URL across controller↔service boundary (`localConfiguration` is stripped during IPC)
+- Track identification after IPC: use `currentMediaItemIndex` not `mediaId` (mediaId lost in IPC)
 - Keep UI state in ViewModels using StateFlow
-- Login verifies connection (ping + auth) before saving credentials
 
 ## Project Structure
 ```
 app/src/main/java/com/zonik/app/
   data/
-    api/          # SubsonicApi, SubsonicAuthInterceptor, UpdateChecker
+    api/          # SubsonicApi, SubsonicAuthInterceptor, ZonikApi, UpdateChecker, LogUploader
     db/           # Room entities, DAOs, ZonikDatabase
-    repository/   # LibraryRepository, SettingsRepository
-  di/             # AppModule (Hilt)
-  media/          # ZonikMediaService (MediaLibraryService), PlaybackManager
-  model/          # Domain models, SubsonicResponse wrappers
+    repository/   # LibraryRepository, SettingsRepository, SyncManager
+    DebugLog.kt   # In-memory debug log buffer (500 entries)
+  di/             # AppModule (Hilt — OkHttpClient, Retrofit, Room, dynamic base URL)
+  media/
+    ZonikMediaService.kt  # MediaLibraryService, ExoPlayer, Auto browse tree, onAddMediaItems
+    PlaybackManager.kt    # MediaController wrapper, queue, playback state, smart bitrate
+  model/          # Domain models (Track, Album, Artist, etc), SubsonicResponse wrappers
   ui/
-    components/   # MiniPlayer
+    components/
+      CoverArt.kt       # Reusable album art via Coil (auth handled by ImageLoader)
+      MiniPlayer.kt     # Persistent mini player bar with progress indicator
+      TrackListItem.kt  # Unified track row with format badge and context menu
     navigation/   # Screen/MainTab route definitions
     screens/
-      home/       # HomeScreen + ViewModel
-      library/    # LibraryScreen, AlbumDetailScreen, ArtistDetailScreen
-      search/     # SearchScreen + ViewModel
-      downloads/  # DownloadsScreen + ViewModel (Soulseek search/queue)
-      playlists/  # PlaylistsScreen + ViewModel
-      nowplaying/ # NowPlayingScreen + ViewModel
-      login/      # LoginScreen + ViewModel (with connection test)
-      settings/   # SettingsScreen + ViewModel (with update checker)
-    theme/        # ZonikTheme (Material 3 dynamic color)
-  MainActivity.kt     # Main activity, nav host, bottom nav
-  ZonikApplication.kt # Hilt app, notification channels, WorkManager
+      home/       # HomeScreen — recent albums, recent tracks, shuffle/random, recently played
+      library/    # LibraryScreen (5 tabs: Tracks/Albums/Artists/Genres/Playlists), AlbumDetail, ArtistDetail
+      search/     # SearchScreen — debounced search across library
+      downloads/  # DownloadsScreen — Soulseek search/active transfers/job history (real Zonik API)
+      playlists/  # PlaylistsScreen
+      nowplaying/ # NowPlayingScreen — Symfonium-style with blurred background, Palette colors
+      login/      # LoginScreen — connection test (ping + auth verification)
+      settings/   # SettingsScreen — server, sync, playback, Last.fm, cache, updates, debug logs
+    theme/        # ZonikTheme — custom dark color scheme (deep dark + purple/teal accents)
+    util/         # FormatUtils (duration, file size formatting)
+  MainActivity.kt     # Main activity, nav host, bottom nav, Now Playing overlay with slide animation
+  ZonikApplication.kt # Hilt app, notification channels, WorkManager, Coil ImageLoader
 ```
 
+## Playback Architecture
+- ExoPlayer in `ZonikMediaService` with `DefaultHttpDataSource` (not OkHttpDataSource)
+- Auth params baked into stream URLs (ExoPlayer doesn't go through OkHttp interceptors)
+- `onAddMediaItems` resolves URIs from `requestMetadata.mediaUri` (survives IPC)
+- `PlaybackManager` connects via `MediaController`, tracks queue locally
+- Track transitions identified by `currentMediaItemIndex` (mediaId lost in IPC)
+- Smart bitrate: auto-detects Wi-Fi vs cellular, applies configured max bitrate
+- Now Playing auto-shows on track start via `currentTrack` flow observation
+
 ## Android Auto
-- Uses MediaLibraryService with MediaLibrarySession.Callback
-- 4 root tabs: Recent, Library, Playlists, Mix (Android Auto max)
-- Max 4 browse levels deep, 10s load timeout
+- MediaLibraryService with MediaLibrarySession.Callback
+- 4 root tabs: Recent, Library, Playlists, Mix
 - Content style: GRID for albums/artists, LIST for tracks/playlists
-- Voice search with empty query handling (plays recent/shuffled)
+- Voice search with empty query handling
 - Browse tree works without Activity; rebuilds from scratch on force-stop
+- Cover art URIs include baked-in auth params (fetched by system UI)
 
 ## API Notes
-- Zonik Subsonic API at `{server}/rest/{endpoint}.view`
+- Subsonic API at `{server}/rest/{endpoint}.view`
 - Auth params: `u`, `t` (md5(apiKey+salt)), `s` (random salt), `v=1.16.1`, `c=ZonikApp`, `f=json`
-- Streaming: `GET /rest/stream.view?id={trackId}&estimateContentLength=true`
-- Cover art: `GET /rest/getCoverArt.view?id={coverId}&size={pixels}`
-- All responses wrapped in `subsonic-response` JSON envelope
-- Query `getOpenSubsonicExtensions` on connect to detect server capabilities
+- Streaming: `GET /rest/stream.view?id={trackId}&estimateContentLength=true` (NO `f=json` — returns binary)
+- Cover art: `GET /rest/getCoverArt.view?id={coverId}&size={pixels}` (NO `f=json`)
+- Library sync: `search3` with empty query, 500 items per page (Symfonium approach)
+- Zonik native API: `POST /api/download/search`, `/api/download/trigger`, `GET /api/jobs` (`Accept: application/json` header required, response wrapped in `{"items": [...]}`)
+
+## Debugging
+- `DebugLog` singleton captures last 500 entries with timestamps
+- Settings > Debug: "Copy Logs" to clipboard or "Upload Logs" to private GitHub Gist
+- Requires GitHub PAT with gist scope for upload
+- Logs cover: API calls (path + status), sync progress, playback events (connect, play, errors, state changes), login flow
 
 ## Release Process
 1. `/release patch` (or `minor`/`major`) — automates everything
 2. Or manually: bump version in `app/build.gradle.kts`, build, copy APK to `release/`, commit, push, `gh release create`
 3. App checks for updates on Settings screen and prompts user to download/install
+4. `/update-release` for hotfixes without version bump
+
+## Known Gotchas
+- Media3 strips `localConfiguration` (URI) during controller↔service IPC — must use `requestMetadata.mediaUri`
+- Media3 `mediaId` becomes empty after IPC — track by queue index not mediaId
+- `onAddMediaItems` callback MUST be implemented or setMediaItems silently does nothing
+- Stream URLs must NOT include `f=json` (server returns binary audio, not JSON)
+- Zonik `/api/jobs` returns HTML without `Accept: application/json` header
+- Job history response is `{"items": [...]}` not a raw array
+- `cleartext` HTTP must be allowed via `network_security_config.xml` for local servers
+- Coil ImageLoader must use the auth-aware OkHttpClient for cover art (configured in ZonikApplication)
