@@ -10,6 +10,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.zonik.app.data.DebugLog
 import com.zonik.app.data.repository.SettingsRepository
 import com.zonik.app.model.Track
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -43,6 +44,7 @@ class PlaybackManager @Inject constructor(
 
     suspend fun connect() {
         if (controller != null) return
+        DebugLog.d("Playback", "Connecting to MediaService...")
         val sessionToken = SessionToken(
             context,
             ComponentName(context, ZonikMediaService::class.java)
@@ -55,20 +57,32 @@ class PlaybackManager @Inject constructor(
             )
         }
 
+        DebugLog.d("Playback", "Connected to MediaService")
+
         controller?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
+                DebugLog.d("Playback", "isPlaying changed: $playing")
                 _isPlaying.value = playing
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                DebugLog.d("Playback", "Track transition: ${mediaItem?.mediaId} reason=$reason")
                 updateCurrentTrack(mediaItem)
                 addToRecentlyPlayed(mediaItem)
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                DebugLog.e("Playback", "Player error: ${error.errorCodeName} - ${error.message}")
             }
         })
     }
 
     fun playTracks(tracks: List<Track>, startIndex: Int = 0) {
-        val ctrl = controller ?: return
+        val ctrl = controller
+        if (ctrl == null) {
+            DebugLog.e("Playback", "playTracks called but controller is null!")
+            return
+        }
         val serverUrl = getServerUrl()
         _queue.value = tracks
 
@@ -76,6 +90,8 @@ class PlaybackManager @Inject constructor(
             buildMediaItem(track, serverUrl)
         }
 
+        DebugLog.d("Playback", "Playing ${tracks.size} tracks from index $startIndex")
+        DebugLog.d("Playback", "Stream URL: ${mediaItems.firstOrNull()?.localConfiguration?.uri}")
         ctrl.setMediaItems(mediaItems, startIndex, 0)
         ctrl.prepare()
         ctrl.play()

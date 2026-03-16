@@ -34,7 +34,9 @@ data class GistResponse(
 )
 
 @Singleton
-class LogUploader @Inject constructor() {
+class LogUploader @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
+) {
 
     private val client = OkHttpClient()
     private val json = Json { ignoreUnknownKeys = true }
@@ -102,5 +104,11 @@ class LogUploader @Inject constructor() {
         }
     }
 
-    private fun getAppVersion(): String = "0.1.5" // TODO: read from BuildConfig
+    private fun getAppVersion(): String {
+        return try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+        } catch (_: Exception) {
+            "unknown"
+        }
+    }
 }
