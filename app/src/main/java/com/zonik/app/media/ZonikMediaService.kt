@@ -15,11 +15,13 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import androidx.media3.session.CommandButton
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.zonik.app.data.db.ZonikDatabase
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SettingsRepository
 import com.zonik.app.model.Album
@@ -42,8 +44,11 @@ class ZonikMediaService : MediaLibraryService() {
     @Inject lateinit var libraryRepository: LibraryRepository
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var okHttpClient: OkHttpClient
+    @Inject lateinit var database: ZonikDatabase
 
     private var mediaLibrarySession: MediaLibrarySession? = null
+    private val starredTrackIds = mutableSetOf<String>()
+    private val toggleStarCommand = SessionCommand(ACTION_TOGGLE_STAR, Bundle.EMPTY)
 
     companion object {
         // Browse tree node IDs
@@ -57,6 +62,9 @@ class ZonikMediaService : MediaLibraryService() {
         private const val GENRES_ID = "genres"
         private const val SHUFFLE_MIX_ID = "shuffle_mix"
         private const val TRUE_RANDOM_ID = "true_random"
+
+        // Custom session commands
+        private const val ACTION_TOGGLE_STAR = "com.zonik.app.TOGGLE_STAR"
 
         // Prefixes for dynamic node IDs
         private const val ARTIST_PREFIX = "artist:"
@@ -249,6 +257,45 @@ class ZonikMediaService : MediaLibraryService() {
             .build()
     }
 
+    private fun buildStarButton(isStarred: Boolean): CommandButton {
+        val icon = if (isStarred) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED
+        return CommandButton.Builder(icon)
+            .setDisplayName(if (isStarred) "Unstar" else "Star")
+            .setSessionCommand(toggleStarCommand)
+            .setEnabled(true)
+            .build()
+    }
+
+    /**
+     * Builds a fully-resolved MediaItem for a Track with stream URL, artwork, and metadata.
+     * Used by onAddMediaItems when resolving browse-tree or mix items for playback.
+     */
+    private fun buildFullMediaItem(track: Track): MediaItem {
+        val streamUrl = buildStreamUrlForTrack(track.id)
+        val artUri = coverArtUri(track.coverArt)
+        return MediaItem.Builder()
+            .setMediaId(track.id)
+            .setUri(streamUrl)
+            .setRequestMetadata(
+                MediaItem.RequestMetadata.Builder()
+                    .setMediaUri(Uri.parse(streamUrl))
+                    .build()
+            )
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(track.title)
+                    .setArtist(track.artist)
+                    .setAlbumTitle(track.album)
+                    .setArtworkUri(artUri)
+                    .setTrackNumber(track.track)
+                    .setIsBrowsable(false)
+                    .setIsPlayable(true)
+                    .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                    .build()
+            )
+            .build()
+    }
+
     private fun albumToMediaItem(album: Album): MediaItem =
         buildBrowsableItem(
             id = "$ALBUM_PREFIX${album.id}",
@@ -300,6 +347,22 @@ class ZonikMediaService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>
         ): ListenableFuture<MutableList<MediaItem>> {
+            // Handle special playable items (Shuffle Mix, True Random) from Android Auto browse tree
+            if (mediaItems.size == 1) {
+                val id = mediaItems[0].mediaId
+                if (id == SHUFFLE_MIX_ID || id == TRUE_RANDOM_ID) {
+                    com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: resolving $id")
+                    val tracks = runBlocking {
+                        libraryRepository.getRandomSongs(count = if (id == SHUFFLE_MIX_ID) 100 else 50)
+                    }
+                    val resolved = tracks.map { track ->
+                        buildFullMediaItem(track)
+                    }.toMutableList()
+                    com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: $id resolved to ${resolved.size} tracks")
+                    return Futures.immediateFuture(resolved)
+                }
+            }
+
             // Media3 strips localConfiguration (URI) during controller→service IPC.
             // Reconstruct the stream URL from requestMetadata.mediaUri (set by PlaybackManager).
             // If that's also null, the mediaId is a track ID — build the stream URL from it.
@@ -309,11 +372,19 @@ class ZonikMediaService : MediaLibraryService() {
                 if (uri != null) {
                     item.buildUpon().setUri(uri).build()
                 } else {
-                    // Fallback: build stream URL from mediaId (track ID)
-                    val trackId = item.mediaId
-                    val streamUrl = buildStreamUrlForTrack(trackId)
-                    com.zonik.app.data.DebugLog.d("MediaService", "Built stream URL for track $trackId: ${streamUrl.take(80)}...")
-                    item.buildUpon().setUri(streamUrl).build()
+                    // Strip track: prefix if present (browse tree items use "track:{id}")
+                    val rawId = item.mediaId
+                    val trackId = if (rawId.startsWith(TRACK_PREFIX)) rawId.removePrefix(TRACK_PREFIX) else rawId
+                    // Look up track in DB for full metadata (artwork, etc.)
+                    val track = runBlocking { database.trackDao().getById(trackId)?.toDomain() }
+                    if (track != null) {
+                        com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: resolved track '${track.title}' from DB")
+                        buildFullMediaItem(track)
+                    } else {
+                        val streamUrl = buildStreamUrlForTrack(trackId)
+                        com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: built stream URL for $trackId (no DB match)")
+                        item.buildUpon().setUri(streamUrl).build()
+                    }
                 }
             }.toMutableList()
             com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: ${resolved.size} items, first URI: ${resolved.firstOrNull()?.localConfiguration?.uri}")
@@ -434,9 +505,51 @@ class ZonikMediaService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo
         ): MediaSession.ConnectionResult {
             val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
+                .buildUpon()
+                .add(toggleStarCommand)
+                .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
+                .setCustomLayout(listOf(buildStarButton(false)))
                 .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle
+        ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == ACTION_TOGGLE_STAR) {
+                val player = session.player
+                if (player.mediaItemCount == 0) {
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                }
+                val currentItem = player.currentMediaItem ?: return Futures.immediateFuture(
+                    SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE)
+                )
+                val trackId = currentItem.mediaId.removePrefix(TRACK_PREFIX)
+                val isStarred = trackId in starredTrackIds
+                try {
+                    runBlocking {
+                        if (isStarred) {
+                            libraryRepository.unstar(trackId)
+                            starredTrackIds.remove(trackId)
+                        } else {
+                            libraryRepository.star(trackId)
+                            starredTrackIds.add(trackId)
+                        }
+                    }
+                    com.zonik.app.data.DebugLog.d("MediaService", "Star toggled for $trackId: ${!isStarred}")
+                    // Update the button to reflect new state
+                    session.setCustomLayout(listOf(buildStarButton(!isStarred)))
+                } catch (e: Exception) {
+                    com.zonik.app.data.DebugLog.e("MediaService", "Star toggle failed", e)
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_IO))
+                }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            return super.onCustomCommand(session, controller, customCommand, args)
         }
     }
 
