@@ -43,11 +43,12 @@ fun MiniPlayer(
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
+            CoverArt(
+                coverArtId = track.coverArt,
+                contentDescription = track.title,
                 modifier = Modifier.size(48.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.small
-            ) {}
+                size = 150
+            )
 
             Column(
                 modifier = Modifier

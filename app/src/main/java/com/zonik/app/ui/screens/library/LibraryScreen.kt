@@ -26,6 +26,7 @@ import com.zonik.app.model.Artist
 import com.zonik.app.model.Genre
 import com.zonik.app.model.Playlist
 import com.zonik.app.model.Track
+import com.zonik.app.ui.components.CoverArt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -191,19 +192,11 @@ private fun ArtistsTab(
                     )
                 },
                 leadingContent = {
-                    Surface(
-                        modifier = Modifier.size(48.dp),
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    CoverArt(
+                        coverArtId = artist.coverArt,
+                        contentDescription = artist.name,
+                        modifier = Modifier.size(48.dp)
+                    )
                 },
                 modifier = Modifier.clickable { onArtistClick(artist.id) }
             )
@@ -247,22 +240,13 @@ private fun AlbumGridCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
-            Surface(
+            CoverArt(
+                coverArtId = album.coverArt,
+                contentDescription = album.name,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.small
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Album,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+                    .aspectRatio(1f)
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 

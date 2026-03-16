@@ -22,6 +22,7 @@ import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Album
 import com.zonik.app.model.Track
+import com.zonik.app.ui.components.CoverArt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -251,22 +252,13 @@ private fun AlbumHeader(album: Album?, onStar: () -> Unit) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Album art placeholder
-        Surface(
-            modifier = Modifier
-                .size(240.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Album,
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        // Album art
+        CoverArt(
+            coverArtId = album?.coverArt,
+            contentDescription = album?.name,
+            modifier = Modifier.size(240.dp),
+            size = 600
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 

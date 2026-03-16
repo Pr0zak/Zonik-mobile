@@ -2,6 +2,8 @@ package com.zonik.app.media
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -35,6 +37,9 @@ class PlaybackManager @Inject constructor(
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
 
+    private val _recentlyPlayed = MutableStateFlow<List<Track>>(emptyList())
+    val recentlyPlayed: StateFlow<List<Track>> = _recentlyPlayed.asStateFlow()
+
     suspend fun connect() {
         if (controller != null) return
         val sessionToken = SessionToken(
@@ -56,6 +61,7 @@ class PlaybackManager @Inject constructor(
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 updateCurrentTrack(mediaItem)
+                addToRecentlyPlayed(mediaItem)
             }
         })
     }
@@ -127,7 +133,9 @@ class PlaybackManager @Inject constructor(
     }
 
     private fun buildMediaItem(track: Track, serverUrl: String): MediaItem {
-        val streamUrl = "${serverUrl.trimEnd('/')}/rest/stream.view?id=${track.id}&estimateContentLength=true"
+        val bitrate = getMaxBitRate()
+        val bitrateParam = if (bitrate > 0) "&maxBitRate=$bitrate" else ""
+        val streamUrl = "${serverUrl.trimEnd('/')}/rest/stream.view?id=${track.id}${bitrateParam}&estimateContentLength=true"
         val artUrl = track.coverArt?.let {
             "${serverUrl.trimEnd('/')}/rest/getCoverArt.view?id=$it&size=600"
         }
@@ -158,6 +166,33 @@ class PlaybackManager @Inject constructor(
     private fun getServerUrl(): String {
         return kotlinx.coroutines.runBlocking {
             settingsRepository.serverConfig.first()?.url ?: ""
+        }
+    }
+
+    private fun getMaxBitRate(): Int {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork
+        val capabilities = connectivityManager.getNetworkCapabilities(network)
+
+        val isWifi = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+
+        val bitrate = kotlinx.coroutines.runBlocking {
+            if (isWifi) settingsRepository.wifiBitrate.first()
+            else settingsRepository.cellularBitrate.first()
+        }
+        return bitrate
+    }
+
+    private fun addToRecentlyPlayed(mediaItem: MediaItem?) {
+        if (mediaItem == null) return
+        val track = _queue.value.find { it.id == mediaItem.mediaId } ?: return
+        val current = _recentlyPlayed.value.toMutableList()
+        current.removeAll { it.id == track.id }
+        current.add(0, track)
+        if (current.size > 20) {
+            _recentlyPlayed.value = current.take(20)
+        } else {
+            _recentlyPlayed.value = current
         }
     }
 }
