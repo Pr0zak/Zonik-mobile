@@ -48,6 +48,10 @@ class PlaybackManager @Inject constructor(
     // PLAYLIST_CHANGED transition to the wrong index.
     private var _pendingStartIndex: Int = -1
 
+    // Set by skipToIndex to prevent onMediaItemTransition from overriding
+    // the correct track when manually seeking within the queue.
+    private var _manualSeekIndex: Int = -1
+
     private val _currentTrack = MutableStateFlow<Track?>(null)
     val currentTrack: StateFlow<Track?> = _currentTrack.asStateFlow()
 
@@ -93,7 +97,17 @@ class PlaybackManager @Inject constructor(
                 val index = controller?.currentMediaItemIndex ?: -1
                 val metaTitle = mediaItem?.mediaMetadata?.title?.toString()
                 val metaArtist = mediaItem?.mediaMetadata?.artist?.toString()
-                DebugLog.d("Playback", "Track transition: title='$metaTitle' artist='$metaArtist' index=$index reason=$reason pendingStart=$_pendingStartIndex")
+                DebugLog.d("Playback", "Track transition: title='$metaTitle' artist='$metaArtist' index=$index reason=$reason pendingStart=$_pendingStartIndex manualSeek=$_manualSeekIndex")
+
+                // Manual seek from skipToIndex — trust our index, ignore ExoPlayer's
+                if (_manualSeekIndex >= 0) {
+                    val expected = _manualSeekIndex
+                    _manualSeekIndex = -1
+                    DebugLog.d("Playback", "Manual seek: using index $expected (ExoPlayer reported $index)")
+                    updateCurrentTrackByIndex(expected)
+                    return
+                }
+
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED && _pendingStartIndex >= 0) {
                     // Media3 processes onAddMediaItems per-item, causing a spurious
                     // PLAYLIST_CHANGED transition to the wrong index. Correct it.
@@ -220,12 +234,12 @@ class PlaybackManager @Inject constructor(
 
     fun skipToIndex(index: Int) {
         val ctrl = controller ?: return
-        if (index in 0 until ctrl.mediaItemCount) {
+        DebugLog.d("Playback", "skipToIndex: $index (mediaItemCount=${ctrl.mediaItemCount}, queueSize=${_queue.value.size})")
+        if (index in 0 until ctrl.mediaItemCount && index in _queue.value.indices) {
             _pendingStartIndex = -1  // Clear any pending correction
-            ctrl.seekToDefaultPosition(index)
-        }
-        if (index in _queue.value.indices) {
-            updateCurrentTrackByIndex(index)
+            _manualSeekIndex = index  // Tell onMediaItemTransition to use our index
+            setCurrentTrack(_queue.value[index])  // Update UI immediately
+            ctrl.seekTo(index, 0L)
         }
     }
 
