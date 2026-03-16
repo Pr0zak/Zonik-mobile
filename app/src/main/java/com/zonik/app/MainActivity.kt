@@ -45,6 +45,7 @@ import com.zonik.app.ui.theme.ZonikTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -65,12 +66,11 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             playbackManager.connect()
         }
-        // Auto-sync library on startup
+        // Auto-sync library once on startup if logged in
         viewModelScope.launch {
-            settingsRepository.isLoggedIn.collect { loggedIn ->
-                if (loggedIn) {
-                    syncManager.fullSync()
-                }
+            val loggedIn = settingsRepository.isLoggedIn.first()
+            if (loggedIn) {
+                syncManager.fullSync()
             }
         }
     }
