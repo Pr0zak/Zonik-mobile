@@ -17,6 +17,7 @@ import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.api.AppUpdate
 import com.zonik.app.data.api.UpdateChecker
 import com.zonik.app.data.repository.SettingsRepository
+import com.zonik.app.data.repository.SyncManager
 import com.zonik.app.model.ServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -48,7 +49,8 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
-    private val updateChecker: UpdateChecker
+    private val updateChecker: UpdateChecker,
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     private val _availableUpdate = MutableStateFlow<AppUpdate?>(null)
@@ -137,15 +139,11 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun syncNow() {
-        viewModelScope.launch {
-            settingsRepository.updateLastSyncTime(System.currentTimeMillis())
-        }
+        viewModelScope.launch { syncManager.fullSync() }
     }
 
     fun fullResync() {
-        viewModelScope.launch {
-            settingsRepository.updateLastSyncTime(System.currentTimeMillis())
-        }
+        viewModelScope.launch { syncManager.fullSync() }
     }
 
     fun setWifiBitrate(bitrate: Int) {

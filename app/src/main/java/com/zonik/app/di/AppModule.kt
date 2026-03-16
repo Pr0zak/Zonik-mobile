@@ -13,6 +13,8 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -35,8 +37,38 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: SubsonicAuthInterceptor): OkHttpClient {
+    fun provideOkHttpClient(
+        authInterceptor: SubsonicAuthInterceptor,
+        settingsRepository: SettingsRepository
+    ): OkHttpClient {
+        // Dynamic base URL interceptor — rewrites every request to the current server URL
+        val dynamicBaseUrlInterceptor = Interceptor { chain ->
+            val serverUrl = runBlocking {
+                settingsRepository.serverConfig.first()?.url
+            }
+
+            if (serverUrl == null) {
+                chain.proceed(chain.request())
+            } else {
+                val originalUrl = chain.request().url
+                val newBaseUrl = serverUrl.trimEnd('/').toHttpUrl()
+
+                val newUrl = originalUrl.newBuilder()
+                    .scheme(newBaseUrl.scheme)
+                    .host(newBaseUrl.host)
+                    .port(newBaseUrl.port)
+                    .build()
+
+                val newRequest = chain.request().newBuilder()
+                    .url(newUrl)
+                    .build()
+
+                chain.proceed(newRequest)
+            }
+        }
+
         return OkHttpClient.Builder()
+            .addInterceptor(dynamicBaseUrlInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC
@@ -50,15 +82,11 @@ object AppModule {
     @Singleton
     fun provideSubsonicApi(
         client: OkHttpClient,
-        json: Json,
-        settingsRepository: SettingsRepository
+        json: Json
     ): SubsonicApi {
-        val baseUrl = runBlocking {
-            settingsRepository.serverConfig.first()?.url ?: "http://localhost:3000"
-        }.trimEnd('/') + "/"
-
+        // Base URL is a placeholder — dynamicBaseUrlInterceptor rewrites it
         return Retrofit.Builder()
-            .baseUrl(baseUrl)
+            .baseUrl("http://localhost/")
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()

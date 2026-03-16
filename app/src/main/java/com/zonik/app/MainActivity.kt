@@ -26,6 +26,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.zonik.app.data.repository.SettingsRepository
+import com.zonik.app.data.repository.SyncManager
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.ui.components.MiniPlayer
 import com.zonik.app.ui.navigation.MainTab
@@ -51,16 +52,31 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
     settingsRepository: SettingsRepository,
-    private val playbackManager: PlaybackManager
+    private val playbackManager: PlaybackManager,
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     val isLoggedIn = settingsRepository.isLoggedIn
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val syncState = syncManager.syncState
+
     init {
         viewModelScope.launch {
             playbackManager.connect()
         }
+        // Auto-sync library on startup
+        viewModelScope.launch {
+            settingsRepository.isLoggedIn.collect { loggedIn ->
+                if (loggedIn) {
+                    syncManager.fullSync()
+                }
+            }
+        }
+    }
+
+    fun syncNow() {
+        viewModelScope.launch { syncManager.fullSync() }
     }
 }
 
