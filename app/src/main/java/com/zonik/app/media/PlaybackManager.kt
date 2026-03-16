@@ -164,10 +164,12 @@ class PlaybackManager @Inject constructor(
     private fun buildMediaItem(track: Track, serverUrl: String): MediaItem {
         val bitrate = getMaxBitRate()
         val bitrateParam = if (bitrate > 0) "&maxBitRate=$bitrate" else ""
-        val streamUrl = "${serverUrl.trimEnd('/')}/rest/stream.view?id=${track.id}${bitrateParam}&estimateContentLength=true"
+        val authParams = buildAuthParams()
+        val streamUrl = "${serverUrl.trimEnd('/')}/rest/stream.view?id=${track.id}${bitrateParam}&estimateContentLength=true$authParams"
         val artUrl = track.coverArt?.let {
             buildArtworkUrl(it, serverUrl)
         }
+        DebugLog.d("Playback", "Built stream URL with auth: ${streamUrl.take(120)}...")
 
         return MediaItem.Builder()
             .setMediaId(track.id)
@@ -182,6 +184,15 @@ class PlaybackManager @Inject constructor(
                     .build()
             )
             .build()
+    }
+
+    private fun buildAuthParams(): String {
+        val config = kotlinx.coroutines.runBlocking {
+            settingsRepository.serverConfig.first()
+        } ?: return ""
+        val salt = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }.joinToString("")
+        val token = md5("${config.apiKey}$salt")
+        return "&u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp&f=json"
     }
 
     private fun buildArtworkUrl(coverArtId: String, serverUrl: String): String {
