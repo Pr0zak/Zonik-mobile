@@ -4,7 +4,20 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Bold Z letterform -->
     <path
         android:fillColor="#7C4DFF"
-        android:pathData="M42,42L42,72c-1.7,-1.3 -3.7,-2 -6,-2c-4.4,0 -8,3.6 -8,8s3.6,8 8,8s8,-3.6 8,-8L44,52h16v-10L42,42z"/>
+        android:pathData="M33,30 L75,30 L75,40 L50,66 L75,66 L75,78 L33,78 L33,68 L58,42 L33,42 Z"/>
+    <!-- Sound wave accent arc 1 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeWidth="2.5"
+        android:strokeColor="#00E5FF"
+        android:pathData="M78,48 Q82,54 78,60"/>
+    <!-- Sound wave accent arc 2 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeWidth="2"
+        android:strokeColor="#00E5FF"
+        android:pathData="M83,44 Q89,54 83,64"/>
 </vector>
