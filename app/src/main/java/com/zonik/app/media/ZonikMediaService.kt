@@ -79,11 +79,20 @@ class ZonikMediaService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
 
-        com.zonik.app.data.DebugLog.d("MediaService", "onCreate — setting up ExoPlayer with DefaultHttpDataSource")
-        val dataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(30_000)
+        com.zonik.app.data.DebugLog.d("MediaService", "onCreate — setting up ExoPlayer with OkHttpDataSource (clean client)")
+        // Use a clean OkHttpClient without auth interceptor — auth is baked into URLs
+        val streamClient = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val url = chain.request().url.toString()
+                com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer fetching: ${url.take(100)}...")
+                val response = chain.proceed(chain.request())
+                com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer response: ${response.code} ${response.header("Content-Type")} ${response.header("Content-Length") ?: "chunked"}")
+                response
+            }
+            .build()
+        val dataSourceFactory = OkHttpDataSource.Factory(streamClient)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
         val player = ExoPlayer.Builder(this)
