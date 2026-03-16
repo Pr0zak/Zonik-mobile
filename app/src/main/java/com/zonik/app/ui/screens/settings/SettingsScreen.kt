@@ -11,216 +11,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import com.zonik.app.data.DebugLog
-import com.zonik.app.data.api.AppUpdate
-import com.zonik.app.data.api.LogUploader
-import com.zonik.app.data.api.UpdateChecker
-import com.zonik.app.data.repository.SettingsRepository
-import com.zonik.app.data.repository.SyncManager
-import com.zonik.app.model.ServerConfig
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
+import com.zonik.app.ui.util.formatLargeDuration
+import com.zonik.app.ui.util.formatLargeFileSize
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import javax.inject.Inject
-
-// region ViewModel
-
-data class SettingsUiState(
-    val serverUrl: String = "",
-    val username: String = "",
-    val isLoggedIn: Boolean = false,
-    val syncIntervalMinutes: Int = 60,
-    val wifiOnly: Boolean = true,
-    val lastSyncTime: Long = 0L,
-    val wifiBitrate: Int = 0,
-    val cellularBitrate: Int = 192,
-    val crossfadeEnabled: Boolean = false,
-    val crossfadeDuration: Int = 3,
-    val lastFmConnected: Boolean = false,
-    val scrobblingEnabled: Boolean = false,
-    val pendingScrobbleCount: Int = 0,
-    val cacheSizeMb: String = "0 MB"
-)
-
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository,
-    private val updateChecker: UpdateChecker,
-    private val syncManager: SyncManager,
-    private val logUploader: LogUploader
-) : ViewModel() {
-
-    val githubToken = settingsRepository.githubToken
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    private val _logUploadUrl = MutableStateFlow<String?>(null)
-    val logUploadUrl: StateFlow<String?> = _logUploadUrl.asStateFlow()
-
-    private val _isUploadingLogs = MutableStateFlow(false)
-    val isUploadingLogs: StateFlow<Boolean> = _isUploadingLogs.asStateFlow()
-
-    fun setGithubToken(token: String) {
-        viewModelScope.launch {
-            settingsRepository.setGithubToken(token.ifBlank { null })
-        }
-    }
-
-    fun uploadLogs() {
-        viewModelScope.launch {
-            val token = githubToken.value ?: return@launch
-            _isUploadingLogs.value = true
-            _logUploadUrl.value = logUploader.uploadLogs(token)
-            _isUploadingLogs.value = false
-        }
-    }
-
-    private val _availableUpdate = MutableStateFlow<AppUpdate?>(null)
-    val availableUpdate: StateFlow<AppUpdate?> = _availableUpdate.asStateFlow()
-
-    private val _isCheckingUpdate = MutableStateFlow(false)
-    val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
-
-    private val _updateProgress = MutableStateFlow<Float?>(null)
-    val updateProgress: StateFlow<Float?> = _updateProgress.asStateFlow()
-
-    init {
-        checkForUpdate()
-    }
-
-    fun checkForUpdate() {
-        viewModelScope.launch {
-            _isCheckingUpdate.value = true
-            _availableUpdate.value = updateChecker.checkForUpdate()
-            _isCheckingUpdate.value = false
-        }
-    }
-
-    fun downloadUpdate() {
-        val update = _availableUpdate.value ?: return
-        viewModelScope.launch {
-            _updateProgress.value = 0f
-            val success = updateChecker.downloadAndInstall(update) { progress ->
-                _updateProgress.value = progress
-            }
-            if (!success) _updateProgress.value = null
-        }
-    }
-
-    private val _wifiOnly = MutableStateFlow(true)
-    private val _crossfadeEnabled = MutableStateFlow(false)
-    private val _crossfadeDuration = MutableStateFlow(3)
-
-    val uiState: StateFlow<SettingsUiState> = combine(
-        settingsRepository.serverConfig,
-        settingsRepository.isLoggedIn,
-        settingsRepository.syncIntervalMinutes,
-        _wifiOnly,
-        settingsRepository.lastSyncTime,
-        settingsRepository.wifiBitrate,
-        settingsRepository.cellularBitrate,
-        _crossfadeEnabled,
-        _crossfadeDuration,
-        settingsRepository.lastFmSessionKey,
-        settingsRepository.scrobblingEnabled
-    ) { values ->
-        val serverConfig = values[0] as ServerConfig?
-        val isLoggedIn = values[1] as Boolean
-        val syncInterval = values[2] as Int
-        val wifiOnly = values[3] as Boolean
-        val lastSync = values[4] as Long
-        val wifiBr = values[5] as Int
-        val cellBr = values[6] as Int
-        val crossfade = values[7] as Boolean
-        val crossfadeDur = values[8] as Int
-        val lastFmKey = values[9] as String?
-        val scrobbling = values[10] as Boolean
-
-        SettingsUiState(
-            serverUrl = serverConfig?.url ?: "",
-            username = serverConfig?.username ?: "",
-            isLoggedIn = isLoggedIn,
-            syncIntervalMinutes = syncInterval,
-            wifiOnly = wifiOnly,
-            lastSyncTime = lastSync,
-            wifiBitrate = wifiBr,
-            cellularBitrate = cellBr,
-            crossfadeEnabled = crossfade,
-            crossfadeDuration = crossfadeDur,
-            lastFmConnected = lastFmKey != null,
-            scrobblingEnabled = scrobbling
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
-
-    fun setSyncInterval(minutes: Int) {
-        viewModelScope.launch { settingsRepository.setSyncInterval(minutes) }
-    }
-
-    fun setWifiOnly(enabled: Boolean) {
-        _wifiOnly.value = enabled
-    }
-
-    fun syncNow() {
-        viewModelScope.launch { syncManager.fullSync() }
-    }
-
-    fun fullResync() {
-        viewModelScope.launch { syncManager.fullSync() }
-    }
-
-    fun setWifiBitrate(bitrate: Int) {
-        viewModelScope.launch { settingsRepository.setWifiBitrate(bitrate) }
-    }
-
-    fun setCellularBitrate(bitrate: Int) {
-        viewModelScope.launch { settingsRepository.setCellularBitrate(bitrate) }
-    }
-
-    fun setCrossfadeEnabled(enabled: Boolean) {
-        _crossfadeEnabled.value = enabled
-    }
-
-    fun setCrossfadeDuration(seconds: Int) {
-        _crossfadeDuration.value = seconds
-    }
-
-    fun toggleLastFm() {
-        viewModelScope.launch {
-            if (uiState.value.lastFmConnected) {
-                settingsRepository.setLastFmSessionKey(null)
-                settingsRepository.setScrobblingEnabled(false)
-            } else {
-                // Stub: in reality this would launch an OAuth flow
-                settingsRepository.setLastFmSessionKey("stub_session_key")
-            }
-        }
-    }
-
-    fun setScrobblingEnabled(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setScrobblingEnabled(enabled) }
-    }
-
-    fun clearCache() {
-        // Stub: clear media cache
-    }
-
-    fun disconnect() {
-        viewModelScope.launch { settingsRepository.clearAll() }
-    }
-}
-
-// endregion
-
-// region Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -230,7 +32,6 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Navigate away when disconnected
     LaunchedEffect(uiState.isLoggedIn) {
         if (!uiState.isLoggedIn && uiState.serverUrl.isEmpty()) {
             // Only navigate if we were previously logged in and state cleared
@@ -239,7 +40,10 @@ fun SettingsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Settings") })
+            TopAppBar(
+                title = { Text("Settings") },
+                windowInsets = WindowInsets(0)
+            )
         }
     ) { padding ->
         Column(
@@ -284,6 +88,22 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        headlineContent = { Text("Server version") },
+                        supportingContent = {
+                            Text(
+                                text = buildString {
+                                    append(uiState.serverVersion.ifEmpty { "Unknown" })
+                                    uiState.serverType?.let { append(" ($it)") }
+                                },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.Cloud, contentDescription = null)
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ListItem(
                         headlineContent = {
                             TextButton(
                                 onClick = {
@@ -304,6 +124,87 @@ fun SettingsScreen(
                             }
                         }
                     )
+                }
+            }
+
+            // Library Stats section
+            SettingsSectionHeader(title = "Library Stats")
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                val stats = uiState.libraryStats
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(label = "Tracks", value = "%,d".format(stats.trackCount))
+                        StatItem(label = "Albums", value = "%,d".format(stats.albumCount))
+                        StatItem(label = "Artists", value = "%,d".format(stats.artistCount))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(label = "Genres", value = "%,d".format(stats.genreCount))
+                        StatItem(label = "Duration", value = formatLargeDuration(stats.totalDurationSeconds))
+                        StatItem(label = "Size", value = formatLargeFileSize(stats.totalSizeBytes))
+                    }
+                }
+            }
+
+            // Playback section
+            SettingsSectionHeader(title = "Playback")
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Column {
+                    BitrateDropdown(
+                        label = "Wi-Fi max bitrate",
+                        icon = Icons.Default.Wifi,
+                        currentBitrate = uiState.wifiBitrate,
+                        onBitrateSelected = viewModel::setWifiBitrate
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    BitrateDropdown(
+                        label = "Cellular max bitrate",
+                        icon = Icons.Default.SignalCellularAlt,
+                        currentBitrate = uiState.cellularBitrate,
+                        onBitrateSelected = viewModel::setCellularBitrate
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ListItem(
+                        headlineContent = { Text("Crossfade") },
+                        leadingContent = {
+                            Icon(Icons.Default.Tune, contentDescription = null)
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = uiState.crossfadeEnabled,
+                                onCheckedChange = viewModel::setCrossfadeEnabled
+                            )
+                        }
+                    )
+                    AnimatedVisibility(visible = uiState.crossfadeEnabled) {
+                        ListItem(
+                            headlineContent = {
+                                Text("Duration: ${uiState.crossfadeDuration}s")
+                            },
+                            supportingContent = {
+                                Slider(
+                                    value = uiState.crossfadeDuration.toFloat(),
+                                    onValueChange = { viewModel.setCrossfadeDuration(it.toInt()) },
+                                    valueRange = 1f..10f,
+                                    steps = 8
+                                )
+                            }
+                        )
+                    }
                 }
             }
 
@@ -365,56 +266,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Playback section
-            SettingsSectionHeader(title = "Playback")
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                Column {
-                    BitrateDropdown(
-                        label = "Wi-Fi max bitrate",
-                        currentBitrate = uiState.wifiBitrate,
-                        onBitrateSelected = viewModel::setWifiBitrate
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    BitrateDropdown(
-                        label = "Cellular max bitrate",
-                        currentBitrate = uiState.cellularBitrate,
-                        onBitrateSelected = viewModel::setCellularBitrate
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ListItem(
-                        headlineContent = { Text("Crossfade") },
-                        leadingContent = {
-                            Icon(Icons.Default.Tune, contentDescription = null)
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = uiState.crossfadeEnabled,
-                                onCheckedChange = viewModel::setCrossfadeEnabled
-                            )
-                        }
-                    )
-                    AnimatedVisibility(visible = uiState.crossfadeEnabled) {
-                        ListItem(
-                            headlineContent = {
-                                Text("Duration: ${uiState.crossfadeDuration}s")
-                            },
-                            supportingContent = {
-                                Slider(
-                                    value = uiState.crossfadeDuration.toFloat(),
-                                    onValueChange = { viewModel.setCrossfadeDuration(it.toInt()) },
-                                    valueRange = 1f..10f,
-                                    steps = 8
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-
             // Last.fm section
             SettingsSectionHeader(title = "Last.fm")
             Card(
@@ -470,8 +321,8 @@ fun SettingsScreen(
                 }
             }
 
-            // Cache section
-            SettingsSectionHeader(title = "Cache")
+            // Storage section
+            SettingsSectionHeader(title = "Storage")
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -500,6 +351,10 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "Updates")
             UpdateSection(viewModel = viewModel)
 
+            // Debug logs section
+            SettingsSectionHeader(title = "Debug")
+            DebugLogsSection(viewModel = viewModel)
+
             // About section
             SettingsSectionHeader(title = "About")
             Card(
@@ -522,18 +377,29 @@ fun SettingsScreen(
                 )
             }
 
-            // Debug logs section
-            SettingsSectionHeader(title = "Debug")
-            DebugLogsSection(viewModel = viewModel)
-
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
-// endregion
-
 // region Components
+
+@Composable
+private fun StatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 @Composable
 private fun UpdateSection(viewModel: SettingsViewModel) {
@@ -647,7 +513,6 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-            // GitHub token setup
             if (githubToken == null) {
                 ListItem(
                     headlineContent = {
@@ -662,7 +527,6 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
                     }
                 )
             } else {
-                // Upload button
                 ListItem(
                     headlineContent = {
                         Row(
@@ -692,7 +556,6 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
                     }
                 )
 
-                // Show upload result
                 if (uploadUrl != null) {
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
@@ -724,7 +587,6 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
             }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            // Copy and clear row
             ListItem(
                 headlineContent = {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -750,7 +612,6 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
         }
     }
 
-    // GitHub token dialog
     if (showTokenDialog) {
         var tokenInput by remember { mutableStateOf(githubToken ?: "") }
         AlertDialog(
@@ -855,6 +716,7 @@ private fun SyncIntervalDropdown(
 @Composable
 private fun BitrateDropdown(
     label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.Speed,
     currentBitrate: Int,
     onBitrateSelected: (Int) -> Unit
 ) {
@@ -872,7 +734,7 @@ private fun BitrateDropdown(
         headlineContent = { Text(label) },
         supportingContent = { Text(currentLabel) },
         leadingContent = {
-            Icon(Icons.Default.Speed, contentDescription = null)
+            Icon(icon, contentDescription = null)
         },
         trailingContent = {
             Box {

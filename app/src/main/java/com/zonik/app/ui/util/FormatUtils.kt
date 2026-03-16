@@ -16,3 +16,23 @@ fun formatFileSize(bytes: Long?): String {
     val mb = bytes / 1_048_576.0
     return "%.1f MB".format(mb)
 }
+
+fun formatLargeDuration(totalSeconds: Long): String {
+    if (totalSeconds <= 0) return "0m"
+    val days = totalSeconds / 86400
+    val hours = (totalSeconds % 86400) / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    return when {
+        days > 0 -> "${days}d ${hours}h"
+        hours > 0 -> "${hours}h ${minutes}m"
+        else -> "${minutes}m"
+    }
+}
+
+fun formatLargeFileSize(bytes: Long): String {
+    if (bytes <= 0) return "0 MB"
+    val gb = bytes / 1_073_741_824.0
+    if (gb >= 1.0) return "%.1f GB".format(gb)
+    val mb = bytes / 1_048_576.0
+    return "%.1f MB".format(mb)
+}

@@ -17,6 +17,9 @@ interface ArtistDao {
     @Query("DELETE FROM artists WHERE id NOT IN (:ids)")
     suspend fun deleteNotIn(ids: List<String>)
 
+    @Query("SELECT COUNT(*) FROM artists")
+    fun count(): Flow<Int>
+
     @Query("DELETE FROM artists")
     suspend fun deleteAll()
 }
@@ -38,6 +41,9 @@ interface AlbumDao {
     @Upsert
     suspend fun upsertAll(albums: List<AlbumEntity>)
 
+    @Query("SELECT COUNT(*) FROM albums")
+    fun count(): Flow<Int>
+
     @Query("DELETE FROM albums WHERE id NOT IN (:ids)")
     suspend fun deleteNotIn(ids: List<String>)
 
@@ -58,6 +64,18 @@ interface TrackDao {
 
     @Query("SELECT * FROM tracks ORDER BY rowid DESC LIMIT :limit")
     fun getRecent(limit: Int = 20): Flow<List<TrackEntity>>
+
+    @Query("SELECT COUNT(*) FROM tracks")
+    fun count(): Flow<Int>
+
+    @Query("SELECT COALESCE(SUM(duration), 0) FROM tracks")
+    fun totalDuration(): Flow<Long>
+
+    @Query("SELECT COALESCE(SUM(size), 0) FROM tracks")
+    fun totalSize(): Flow<Long>
+
+    @Query("SELECT COUNT(DISTINCT genre) FROM tracks WHERE genre IS NOT NULL")
+    fun genreCount(): Flow<Int>
 
     @Upsert
     suspend fun upsertAll(tracks: List<TrackEntity>)

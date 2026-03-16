@@ -13,6 +13,19 @@ class LibraryRepository @Inject constructor(
     private val api: SubsonicApi,
     private val database: ZonikDatabase
 ) {
+    fun artistCount(): Flow<Int> = database.artistDao().count()
+    fun albumCount(): Flow<Int> = database.albumDao().count()
+    fun trackCount(): Flow<Int> = database.trackDao().count()
+    fun totalDuration(): Flow<Long> = database.trackDao().totalDuration()
+    fun totalSize(): Flow<Long> = database.trackDao().totalSize()
+    fun genreCount(): Flow<Int> = database.trackDao().genreCount()
+
+    suspend fun getServerInfo(): Triple<String, String?, String?> {
+        val response = api.ping()
+        val envelope = response.response
+        return Triple(envelope.version, envelope.serverVersion, envelope.type)
+    }
+
     fun getArtists(): Flow<List<Artist>> =
         database.artistDao().getAll().map { entities ->
             entities.map { it.toDomain() }

@@ -45,6 +45,10 @@ class SettingsRepository @Inject constructor(
         prefs[SYNC_INTERVAL] ?: 60
     }
 
+    val wifiOnly: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[WIFI_ONLY] ?: true
+    }
+
     val scrobblingEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[SCROBBLING_ENABLED] ?: false
     }
@@ -75,6 +79,10 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setCellularBitrate(bitrate: Int) {
         dataStore.edit { prefs -> prefs[CELLULAR_BITRATE] = bitrate }
+    }
+
+    suspend fun setWifiOnly(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[WIFI_ONLY] = enabled }
     }
 
     suspend fun setScrobblingEnabled(enabled: Boolean) {
@@ -111,6 +119,7 @@ class SettingsRepository @Inject constructor(
         private val CELLULAR_BITRATE = intPreferencesKey("cellular_bitrate")
         private val LAST_SYNC = longPreferencesKey("last_sync")
         private val SYNC_INTERVAL = intPreferencesKey("sync_interval")
+        private val WIFI_ONLY = booleanPreferencesKey("wifi_only")
         private val SCROBBLING_ENABLED = booleanPreferencesKey("scrobbling_enabled")
         private val LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
         private val GITHUB_TOKEN = stringPreferencesKey("github_token")

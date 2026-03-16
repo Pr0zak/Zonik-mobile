@@ -52,6 +52,10 @@ class PlaybackManager @Inject constructor(
     // the correct track when manually seeking within the queue.
     private var _manualSeekIndex: Int = -1
 
+    // After a manual seek, ExoPlayer fires two transitions: reason=2 (SEEK) then
+    // reason=3 (AUTO). We must ignore the second one to avoid overriding the track.
+    private var _ignoreNextAutoTransition: Boolean = false
+
     private val _currentTrack = MutableStateFlow<Track?>(null)
     val currentTrack: StateFlow<Track?> = _currentTrack.asStateFlow()
 
@@ -87,6 +91,32 @@ class PlaybackManager @Inject constructor(
 
         DebugLog.d("Playback", "Connected to MediaService")
 
+        // When Cast session starts, transfer current playback to Cast device
+        scope.launch {
+            castManager.isCasting.collect { casting ->
+                if (casting) {
+                    val queue = _queue.value
+                    val track = _currentTrack.value
+                    if (queue.isNotEmpty() && track != null) {
+                        val startIndex = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+                        val config = getServerConfig() ?: return@collect
+                        val serverUrl = config.url
+
+                        // Pause local playback
+                        controller?.pause()
+
+                        DebugLog.d("Playback", "Transferring ${queue.size} tracks to Cast (starting at $startIndex)")
+                        castManager.loadQueue(
+                            tracks = queue,
+                            startIndex = startIndex,
+                            buildStreamUrl = { t -> buildStreamUrl(t, serverUrl, config) },
+                            buildArtUrl = { t -> buildArtUrl(t, serverUrl, config) }
+                        )
+                    }
+                }
+            }
+        }
+
         controller?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 DebugLog.d("Playback", "isPlaying changed: $playing")
@@ -99,10 +129,18 @@ class PlaybackManager @Inject constructor(
                 val metaArtist = mediaItem?.mediaMetadata?.artist?.toString()
                 DebugLog.d("Playback", "Track transition: title='$metaTitle' artist='$metaArtist' index=$index reason=$reason pendingStart=$_pendingStartIndex manualSeek=$_manualSeekIndex")
 
+                // After a manual seek, ignore the follow-up AUTO transition
+                if (_ignoreNextAutoTransition && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    _ignoreNextAutoTransition = false
+                    DebugLog.d("Playback", "Ignoring post-seek AUTO transition")
+                    return
+                }
+
                 // Manual seek from skipToIndex — trust our index, ignore ExoPlayer's
                 if (_manualSeekIndex >= 0) {
                     val expected = _manualSeekIndex
                     _manualSeekIndex = -1
+                    _ignoreNextAutoTransition = true
                     DebugLog.d("Playback", "Manual seek: using index $expected (ExoPlayer reported $index)")
                     updateCurrentTrackByIndex(expected)
                     return
@@ -234,13 +272,31 @@ class PlaybackManager @Inject constructor(
 
     fun skipToIndex(index: Int) {
         val ctrl = controller ?: return
+        val track = _queue.value.getOrNull(index) ?: return
         DebugLog.d("Playback", "skipToIndex: $index (mediaItemCount=${ctrl.mediaItemCount}, queueSize=${_queue.value.size})")
-        if (index in 0 until ctrl.mediaItemCount && index in _queue.value.indices) {
-            _pendingStartIndex = -1  // Clear any pending correction
-            _manualSeekIndex = index  // Tell onMediaItemTransition to use our index
-            setCurrentTrack(_queue.value[index])  // Update UI immediately
-            ctrl.seekTo(index, 0L)
+
+        // ExoPlayer's internal queue may differ from _queue due to IPC reordering.
+        // Find the track by mediaId in ExoPlayer's actual queue.
+        var exoIndex = -1
+        for (i in 0 until ctrl.mediaItemCount) {
+            if (ctrl.getMediaItemAt(i).mediaId == track.id) {
+                exoIndex = i
+                break
+            }
         }
+        if (exoIndex < 0) {
+            DebugLog.w("Playback", "skipToIndex: track '${track.title}' (${track.id}) not found in ExoPlayer queue, falling back to index $index")
+            exoIndex = index
+        }
+        if (exoIndex != index) {
+            DebugLog.d("Playback", "skipToIndex: queue index $index maps to ExoPlayer index $exoIndex")
+        }
+
+        _pendingStartIndex = -1  // Clear any pending correction
+        _manualSeekIndex = index  // Tell onMediaItemTransition to use our queue index
+        _ignoreNextAutoTransition = false
+        setCurrentTrack(track)  // Update UI immediately
+        ctrl.seekTo(exoIndex, 0L)
     }
 
     fun skipNext() {
