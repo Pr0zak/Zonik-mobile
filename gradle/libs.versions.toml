@@ -23,11 +23,13 @@ cast = "21.5.0"
 mediarouter = "1.7.0"
 core-ktx = "1.15.0"
 core-splashscreen = "1.0.1"
+appcompat = "1.7.0"
 
 [libraries]
 # AndroidX Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "core-splashscreen" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity-compose" }
 
 # Compose

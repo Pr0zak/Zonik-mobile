@@ -2,7 +2,7 @@ package com.zonik.app
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
@@ -90,7 +90,7 @@ class MainViewModel @Inject constructor(
 }
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_SHOW_NOW_PLAYING = "SHOW_NOW_PLAYING"
