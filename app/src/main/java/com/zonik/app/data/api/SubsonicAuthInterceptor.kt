@@ -1,5 +1,6 @@
 package com.zonik.app.data.api
 
+import com.zonik.app.data.DebugLog
 import com.zonik.app.data.repository.SettingsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -34,7 +35,13 @@ class SubsonicAuthInterceptor @Inject constructor(
             .url(url)
             .build()
 
-        return chain.proceed(request)
+        val response = chain.proceed(request)
+        val path = url.encodedPath
+        DebugLog.d("API", "$path → ${response.code}")
+        if (!response.isSuccessful) {
+            DebugLog.e("API", "$path failed: ${response.code} ${response.message}")
+        }
+        return response
     }
 
     private fun generateSalt(): String {

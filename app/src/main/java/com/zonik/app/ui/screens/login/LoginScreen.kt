@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zonik.app.data.DebugLog
 import com.zonik.app.data.repository.SettingsRepository
 import com.zonik.app.model.PingResponse
 import com.zonik.app.model.ServerConfig
@@ -99,6 +100,7 @@ class LoginViewModel @Inject constructor(
     private suspend fun testConnection(config: ServerConfig): String? =
         withContext(Dispatchers.IO) {
             try {
+                DebugLog.d("Login", "Testing connection to ${config.url}")
                 val client = OkHttpClient.Builder()
                     .connectTimeout(10, TimeUnit.SECONDS)
                     .readTimeout(10, TimeUnit.SECONDS)
@@ -114,29 +116,40 @@ class LoginViewModel @Inject constructor(
                 val request = Request.Builder().url(url).build()
                 val response = client.newCall(request).execute()
 
+                DebugLog.d("Login", "Ping response: ${response.code}")
+
                 if (!response.isSuccessful) {
+                    DebugLog.e("Login", "Server returned ${response.code}")
                     return@withContext "Server returned ${response.code}"
                 }
 
                 val body = response.body?.string()
                     ?: return@withContext "Empty response from server"
 
+                DebugLog.d("Login", "Ping body: $body")
+
                 val json = Json { ignoreUnknownKeys = true }
                 val ping = json.decodeFromString<PingResponse>(body)
 
                 if (!ping.response.isOk) {
                     val error = ping.response.error
+                    DebugLog.e("Login", "Auth failed: ${error?.message}")
                     return@withContext error?.message ?: "Authentication failed"
                 }
 
+                DebugLog.d("Login", "Connection test passed")
                 null // success
             } catch (e: java.net.UnknownHostException) {
+                DebugLog.e("Login", "UnknownHostException", e)
                 "Server not found. Check the URL."
             } catch (e: java.net.ConnectException) {
+                DebugLog.e("Login", "ConnectException", e)
                 "Cannot connect to server. Check the URL and port."
             } catch (e: java.net.SocketTimeoutException) {
+                DebugLog.e("Login", "SocketTimeoutException", e)
                 "Connection timed out. Server may be offline."
             } catch (e: Exception) {
+                DebugLog.e("Login", "Exception", e)
                 "Connection failed: ${e.message}"
             }
         }

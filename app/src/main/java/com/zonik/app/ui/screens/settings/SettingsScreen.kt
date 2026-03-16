@@ -14,6 +14,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import com.zonik.app.data.DebugLog
 import com.zonik.app.data.api.AppUpdate
 import com.zonik.app.data.api.UpdateChecker
 import com.zonik.app.data.repository.SettingsRepository
@@ -485,6 +489,10 @@ fun SettingsScreen(
                 )
             }
 
+            // Debug logs section
+            SettingsSectionHeader(title = "Debug")
+            DebugLogsSection()
+
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -578,6 +586,51 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DebugLogsSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var copied by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Column {
+            ListItem(
+                headlineContent = { Text("Debug Logs") },
+                supportingContent = { Text("Copy logs to clipboard for troubleshooting") },
+                leadingContent = {
+                    Icon(Icons.Default.BugReport, contentDescription = null)
+                }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            ListItem(
+                headlineContent = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = {
+                            val logs = DebugLog.getAll()
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Zonik Logs", logs))
+                            copied = true
+                        }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (copied) "Copied!" else "Copy Logs")
+                        }
+                        OutlinedButton(onClick = {
+                            DebugLog.clear()
+                            copied = false
+                        }) {
+                            Text("Clear")
+                        }
+                    }
+                }
+            )
         }
     }
 }

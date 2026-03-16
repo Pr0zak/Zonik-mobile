@@ -1,5 +1,6 @@
 package com.zonik.app.data.repository
 
+import com.zonik.app.data.DebugLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,10 +31,12 @@ class SyncManager @Inject constructor(
         if (_syncState.value.isSyncing) return
 
         _syncState.value = SyncState(isSyncing = true, phase = "Syncing artists...")
+        DebugLog.d("Sync", "Starting full sync")
 
         try {
             // Artists
             val artistCount = libraryRepository.syncArtists()
+            DebugLog.d("Sync", "Artists synced: $artistCount")
             _syncState.value = _syncState.value.copy(
                 phase = "Syncing albums...",
                 detail = "$artistCount artists synced",
@@ -77,6 +80,7 @@ class SyncManager @Inject constructor(
             settingsRepository.updateLastSyncTime(System.currentTimeMillis())
 
             val summary = "$artistCount artists \u00b7 $albumCount albums \u00b7 $trackCount tracks \u00b7 $playlistCount playlists"
+            DebugLog.d("Sync", "Sync complete: $summary")
             _syncState.value = SyncState(
                 isSyncing = false,
                 artistCount = artistCount,
@@ -89,7 +93,9 @@ class SyncManager @Inject constructor(
             _syncState.value = _syncState.value.copy(
                 isSyncing = false,
                 error = e.message ?: "Sync failed",
-                lastSyncResult = "Sync failed: ${e.message}"
+                lastSyncResult = "Sync failed: ${e.message}".also {
+                    DebugLog.e("Sync", "Sync failed", e)
+                }
             )
         }
     }
