@@ -165,7 +165,7 @@ class ZonikMediaService : MediaLibraryService() {
         val salt = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }.joinToString("")
         val token = md5("${config.apiKey}$salt")
         val separator = if (baseUrl.contains('?')) '&' else '?'
-        return "${baseUrl}${separator}u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp&f=json"
+        return "${baseUrl}${separator}u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp"
     }
 
     private fun md5(input: String): String {
