@@ -42,7 +42,7 @@ interface ZonikApi {
         @Query("offset") offset: Int = 0,
         @Query("limit") limit: Int = 50,
         @Query("type") type: String = "download,bulk_download"
-    ): List<JobInfo>
+    ): JobHistoryResponse
 
     @GET("api/jobs/{id}")
     suspend fun getJob(@Path("id") id: String): JobDetailResponse
@@ -160,7 +160,7 @@ data class JobInfo(
 
 @Serializable
 data class JobHistoryResponse(
-    val jobs: List<JobInfo> = emptyList(),
+    val items: List<JobInfo> = emptyList(),
     val total: Int = 0
 )
 

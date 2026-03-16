@@ -197,10 +197,10 @@ class DownloadsViewModel @Inject constructor(
         _uiState.update { it.copy(isLoadingJobs = true) }
         viewModelScope.launch {
             try {
-                val jobs = zonikApi.getJobHistory()
+                val response = zonikApi.getJobHistory()
                 _uiState.update {
                     it.copy(
-                        jobHistory = jobs,
+                        jobHistory = response.items,
                         isLoadingJobs = false
                     )
                 }
