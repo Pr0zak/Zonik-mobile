@@ -79,12 +79,16 @@ class ZonikMediaService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
 
-        com.zonik.app.data.DebugLog.d("MediaService", "onCreate — setting up ExoPlayer with OkHttpDataSource")
-        val dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
+        com.zonik.app.data.DebugLog.d("MediaService", "onCreate — setting up ExoPlayer with DefaultHttpDataSource")
+        val dataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(30_000)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
