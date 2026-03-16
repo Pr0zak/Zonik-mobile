@@ -15,8 +15,8 @@ android {
         applicationId = "com.zonik.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 34
-        versionName = "0.2.14"
+        versionCode = 35
+        versionName = "0.2.15"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -106,6 +106,11 @@ dependencies {
 
     // Palette
     implementation(libs.androidx.palette)
+
+    // Cast
+    implementation(libs.google.cast)
+    implementation(libs.androidx.mediarouter)
+
 
     // DataStore
     implementation(libs.datastore.preferences)

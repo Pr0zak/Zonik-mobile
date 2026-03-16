@@ -28,6 +28,7 @@ import com.zonik.app.model.Genre
 import com.zonik.app.model.Playlist
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
+import com.zonik.app.ui.components.TrackDetailsSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -235,7 +236,10 @@ fun LibraryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Library") })
+            TopAppBar(
+                title = { Text("Library") },
+                windowInsets = WindowInsets(0)
+            )
         }
     ) { padding ->
         Column(
@@ -619,6 +623,7 @@ private fun TracksTab(
 
         items(sortedTracks, key = { it.id }) { track ->
             var showMenu by remember { mutableStateOf(false) }
+            var showDetails by remember { mutableStateOf(false) }
 
             Box {
                 ListItem(
@@ -696,6 +701,11 @@ private fun TracksTab(
                         leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
                     )
                     DropdownMenuItem(
+                        text = { Text("Track Details") },
+                        onClick = { showMenu = false; showDetails = true },
+                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
                         text = {
                             Text(
                                 if (track.markedForDeletion) "Unmark for Deletion" else "Mark for Deletion",
@@ -711,6 +721,10 @@ private fun TracksTab(
                             )
                         }
                     )
+                }
+
+                if (showDetails) {
+                    TrackDetailsSheet(track = track, onDismiss = { showDetails = false })
                 }
             }
         }

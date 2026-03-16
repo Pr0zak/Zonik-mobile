@@ -140,9 +140,9 @@ fun HomeScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
-                                painter = painterResource(R.drawable.ic_logo_z),
+                                painter = painterResource(R.drawable.ic_launcher_foreground),
                                 contentDescription = null,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))

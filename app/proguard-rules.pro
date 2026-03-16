@@ -16,3 +16,8 @@
 # Room
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *
+
+# Google Cast
+-keep class com.zonik.app.media.CastOptionsProvider { *; }
+-keep class com.google.android.gms.cast.** { *; }
+-dontwarn com.google.android.gms.**

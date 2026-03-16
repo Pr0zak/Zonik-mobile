@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -65,6 +66,10 @@ class NowPlayingViewModel @Inject constructor(
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
     val isPlaying: StateFlow<Boolean> = playbackManager.isPlaying
     val queue: StateFlow<List<Track>> = playbackManager.queue
+    val isCasting: StateFlow<Boolean> = playbackManager.castManager.isCasting
+    val castDeviceName: StateFlow<String?> = playbackManager.castManager.castDeviceName
+
+    fun getCastContext() = playbackManager.castManager.getCastContext()
 
     private val _shuffleEnabled = MutableStateFlow(false)
     val shuffleEnabled: StateFlow<Boolean> = _shuffleEnabled.asStateFlow()
@@ -90,6 +95,7 @@ class NowPlayingViewModel @Inject constructor(
     fun skipNext() = playbackManager.skipNext()
     fun skipPrevious() = playbackManager.skipPrevious()
     fun seekTo(positionMs: Long) = playbackManager.seekTo(positionMs)
+    fun skipToIndex(index: Int) = playbackManager.skipToIndex(index)
     fun getCurrentPosition(): Long = playbackManager.getCurrentPosition()
     fun getDuration(): Long = playbackManager.getDuration()
 
@@ -151,6 +157,8 @@ fun NowPlayingScreen(
     val repeatState by viewModel.repeatState.collectAsState()
     val isStarred by viewModel.isStarred.collectAsState()
     val playbackSpeed by viewModel.playbackSpeed.collectAsState()
+    val isCasting by viewModel.isCasting.collectAsState()
+    val castDeviceName by viewModel.castDeviceName.collectAsState()
 
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
@@ -492,11 +500,48 @@ fun NowPlayingScreen(
                     }
                 }
 
+                // Cast button — uses AndroidView to wrap MediaRouteButton from Cast SDK
+                androidx.compose.ui.viewinterop.AndroidView(
+                    factory = { ctx ->
+                        androidx.mediarouter.app.MediaRouteButton(ctx).apply {
+                            try {
+                                com.google.android.gms.cast.framework.CastButtonFactory.setUpMediaRouteButton(ctx, this)
+                            } catch (e: Exception) {
+                                com.zonik.app.data.DebugLog.w("NowPlaying", "Cast button setup failed: ${e.message}")
+                            }
+                        }
+                    },
+                    modifier = Modifier.size(48.dp)
+                )
+
                 IconButton(onClick = { showQueue = !showQueue }) {
                     Icon(
                         Icons.AutoMirrored.Filled.QueueMusic,
                         contentDescription = "Queue",
                         tint = if (showQueue) animatedAccent else Color.White.copy(alpha = 0.5f)
+                    )
+                }
+            }
+
+            // Casting indicator
+            if (isCasting && castDeviceName != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Cast,
+                        contentDescription = null,
+                        tint = animatedAccent,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Casting to $castDeviceName",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = animatedAccent
                     )
                 }
             }
@@ -580,7 +625,10 @@ fun NowPlayingScreen(
                                         color = if (isCurrent) animatedAccent else Color.White.copy(alpha = 0.4f)
                                     )
                                 },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                modifier = Modifier.clickable {
+                                    viewModel.skipToIndex(index)
+                                }
                             )
                         }
                     }
@@ -600,3 +648,4 @@ private fun DetailRow(label: String, value: String) {
         Text(value, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
     }
 }
+

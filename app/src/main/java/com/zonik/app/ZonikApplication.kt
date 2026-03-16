@@ -9,6 +9,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.zonik.app.media.CastManager
 import dagger.hilt.android.HiltAndroidApp
 import okhttp3.OkHttpClient
 import javax.inject.Inject
@@ -22,6 +23,9 @@ class ZonikApplication : Application(), Configuration.Provider, ImageLoaderFacto
     @Inject
     lateinit var okHttpClient: OkHttpClient
 
+    @Inject
+    lateinit var castManager: CastManager
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -31,6 +35,11 @@ class ZonikApplication : Application(), Configuration.Provider, ImageLoaderFacto
         super.onCreate()
         com.zonik.app.data.DebugLog.init(this)
         createNotificationChannels()
+        try {
+            castManager.initialize()
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("App", "Cast SDK init failed (no Play Services?): ${e.message}")
+        }
     }
 
     private fun createNotificationChannels() {

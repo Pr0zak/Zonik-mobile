@@ -1,5 +1,6 @@
 package com.zonik.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -90,24 +91,47 @@ class MainViewModel @Inject constructor(
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        const val EXTRA_SHOW_NOW_PLAYING = "SHOW_NOW_PLAYING"
+    }
+
+    // Mutable state to signal that Now Playing should be shown
+    internal val showNowPlayingFromIntent = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleNowPlayingIntent(intent)
         setContent {
             ZonikTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    ZonikApp()
+                    ZonikApp(showNowPlayingFromIntent = showNowPlayingFromIntent)
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleNowPlayingIntent(intent)
+    }
+
+    private fun handleNowPlayingIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_SHOW_NOW_PLAYING, false) == true) {
+            showNowPlayingFromIntent.value = true
         }
     }
 }
 
 @Composable
-fun ZonikApp(viewModel: MainViewModel = hiltViewModel()) {
+fun ZonikApp(
+    viewModel: MainViewModel = hiltViewModel(),
+    showNowPlayingFromIntent: MutableState<Boolean> = mutableStateOf(false)
+) {
     val rootNavController = rememberNavController()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     var showNowPlaying by remember { mutableStateOf(false) }
@@ -117,6 +141,15 @@ fun ZonikApp(viewModel: MainViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) {
         viewModel.playbackStarted.collect {
             showNowPlaying = true
+        }
+    }
+
+    // Show Now Playing when opened from notification
+    val intentShowNowPlaying by showNowPlayingFromIntent
+    LaunchedEffect(intentShowNowPlaying) {
+        if (intentShowNowPlaying) {
+            showNowPlaying = true
+            showNowPlayingFromIntent.value = false
         }
     }
 

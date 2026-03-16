@@ -139,7 +139,16 @@ class ZonikMediaService : MediaLibraryService() {
 
         val callback = BrowseTreeCallback()
 
+        val sessionActivityIntent = android.content.Intent(this, com.zonik.app.MainActivity::class.java).apply {
+            putExtra("SHOW_NOW_PLAYING", true)
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            this, 0, sessionActivityIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, callback)
+            .setSessionActivity(pendingIntent)
             .build()
     }
 

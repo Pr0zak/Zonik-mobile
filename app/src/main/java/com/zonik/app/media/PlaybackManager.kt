@@ -37,7 +37,8 @@ import javax.inject.Singleton
 class PlaybackManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
-    private val libraryRepository: LibraryRepository
+    private val libraryRepository: LibraryRepository,
+    val castManager: CastManager
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var controller: MediaController? = null
@@ -137,11 +138,6 @@ class PlaybackManager @Inject constructor(
     }
 
     fun playTracks(tracks: List<Track>, startIndex: Int = 0) {
-        val ctrl = controller
-        if (ctrl == null) {
-            DebugLog.e("Playback", "playTracks called but controller is null!")
-            return
-        }
         val config = getServerConfig() ?: return
         val serverUrl = config.url
         _queue.value = tracks
@@ -149,12 +145,30 @@ class PlaybackManager @Inject constructor(
         if (startIndex in tracks.indices) {
             _currentTrack.value = tracks[startIndex]
         }
+        _playbackRequested.tryEmit(Unit)
+
+        // Route to Cast if a Cast session is active
+        if (castManager.isCasting.value) {
+            DebugLog.d("Playback", "Casting ${tracks.size} tracks from index $startIndex")
+            castManager.loadQueue(
+                tracks = tracks,
+                startIndex = startIndex,
+                buildStreamUrl = { track -> buildStreamUrl(track, serverUrl, config) },
+                buildArtUrl = { track -> buildArtUrl(track, serverUrl, config) }
+            )
+            return
+        }
+
+        val ctrl = controller
+        if (ctrl == null) {
+            DebugLog.e("Playback", "playTracks called but controller is null!")
+            return
+        }
 
         val mediaItems = tracks.map { track ->
             buildMediaItem(track, serverUrl, config)
         }
 
-        _playbackRequested.tryEmit(Unit)
         _pendingStartIndex = startIndex
         DebugLog.d("Playback", "Playing ${tracks.size} tracks from index $startIndex")
         DebugLog.d("Playback", "Stream URL: ${mediaItems.firstOrNull()?.localConfiguration?.uri}")
@@ -187,15 +201,38 @@ class PlaybackManager @Inject constructor(
     }
 
     fun togglePlayPause() {
+        if (castManager.isCasting.value) {
+            castManager.togglePlayPause()
+            _isPlaying.value = !_isPlaying.value
+            return
+        }
         val ctrl = controller ?: return
         if (ctrl.isPlaying) ctrl.pause() else ctrl.play()
     }
 
     fun seekTo(positionMs: Long) {
+        if (castManager.isCasting.value) {
+            castManager.seekTo(positionMs)
+            return
+        }
         controller?.seekTo(positionMs)
     }
 
+    fun skipToIndex(index: Int) {
+        if (index in _queue.value.indices) {
+            updateCurrentTrackByIndex(index)
+        }
+        val ctrl = controller ?: return
+        if (index in 0 until ctrl.mediaItemCount) {
+            ctrl.seekTo(index, 0)
+        }
+    }
+
     fun skipNext() {
+        if (castManager.isCasting.value) {
+            castManager.skipNext()
+            return
+        }
         val ctrl = controller
         if (ctrl == null) {
             DebugLog.w("Playback", "skipNext: controller is null")
@@ -206,6 +243,10 @@ class PlaybackManager @Inject constructor(
     }
 
     fun skipPrevious() {
+        if (castManager.isCasting.value) {
+            castManager.skipPrevious()
+            return
+        }
         val ctrl = controller
         if (ctrl == null) {
             DebugLog.w("Playback", "skipPrevious: controller is null")
@@ -224,11 +265,20 @@ class PlaybackManager @Inject constructor(
     }
 
     fun getCurrentPosition(): Long {
+        if (castManager.isCasting.value) {
+            val pos = castManager.getCurrentPosition()
+            checkScrobble(pos)
+            return pos
+        }
         val pos = controller?.currentPosition ?: 0L
         checkScrobble(pos)
         return pos
     }
-    fun getDuration(): Long = controller?.duration ?: 0L
+
+    fun getDuration(): Long {
+        if (castManager.isCasting.value) return castManager.getDuration()
+        return controller?.duration ?: 0L
+    }
 
     private fun checkScrobble(positionMs: Long) {
         val track = _currentTrack.value ?: return
@@ -253,14 +303,23 @@ class PlaybackManager @Inject constructor(
         controller = null
     }
 
-    private fun buildMediaItem(track: Track, serverUrl: String, config: ServerConfig): MediaItem {
+    private fun buildStreamUrl(track: Track, serverUrl: String, config: ServerConfig): String {
         val bitrate = getMaxBitRate()
         val bitrateParam = if (bitrate > 0) "&maxBitRate=$bitrate" else ""
         val authParams = buildAuthParamsFromConfig(config)
-        val streamUrl = "${serverUrl.trimEnd('/')}/rest/stream.view?id=${track.id}${bitrateParam}&estimateContentLength=true$authParams"
-        val artUrl = track.coverArt?.let {
+        return "${serverUrl.trimEnd('/')}/rest/stream.view?id=${track.id}${bitrateParam}&estimateContentLength=true$authParams"
+    }
+
+    private fun buildArtUrl(track: Track, serverUrl: String, config: ServerConfig): String? {
+        val authParams = buildAuthParamsFromConfig(config)
+        return track.coverArt?.let {
             "${serverUrl.trimEnd('/')}/rest/getCoverArt.view?id=$it&size=600$authParams"
         }
+    }
+
+    private fun buildMediaItem(track: Track, serverUrl: String, config: ServerConfig): MediaItem {
+        val streamUrl = buildStreamUrl(track, serverUrl, config)
+        val artUrl = buildArtUrl(track, serverUrl, config)
 
         return MediaItem.Builder()
             .setMediaId(track.id)
