@@ -253,7 +253,10 @@ class PlaybackManager @Inject constructor(
         // Workaround: Media3 calls onAddMediaItems per-item during IPC, which can
         // leave the player at the wrong index. Explicit seekTo corrects it after
         // the playlist is fully built (IPC commands are processed in order).
-        ctrl.seekTo(startIndex, 0)
+        // Only needed when startIndex > 0 — at index 0, seekTo causes a spurious skip.
+        if (startIndex > 0) {
+            ctrl.seekTo(startIndex, 0)
+        }
     }
 
     fun playNext(track: Track) {
