@@ -61,7 +61,8 @@ enum class RepeatState { OFF, ALL, ONE }
 class NowPlayingViewModel @Inject constructor(
     private val playbackManager: PlaybackManager,
     private val libraryRepository: LibraryRepository,
-    private val settingsRepository: com.zonik.app.data.repository.SettingsRepository
+    private val settingsRepository: com.zonik.app.data.repository.SettingsRepository,
+    private val database: com.zonik.app.data.db.ZonikDatabase
 ) : ViewModel() {
 
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
@@ -91,9 +92,10 @@ class NowPlayingViewModel @Inject constructor(
         viewModelScope.launch {
             currentTrack.collect { track ->
                 if (track != null) {
-                    // Read current starred status from DB (not the in-memory Track object)
-                    val dbTrack = libraryRepository.getTrackById(track.id)
-                    _isStarred.value = dbTrack?.starred ?: track.starred
+                    // Read starred status directly from DB (not the in-memory Track object)
+                    val starred = database.trackDao().isStarred(track.id)
+                    _isStarred.value = starred ?: false
+                    com.zonik.app.data.DebugLog.d("NowPlaying", "Track '${track.title}' starred=$starred (track.starred=${track.starred})")
                 } else {
                     _isStarred.value = false
                 }
