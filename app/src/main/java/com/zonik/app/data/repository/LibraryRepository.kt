@@ -157,8 +157,12 @@ class LibraryRepository @Inject constructor(
 
     suspend fun star(id: String) {
         api.star(id = id)
-        database.trackDao().getById(id)?.let {
-            database.trackDao().upsertAll(listOf(it.copy(starred = true)))
+        val track = database.trackDao().getById(id)
+        if (track != null) {
+            database.trackDao().upsertAll(listOf(track.copy(starred = true)))
+            com.zonik.app.data.DebugLog.d("Library", "Starred track in DB: $id (was ${track.starred})")
+        } else {
+            com.zonik.app.data.DebugLog.w("Library", "Star: track $id not found in DB")
         }
         database.albumDao().getById(id)?.let {
             database.albumDao().upsertAll(listOf(it.copy(starred = true)))
@@ -252,6 +256,7 @@ class LibraryRepository @Inject constructor(
         // Preserve local flags (markedForDeletion, starred) from existing tracks
         val existingMarked = database.trackDao().getMarkedForDeletionIds()
         val existingStarredIds = database.trackDao().getStarred().map { it.id }.toSet()
+        com.zonik.app.data.DebugLog.d("Sync", "Preserving ${existingStarredIds.size} starred, ${existingMarked.size} marked for deletion")
         val entities = allTracks.map { subsonicTrack ->
             var entity = TrackEntity.fromDomain(subsonicTrack.toDomain())
             if (entity.id in existingMarked) entity = entity.copy(markedForDeletion = true)
