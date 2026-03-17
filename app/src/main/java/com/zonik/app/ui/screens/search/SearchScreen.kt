@@ -145,7 +145,10 @@ fun SearchScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Search") })
+            TopAppBar(
+                title = { Text("Search") },
+                windowInsets = WindowInsets(0)
+            )
         }
     ) { padding ->
         Column(

@@ -151,7 +151,10 @@ private fun PlaylistListScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Playlists") })
+            TopAppBar(
+                title = { Text("Playlists") },
+                windowInsets = WindowInsets(0)
+            )
         }
     ) { padding ->
         when {
@@ -269,7 +272,8 @@ private fun PlaylistDetailScreen(
                             contentDescription = "Back"
                         )
                     }
-                }
+                },
+                windowInsets = WindowInsets(0)
             )
         }
     ) { padding ->

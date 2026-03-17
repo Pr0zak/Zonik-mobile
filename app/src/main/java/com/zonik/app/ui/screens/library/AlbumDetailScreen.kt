@@ -160,7 +160,8 @@ fun AlbumDetailScreen(
                             contentDescription = "Back"
                         )
                     }
-                }
+                },
+                windowInsets = WindowInsets(0)
             )
         }
     ) { padding ->

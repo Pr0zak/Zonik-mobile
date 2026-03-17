@@ -390,7 +390,10 @@ class PlaybackManager @Inject constructor(
 
     private fun buildMediaItem(track: Track, serverUrl: String, config: ServerConfig): MediaItem {
         val streamUrl = buildStreamUrl(track, serverUrl, config)
-        val artUrl = buildArtUrl(track, serverUrl, config)
+        // Use ContentProvider URI for artwork so Android Auto can fetch it
+        val artUri = track.coverArt?.let {
+            com.zonik.app.data.CoverArtProvider.buildUri(it, 600)
+        }
 
         return MediaItem.Builder()
             .setMediaId(track.id)
@@ -406,7 +409,7 @@ class PlaybackManager @Inject constructor(
                     .setArtist(track.artist)
                     .setAlbumTitle(track.album)
                     .setTrackNumber(track.track)
-                    .setArtworkUri(artUrl?.let { Uri.parse(it) })
+                    .setArtworkUri(artUri)
                     .build()
             )
             .build()

@@ -602,37 +602,69 @@ fun NowPlayingScreen(
                     ) {
                         itemsIndexed(queue, key = { index, t -> "$index-${t.id}" }) { index, queueTrack ->
                             val isCurrent = queueTrack.id == track?.id
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = queueTrack.title,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        color = if (isCurrent) animatedAccent else Color.White,
-                                        style = if (isCurrent) MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-                                                else MaterialTheme.typography.bodyLarge
-                                    )
-                                },
-                                supportingContent = {
-                                    Text(
-                                        text = "${queueTrack.artist} · ${queueTrack.album}",
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        color = Color.White.copy(alpha = 0.5f)
-                                    )
-                                },
-                                leadingContent = {
-                                    Text(
-                                        text = "${index + 1}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = if (isCurrent) animatedAccent else Color.White.copy(alpha = 0.4f)
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                modifier = Modifier.clickable {
-                                    viewModel.skipToIndex(index)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { viewModel.skipToIndex(index) }
+                            ) {
+                                // Blurred cover art background
+                                if (queueTrack.coverArt != null) {
+                                    Box(modifier = Modifier.matchParentSize()) {
+                                        CoverArt(
+                                            coverArtId = queueTrack.coverArt,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .blur(40.dp),
+                                            size = 64
+                                        )
+                                        // Dark overlay for readability
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Black.copy(alpha = 0.75f))
+                                        )
+                                    }
                                 }
-                            )
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            text = queueTrack.title,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = if (isCurrent) animatedAccent else Color.White,
+                                            style = if (isCurrent) MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                                                    else MaterialTheme.typography.bodyLarge
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            text = "${queueTrack.artist} · ${queueTrack.album}",
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = Color.White.copy(alpha = 0.5f)
+                                        )
+                                    },
+                                    leadingContent = {
+                                        CoverArt(
+                                            coverArtId = queueTrack.coverArt,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(RoundedCornerShape(4.dp)),
+                                            size = 100
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Text(
+                                            text = "${index + 1}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (isCurrent) animatedAccent else Color.White.copy(alpha = 0.4f)
+                                        )
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
+                            }
                         }
                     }
                 }

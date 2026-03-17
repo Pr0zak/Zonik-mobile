@@ -21,6 +21,7 @@ import androidx.media3.session.SessionResult
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.zonik.app.R
 import com.zonik.app.data.db.ZonikDatabase
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SettingsRepository
@@ -182,10 +183,9 @@ class ZonikMediaService : MediaLibraryService() {
 
     private fun coverArtUri(coverArtId: String?): Uri? {
         if (coverArtId == null) return null
-        val serverUrl = getServerUrl() ?: return null
-        return Uri.parse(buildAuthenticatedUrl(
-            "$serverUrl/rest/getCoverArt.view?id=$coverArtId&size=300"
-        ))
+        // Use ContentProvider URI so Android Auto and other external processes
+        // can fetch artwork without needing cleartext HTTP access
+        return com.zonik.app.data.CoverArtProvider.buildUri(coverArtId)
     }
 
     private fun buildStreamUrlForTrack(trackId: String): String {
@@ -268,8 +268,10 @@ class ZonikMediaService : MediaLibraryService() {
 
     private fun buildStarButton(isStarred: Boolean): CommandButton {
         val icon = if (isStarred) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED
+        val iconRes = if (isStarred) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
         return CommandButton.Builder(icon)
             .setDisplayName(if (isStarred) "Unstar" else "Star")
+            .setIconResId(iconRes)
             .setSessionCommand(toggleStarCommand)
             .setEnabled(true)
             .build()
@@ -351,12 +353,55 @@ class ZonikMediaService : MediaLibraryService() {
 
     private inner class BrowseTreeCallback : MediaLibrarySession.Callback {
 
+        /**
+         * Handle setMediaItems calls — intercept Shuffle Mix / True Random from Android Auto.
+         * Android Auto uses playFromMediaId() which maps to onSetMediaItems with INDEX_UNSET.
+         * We must resolve the tracks AND set startIndex=0 explicitly.
+         */
+        override fun onSetMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            if (mediaItems.size == 1) {
+                val id = mediaItems[0].mediaId
+                if (id == SHUFFLE_MIX_ID || id == TRUE_RANDOM_ID) {
+                    com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: resolving $id")
+                    try {
+                        val tracks = runBlocking {
+                            libraryRepository.getRandomSongs(count = if (id == SHUFFLE_MIX_ID) 100 else 50)
+                        }
+                        if (tracks.isEmpty()) {
+                            com.zonik.app.data.DebugLog.w("MediaService", "onSetMediaItems: $id returned 0 tracks")
+                            return Futures.immediateFuture(
+                                MediaSession.MediaItemsWithStartPosition(mutableListOf(), 0, 0L)
+                            )
+                        }
+                        val resolved = tracks.map { buildFullMediaItem(it) }
+                        com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: $id resolved to ${resolved.size} tracks")
+                        return Futures.immediateFuture(
+                            MediaSession.MediaItemsWithStartPosition(resolved, 0, 0L)
+                        )
+                    } catch (e: Exception) {
+                        com.zonik.app.data.DebugLog.e("MediaService", "onSetMediaItems: $id failed: ${e.message}")
+                        return Futures.immediateFuture(
+                            MediaSession.MediaItemsWithStartPosition(mutableListOf(), 0, 0L)
+                        )
+                    }
+                }
+            }
+            // For everything else, delegate to default (which calls onAddMediaItems)
+            return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
+        }
+
         override fun onAddMediaItems(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>
         ): ListenableFuture<MutableList<MediaItem>> {
-            // Handle special playable items (Shuffle Mix, True Random) from Android Auto browse tree
+            // Handle shuffle/random if they come through addMediaItem path too
             if (mediaItems.size == 1) {
                 val id = mediaItems[0].mediaId
                 if (id == SHUFFLE_MIX_ID || id == TRUE_RANDOM_ID) {
@@ -364,11 +409,7 @@ class ZonikMediaService : MediaLibraryService() {
                     val tracks = runBlocking {
                         libraryRepository.getRandomSongs(count = if (id == SHUFFLE_MIX_ID) 100 else 50)
                     }
-                    val resolved = tracks.map { track ->
-                        buildFullMediaItem(track)
-                    }.toMutableList()
-                    com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: $id resolved to ${resolved.size} tracks")
-                    return Futures.immediateFuture(resolved)
+                    return Futures.immediateFuture(tracks.map { buildFullMediaItem(it) }.toMutableList())
                 }
             }
 
@@ -537,7 +578,22 @@ class ZonikMediaService : MediaLibraryService() {
                 val currentItem = player.currentMediaItem ?: return Futures.immediateFuture(
                     SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE)
                 )
-                val trackId = currentItem.mediaId.removePrefix(TRACK_PREFIX)
+                // mediaId may be empty after IPC — fall back to DB lookup by metadata
+                var trackId = currentItem.mediaId.removePrefix(TRACK_PREFIX)
+                if (trackId.isBlank()) {
+                    val title = currentItem.mediaMetadata.title?.toString()
+                    val artist = currentItem.mediaMetadata.artist?.toString()
+                    if (title != null) {
+                        val match = runBlocking {
+                            database.trackDao().getAll().first()
+                        }.find { it.title == title && (artist == null || it.artist == artist) }
+                        trackId = match?.id ?: ""
+                    }
+                }
+                if (trackId.isBlank()) {
+                    com.zonik.app.data.DebugLog.w("MediaService", "Star toggle: could not determine track ID")
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                }
                 val isStarred = trackId in starredTrackIds
                 try {
                     runBlocking {
@@ -550,7 +606,6 @@ class ZonikMediaService : MediaLibraryService() {
                         }
                     }
                     com.zonik.app.data.DebugLog.d("MediaService", "Star toggled for $trackId: ${!isStarred}")
-                    // Update the button to reflect new state
                     session.setCustomLayout(listOf(buildStarButton(!isStarred)))
                 } catch (e: Exception) {
                     com.zonik.app.data.DebugLog.e("MediaService", "Star toggle failed", e)
