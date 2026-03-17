@@ -21,6 +21,10 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.database.StandaloneDatabaseProvider
+import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -112,5 +116,20 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ZonikDatabase {
         return ZonikDatabase.create(context)
+    }
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    @Provides
+    @Singleton
+    fun provideSimpleCache(
+        @ApplicationContext context: Context,
+        settingsRepository: SettingsRepository
+    ): SimpleCache {
+        val cacheSizeMb = runBlocking {
+            settingsRepository.audioCacheSizeMb.first()
+        }
+        val cacheDir = File(context.cacheDir, "exoplayer_audio_cache")
+        val evictor = LeastRecentlyUsedCacheEvictor(cacheSizeMb.toLong() * 1024 * 1024)
+        return SimpleCache(cacheDir, evictor, StandaloneDatabaseProvider(context))
     }
 }

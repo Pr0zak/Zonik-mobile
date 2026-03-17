@@ -107,6 +107,22 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    val audioCacheSizeMb: Flow<Int> = dataStore.data.map { prefs ->
+        prefs[AUDIO_CACHE_SIZE_MB] ?: 500
+    }
+
+    suspend fun setAudioCacheSizeMb(sizeMb: Int) {
+        dataStore.edit { prefs -> prefs[AUDIO_CACHE_SIZE_MB] = sizeMb }
+    }
+
+    val cacheReadAhead: Flow<Int> = dataStore.data.map { prefs ->
+        prefs[CACHE_READ_AHEAD] ?: 3
+    }
+
+    suspend fun setCacheReadAhead(count: Int) {
+        dataStore.edit { prefs -> prefs[CACHE_READ_AHEAD] = count }
+    }
+
     val autoTabOrder: Flow<List<String>> = dataStore.data.map { prefs ->
         val raw = prefs[AUTO_TAB_ORDER]
         if (raw != null) raw.split(",") else listOf("mix", "recent", "library", "playlists")
@@ -132,6 +148,8 @@ class SettingsRepository @Inject constructor(
         private val SCROBBLING_ENABLED = booleanPreferencesKey("scrobbling_enabled")
         private val LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
         private val GITHUB_TOKEN = stringPreferencesKey("github_token")
+        private val AUDIO_CACHE_SIZE_MB = intPreferencesKey("audio_cache_size_mb")
+        private val CACHE_READ_AHEAD = intPreferencesKey("cache_read_ahead")
         private val AUTO_TAB_ORDER = stringPreferencesKey("auto_tab_order")
     }
 }

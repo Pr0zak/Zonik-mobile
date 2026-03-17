@@ -8,7 +8,10 @@ import com.zonik.app.data.api.UpdateChecker
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SettingsRepository
 import com.zonik.app.data.repository.SyncManager
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.cache.SimpleCache
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -36,19 +39,23 @@ data class SettingsUiState(
     val lastFmConnected: Boolean = false,
     val scrobblingEnabled: Boolean = false,
     val pendingScrobbleCount: Int = 0,
-    val cacheSizeMb: String = "0 MB",
+    val cacheSizeBytes: Long = 0L,
+    val maxCacheSizeMb: Int = 500,
+    val cacheReadAhead: Int = 3,
     val libraryStats: LibraryStats = LibraryStats(),
     val serverVersion: String = "",
     val serverType: String? = null
 )
 
+@androidx.annotation.OptIn(UnstableApi::class)
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val libraryRepository: LibraryRepository,
     private val updateChecker: UpdateChecker,
     private val syncManager: SyncManager,
-    private val logUploader: LogUploader
+    private val logUploader: LogUploader,
+    private val simpleCache: SimpleCache
 ) : ViewModel() {
 
     val githubToken = settingsRepository.githubToken
@@ -89,10 +96,16 @@ class SettingsViewModel @Inject constructor(
 
     private val _crossfadeEnabled = MutableStateFlow(false)
     private val _crossfadeDuration = MutableStateFlow(3)
+    private val _cacheSizeBytes = MutableStateFlow(0L)
 
     init {
         checkForUpdate()
         fetchServerInfo()
+        refreshCacheSize()
+    }
+
+    private fun refreshCacheSize() {
+        _cacheSizeBytes.value = simpleCache.cacheSpace
     }
 
     private fun fetchServerInfo() {
@@ -158,7 +171,10 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.scrobblingEnabled,
         libraryStats,
         _serverVersion,
-        _serverType
+        _serverType,
+        _cacheSizeBytes,
+        settingsRepository.audioCacheSizeMb,
+        settingsRepository.cacheReadAhead
     ) { values ->
         val serverConfig = values[0] as com.zonik.app.model.ServerConfig?
         val isLoggedIn = values[1] as Boolean
@@ -174,6 +190,9 @@ class SettingsViewModel @Inject constructor(
         val stats = values[11] as LibraryStats
         val serverVer = values[12] as String
         val serverTp = values[13] as String?
+        val cacheBytes = values[14] as Long
+        val maxCache = values[15] as Int
+        val readAhead = values[16] as Int
 
         SettingsUiState(
             serverUrl = serverConfig?.url ?: "",
@@ -190,7 +209,10 @@ class SettingsViewModel @Inject constructor(
             scrobblingEnabled = scrobbling,
             libraryStats = stats,
             serverVersion = serverVer,
-            serverType = serverTp
+            serverType = serverTp,
+            cacheSizeBytes = cacheBytes,
+            maxCacheSizeMb = maxCache,
+            cacheReadAhead = readAhead
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -242,7 +264,20 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun clearCache() {
-        // Stub: clear media cache
+        viewModelScope.launch(Dispatchers.IO) {
+            simpleCache.keys.toList().forEach { key ->
+                simpleCache.removeResource(key)
+            }
+            refreshCacheSize()
+        }
+    }
+
+    fun setAudioCacheSizeMb(sizeMb: Int) {
+        viewModelScope.launch { settingsRepository.setAudioCacheSizeMb(sizeMb) }
+    }
+
+    fun setCacheReadAhead(count: Int) {
+        viewModelScope.launch { settingsRepository.setCacheReadAhead(count) }
     }
 
     val autoTabOrder = settingsRepository.autoTabOrder

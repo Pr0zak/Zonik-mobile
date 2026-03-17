@@ -9,7 +9,15 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
+import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.LibraryResult
@@ -46,8 +54,12 @@ class ZonikMediaService : MediaLibraryService() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var database: ZonikDatabase
+    @Inject lateinit var simpleCache: SimpleCache
 
     private var mediaLibrarySession: MediaLibrarySession? = null
+    private val preCacheScope = CoroutineScope(Dispatchers.IO)
+    private var preCacheJob: Job? = null
+    private var cacheDataSourceFactory: CacheDataSource.Factory? = null
     private val starredTrackIds = mutableSetOf<String>()
     private val markedForDeletionIds = mutableSetOf<String>()
     private val toggleStarCommand = SessionCommand(ACTION_TOGGLE_STAR, Bundle.EMPTY)
@@ -106,7 +118,16 @@ class ZonikMediaService : MediaLibraryService() {
                 response
             }
             .build()
-        val dataSourceFactory = OkHttpDataSource.Factory(streamClient)
+        val upstreamFactory = OkHttpDataSource.Factory(streamClient)
+        val cacheKeyFactory = androidx.media3.datasource.cache.CacheKeyFactory { dataSpec ->
+            dataSpec.uri.getQueryParameter("id") ?: dataSpec.key ?: dataSpec.uri.toString()
+        }
+        val dataSourceFactory = CacheDataSource.Factory()
+            .setCache(simpleCache)
+            .setUpstreamDataSourceFactory(upstreamFactory)
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+            .setCacheKeyFactory(cacheKeyFactory)
+        cacheDataSourceFactory = dataSourceFactory
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
         val player = ExoPlayer.Builder(this)
@@ -135,6 +156,8 @@ class ZonikMediaService : MediaLibraryService() {
                 // Update custom buttons for the new track
                 val trackId = mediaItem?.mediaId?.removePrefix(TRACK_PREFIX) ?: ""
                 mediaLibrarySession?.setCustomLayout(buildCustomLayout(trackId))
+                // Pre-cache upcoming tracks
+                preCacheUpcoming(player)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -661,6 +684,44 @@ class ZonikMediaService : MediaLibraryService() {
             return null
         }
         return trackId
+    }
+
+    private fun preCacheUpcoming(player: androidx.media3.common.Player) {
+        preCacheJob?.cancel()
+        val factory = cacheDataSourceFactory ?: return
+        val currentIndex = player.currentMediaItemIndex
+        val itemCount = player.mediaItemCount
+        val readAhead = runBlocking { settingsRepository.cacheReadAhead.first() }
+        if (readAhead <= 0 || itemCount == 0) return
+
+        val upcoming = mutableListOf<Uri>()
+        for (i in 1..readAhead) {
+            val idx = currentIndex + i
+            if (idx >= itemCount) break
+            val item = player.getMediaItemAt(idx)
+            val uri = item.requestMetadata.mediaUri ?: item.localConfiguration?.uri
+            if (uri != null) upcoming.add(uri)
+        }
+        if (upcoming.isEmpty()) return
+
+        preCacheJob = preCacheScope.launch {
+            for (uri in upcoming) {
+                try {
+                    val trackId = uri.getQueryParameter("id") ?: continue
+                    // Skip if already fully cached
+                    if (simpleCache.isCached(trackId, 0, Long.MAX_VALUE)) continue
+                    com.zonik.app.data.DebugLog.d("MediaService", "Pre-caching track: $trackId")
+                    val dataSpec = DataSpec(uri)
+                    val dataSource = factory.createDataSource()
+                    val writer = CacheWriter(dataSource, dataSpec, null, null)
+                    writer.cache()
+                    com.zonik.app.data.DebugLog.d("MediaService", "Pre-cached track: $trackId")
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    com.zonik.app.data.DebugLog.w("MediaService", "Pre-cache failed: ${e.message}")
+                }
+            }
+        }
     }
 
     // -- Browse tree resolution --

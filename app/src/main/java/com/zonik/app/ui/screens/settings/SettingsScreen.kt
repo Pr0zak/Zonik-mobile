@@ -330,11 +330,21 @@ fun SettingsScreen(
             ) {
                 Column {
                     ListItem(
-                        headlineContent = { Text("Cache size") },
-                        supportingContent = { Text(uiState.cacheSizeMb) },
+                        headlineContent = { Text("Audio cache") },
+                        supportingContent = { Text(formatLargeFileSize(uiState.cacheSizeBytes)) },
                         leadingContent = {
                             Icon(Icons.Default.Storage, contentDescription = null)
                         }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    CacheSizeDropdown(
+                        currentSizeMb = uiState.maxCacheSizeMb,
+                        onSizeSelected = viewModel::setAudioCacheSizeMb
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ReadAheadDropdown(
+                        currentCount = uiState.cacheReadAhead,
+                        onCountSelected = viewModel::setCacheReadAhead
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
@@ -821,6 +831,120 @@ private fun BitrateDropdown(
                                 expanded = false
                             },
                             trailingIcon = if (bitrate == currentBitrate) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null
+                        )
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun ReadAheadDropdown(
+    currentCount: Int,
+    onCountSelected: (Int) -> Unit
+) {
+    val options = listOf(
+        0 to "Off",
+        1 to "1 track",
+        2 to "2 tracks",
+        3 to "3 tracks",
+        5 to "5 tracks",
+        10 to "10 tracks"
+    )
+    val currentLabel = options.find { it.first == currentCount }?.second ?: "$currentCount tracks"
+    var expanded by remember { mutableStateOf(false) }
+
+    ListItem(
+        headlineContent = { Text("Read-ahead") },
+        supportingContent = { Text("Pre-cache upcoming tracks") },
+        leadingContent = {
+            Icon(Icons.Default.FastForward, contentDescription = null)
+        },
+        trailingContent = {
+            Box {
+                TextButton(onClick = { expanded = true }) {
+                    Text(currentLabel)
+                    Icon(
+                        Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    options.forEach { (count, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                onCountSelected(count)
+                                expanded = false
+                            },
+                            trailingIcon = if (count == currentCount) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null
+                        )
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun CacheSizeDropdown(
+    currentSizeMb: Int,
+    onSizeSelected: (Int) -> Unit
+) {
+    val options = listOf(
+        0 to "Off",
+        250 to "250 MB",
+        500 to "500 MB",
+        1024 to "1 GB",
+        2048 to "2 GB",
+        5120 to "5 GB",
+        10240 to "10 GB"
+    )
+    val currentLabel = options.find { it.first == currentSizeMb }?.second ?: "${currentSizeMb} MB"
+    var expanded by remember { mutableStateOf(false) }
+
+    ListItem(
+        headlineContent = { Text("Max cache size") },
+        supportingContent = {
+            Text(
+                if (currentSizeMb == 0) "Caching disabled"
+                else "$currentLabel (restart to apply)"
+            )
+        },
+        leadingContent = {
+            Icon(Icons.Default.Sd, contentDescription = null)
+        },
+        trailingContent = {
+            Box {
+                TextButton(onClick = { expanded = true }) {
+                    Text(currentLabel)
+                    Icon(
+                        Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    options.forEach { (sizeMb, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                onSizeSelected(sizeMb)
+                                expanded = false
+                            },
+                            trailingIcon = if (sizeMb == currentSizeMb) {
                                 { Icon(Icons.Default.Check, contentDescription = null) }
                             } else null
                         )

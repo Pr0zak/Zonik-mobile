@@ -15,8 +15,8 @@ android {
         applicationId = "com.zonik.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 48
-        versionName = "0.2.28"
+        versionCode = 49
+        versionName = "0.2.29"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -73,6 +73,7 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.media3.ui)
+    implementation(libs.media3.datasource)
     implementation(libs.media3.datasource.okhttp)
 
     // Hilt
