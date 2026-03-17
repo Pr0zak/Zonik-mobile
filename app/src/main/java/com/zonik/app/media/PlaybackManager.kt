@@ -168,10 +168,13 @@ class PlaybackManager @Inject constructor(
                     if (index != expected) {
                         DebugLog.d("Playback", "Correcting playlist start: got index $index, seeking to $expected")
                         controller?.seekTo(expected, 0)
-                        updateCurrentTrackByIndex(expected)
-                    } else {
-                        updateCurrentTrackByIndex(index)
                     }
+                    // Don't update UI track here — wait for the SEEK transition
+                    return
+                }
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
+                    // Spurious transition during playlist setup — ignore, UI already set
+                    DebugLog.d("Playback", "Ignoring PLAYLIST_CHANGED transition (no pending correction)")
                     return
                 }
                 // Match by metadata first (more reliable than index after shuffle/IPC)
