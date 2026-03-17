@@ -22,6 +22,9 @@ interface ArtistDao {
 
     @Query("DELETE FROM artists")
     suspend fun deleteAll()
+
+    @Query("SELECT * FROM artists ORDER BY albumCount DESC LIMIT :limit")
+    suspend fun getTopByAlbumCount(limit: Int = 10): List<ArtistEntity>
 }
 
 @Dao
@@ -49,6 +52,9 @@ interface AlbumDao {
 
     @Query("DELETE FROM albums")
     suspend fun deleteAll()
+
+    @Query("SELECT COUNT(*) FROM albums WHERE starred = 1")
+    suspend fun starredCount(): Int
 }
 
 @Dao
@@ -103,7 +109,28 @@ interface TrackDao {
 
     @Query("DELETE FROM tracks")
     suspend fun deleteAll()
+
+    // Stats queries
+    @Query("SELECT suffix as label, COUNT(*) as count FROM tracks WHERE suffix IS NOT NULL GROUP BY suffix ORDER BY count DESC")
+    suspend fun getFormatDistribution(): List<StatCount>
+
+    @Query("SELECT CAST(bitRate AS TEXT) as label, COUNT(*) as count FROM tracks WHERE bitRate IS NOT NULL GROUP BY bitRate ORDER BY bitRate DESC")
+    suspend fun getBitrateDistribution(): List<StatCount>
+
+    @Query("SELECT genre as label, COUNT(*) as count FROM tracks WHERE genre IS NOT NULL GROUP BY genre ORDER BY count DESC LIMIT :limit")
+    suspend fun getTopGenres(limit: Int = 15): List<StatCount>
+
+    @Query("SELECT CAST(year AS TEXT) as label, COUNT(*) as count FROM tracks WHERE year IS NOT NULL AND year > 0 GROUP BY year ORDER BY year")
+    suspend fun getYearDistribution(): List<StatCount>
+
+    @Query("SELECT COUNT(*) FROM tracks WHERE starred = 1")
+    suspend fun starredCount(): Int
+
+    @Query("SELECT COUNT(*) FROM tracks WHERE markedForDeletion = 1")
+    suspend fun markedCount(): Int
 }
+
+data class StatCount(val label: String, val count: Int)
 
 @Dao
 interface PendingScrobbleDao {

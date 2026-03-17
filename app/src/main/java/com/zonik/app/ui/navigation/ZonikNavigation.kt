@@ -9,6 +9,7 @@ sealed class Screen(val route: String) {
     data object ArtistDetail : Screen("artist/{artistId}") {
         fun createRoute(artistId: String) = "artist/$artistId"
     }
+    data object Stats : Screen("stats")
 }
 
 sealed class MainTab(val route: String, val label: String) {

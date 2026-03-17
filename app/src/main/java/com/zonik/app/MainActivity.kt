@@ -197,6 +197,11 @@ fun ZonikApp(
                     }
                 )
             }
+            composable(Screen.Stats.route) {
+                com.zonik.app.ui.screens.stats.StatsScreen(
+                    onBack = { rootNavController.popBackStack() }
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -326,6 +331,9 @@ fun MainScreen(
                         rootNavController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }
+                    },
+                    onNavigateToStats = {
+                        rootNavController.navigate(Screen.Stats.route)
                     }
                 )
             }

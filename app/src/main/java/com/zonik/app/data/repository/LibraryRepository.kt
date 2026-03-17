@@ -155,6 +155,30 @@ class LibraryRepository @Inject constructor(
     fun markedForDeletionCount(): Flow<Int> =
         database.trackDao().markedForDeletionCount()
 
+    // Stats
+    suspend fun getFormatDistribution() = database.trackDao().getFormatDistribution()
+    suspend fun getBitrateDistribution() = database.trackDao().getBitrateDistribution()
+    suspend fun getTopGenres(limit: Int = 15) = database.trackDao().getTopGenres(limit)
+    suspend fun getYearDistribution() = database.trackDao().getYearDistribution()
+    suspend fun getStarredTrackCount() = database.trackDao().starredCount()
+    suspend fun getStarredAlbumCount() = database.albumDao().starredCount()
+    suspend fun getMarkedForDeletionCount() = database.trackDao().markedCount()
+    suspend fun getTopArtists(limit: Int = 10) = database.artistDao().getTopByAlbumCount(limit).map { it.toDomain() }
+
+    suspend fun getMostPlayedAlbums(count: Int = 10): List<Album> {
+        return try {
+            val response = api.getAlbumList2("frequent", count)
+            response.response.albumList2?.album?.map { it.toDomain() } ?: emptyList()
+        } catch (_: Exception) { emptyList() }
+    }
+
+    suspend fun getRecentlyPlayedAlbums(count: Int = 10): List<Album> {
+        return try {
+            val response = api.getAlbumList2("recent", count)
+            response.response.albumList2?.album?.map { it.toDomain() } ?: emptyList()
+        } catch (_: Exception) { emptyList() }
+    }
+
     suspend fun star(id: String) {
         api.star(id = id)
         val track = database.trackDao().getById(id)

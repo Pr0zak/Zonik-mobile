@@ -28,6 +28,7 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     onDisconnected: () -> Unit,
+    onNavigateToStats: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -152,6 +153,15 @@ fun SettingsScreen(
                         StatItem(label = "Genres", value = "%,d".format(stats.genreCount))
                         StatItem(label = "Duration", value = formatLargeDuration(stats.totalDurationSeconds))
                         StatItem(label = "Size", value = formatLargeFileSize(stats.totalSizeBytes))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = onNavigateToStats,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View Full Stats")
                     }
                 }
             }
