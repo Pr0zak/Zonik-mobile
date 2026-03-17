@@ -115,6 +115,14 @@ class SettingsRepository @Inject constructor(
         dataStore.edit { prefs -> prefs[AUDIO_CACHE_SIZE_MB] = sizeMb }
     }
 
+    val keepScreenOn: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEEP_SCREEN_ON] ?: false
+    }
+
+    suspend fun setKeepScreenOn(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[KEEP_SCREEN_ON] = enabled }
+    }
+
     val cacheReadAhead: Flow<Int> = dataStore.data.map { prefs ->
         prefs[CACHE_READ_AHEAD] ?: 3
     }
@@ -148,6 +156,7 @@ class SettingsRepository @Inject constructor(
         private val SCROBBLING_ENABLED = booleanPreferencesKey("scrobbling_enabled")
         private val LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
         private val GITHUB_TOKEN = stringPreferencesKey("github_token")
+        private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         private val AUDIO_CACHE_SIZE_MB = intPreferencesKey("audio_cache_size_mb")
         private val CACHE_READ_AHEAD = intPreferencesKey("cache_read_ahead")
         private val AUTO_TAB_ORDER = stringPreferencesKey("auto_tab_order")

@@ -205,6 +205,20 @@ fun SettingsScreen(
                             }
                         )
                     }
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ListItem(
+                        headlineContent = { Text("Keep screen on") },
+                        supportingContent = { Text("Prevent sleep while Now Playing is visible") },
+                        leadingContent = {
+                            Icon(Icons.Default.Brightness7, contentDescription = null)
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = uiState.keepScreenOn,
+                                onCheckedChange = viewModel::setKeepScreenOn
+                            )
+                        }
+                    )
                 }
             }
 

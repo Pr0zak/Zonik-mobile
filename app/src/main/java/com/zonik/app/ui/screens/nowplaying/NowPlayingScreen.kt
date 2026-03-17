@@ -60,7 +60,8 @@ enum class RepeatState { OFF, ALL, ONE }
 @HiltViewModel
 class NowPlayingViewModel @Inject constructor(
     private val playbackManager: PlaybackManager,
-    private val libraryRepository: LibraryRepository
+    private val libraryRepository: LibraryRepository,
+    private val settingsRepository: com.zonik.app.data.repository.SettingsRepository
 ) : ViewModel() {
 
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
@@ -82,6 +83,9 @@ class NowPlayingViewModel @Inject constructor(
 
     private val _playbackSpeed = MutableStateFlow(1.0f)
     val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    val keepScreenOn: StateFlow<Boolean> = settingsRepository.keepScreenOn
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     init {
         viewModelScope.launch {
@@ -159,6 +163,18 @@ fun NowPlayingScreen(
     val playbackSpeed by viewModel.playbackSpeed.collectAsState()
     val isCasting by viewModel.isCasting.collectAsState()
     val castDeviceName by viewModel.castDeviceName.collectAsState()
+    val keepScreenOn by viewModel.keepScreenOn.collectAsState()
+
+    // Keep screen on while Now Playing is visible (if enabled in settings)
+    val activity = LocalContext.current as? android.app.Activity
+    DisposableEffect(keepScreenOn, isPlaying) {
+        if (keepScreenOn && isPlaying) {
+            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
