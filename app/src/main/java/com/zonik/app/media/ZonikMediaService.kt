@@ -62,7 +62,6 @@ class ZonikMediaService : MediaLibraryService() {
         private const val ALBUMS_ID = "albums"
         private const val GENRES_ID = "genres"
         private const val SHUFFLE_MIX_ID = "shuffle_mix"
-        private const val TRUE_RANDOM_ID = "true_random"
         private const val NEWLY_ADDED_ID = "newly_added"
         private const val FAVORITES_ID = "favorites"
         private const val NON_FAVORITES_ID = "non_favorites"
@@ -366,7 +365,7 @@ class ZonikMediaService : MediaLibraryService() {
     private inner class BrowseTreeCallback : MediaLibrarySession.Callback {
 
         /**
-         * Handle setMediaItems calls — intercept Shuffle Mix / True Random from Android Auto.
+         * Handle setMediaItems calls — intercept Mix items from Android Auto.
          * Android Auto uses playFromMediaId() which maps to onSetMediaItems with INDEX_UNSET.
          * We must resolve the tracks AND set startIndex=0 explicitly.
          */
@@ -707,8 +706,7 @@ class ZonikMediaService : MediaLibraryService() {
 
     private fun mixChildren(): List<MediaItem> {
         return listOf(
-            buildPlayableItem(id = SHUFFLE_MIX_ID, title = "Shuffle Mix", subtitle = "Shuffled random songs"),
-            buildPlayableItem(id = TRUE_RANDOM_ID, title = "True Random", subtitle = "Completely random songs"),
+            buildPlayableItem(id = SHUFFLE_MIX_ID, title = "Shuffle", subtitle = "Random songs"),
             buildPlayableItem(id = NEWLY_ADDED_ID, title = "Newly Added", subtitle = "Recently added tracks"),
             buildPlayableItem(id = FAVORITES_ID, title = "Favorites", subtitle = "Starred tracks"),
             buildPlayableItem(id = NON_FAVORITES_ID, title = "Non-Favorites", subtitle = "Unstarred tracks")
@@ -720,7 +718,6 @@ class ZonikMediaService : MediaLibraryService() {
         return runBlocking {
             when (id) {
                 SHUFFLE_MIX_ID -> libraryRepository.getRandomSongs(count = 100)
-                TRUE_RANDOM_ID -> libraryRepository.getRandomSongs(count = 50)
                 NEWLY_ADDED_ID -> {
                     libraryRepository.getRecentTracks(limit = 100).first()
                 }
@@ -785,8 +782,7 @@ class ZonikMediaService : MediaLibraryService() {
             mediaId == ARTISTS_ID -> buildBrowsableItem(id = ARTISTS_ID, title = "Artists")
             mediaId == ALBUMS_ID -> buildBrowsableItem(id = ALBUMS_ID, title = "Albums")
             mediaId == GENRES_ID -> buildBrowsableItem(id = GENRES_ID, title = "Genres")
-            mediaId == SHUFFLE_MIX_ID -> buildPlayableItem(id = SHUFFLE_MIX_ID, title = "Shuffle Mix")
-            mediaId == TRUE_RANDOM_ID -> buildPlayableItem(id = TRUE_RANDOM_ID, title = "True Random")
+            mediaId == SHUFFLE_MIX_ID -> buildPlayableItem(id = SHUFFLE_MIX_ID, title = "Shuffle")
             mediaId == NEWLY_ADDED_ID -> buildPlayableItem(id = NEWLY_ADDED_ID, title = "Newly Added")
             mediaId == FAVORITES_ID -> buildPlayableItem(id = FAVORITES_ID, title = "Favorites")
             mediaId == NON_FAVORITES_ID -> buildPlayableItem(id = NON_FAVORITES_ID, title = "Non-Favorites")
