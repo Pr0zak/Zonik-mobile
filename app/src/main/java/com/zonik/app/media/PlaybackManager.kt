@@ -92,7 +92,7 @@ class PlaybackManager @Inject constructor(
         DebugLog.d("Playback", "Connected to MediaService")
 
         // When Cast session starts, transfer current playback to Cast device
-        scope.launch {
+        scope.launch(Dispatchers.Main) {
             castManager.isCasting.collect { casting ->
                 if (casting) {
                     val queue = _queue.value
