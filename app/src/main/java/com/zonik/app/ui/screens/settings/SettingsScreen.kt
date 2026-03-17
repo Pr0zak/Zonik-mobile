@@ -384,10 +384,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Updates section
-            SettingsSectionHeader(title = "Updates")
-            UpdateSection(viewModel = viewModel)
-
             // Android Auto section
             SettingsSectionHeader(title = "Android Auto")
             AutoTabOrderSection(viewModel = viewModel)
@@ -396,7 +392,7 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "Debug")
             DebugLogsSection(viewModel = viewModel)
 
-            // About section
+            // About & Updates section
             SettingsSectionHeader(title = "About")
             Card(
                 modifier = Modifier
@@ -417,6 +413,7 @@ fun SettingsScreen(
                     }
                 )
             }
+            UpdateSection(viewModel = viewModel)
 
             Spacer(modifier = Modifier.height(24.dp))
         }

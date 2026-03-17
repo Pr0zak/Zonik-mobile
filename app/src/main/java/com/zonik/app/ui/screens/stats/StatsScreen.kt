@@ -204,17 +204,30 @@ fun StatsScreen(
                     DistributionCard(state.topGenres.take(10), state.trackCount)
                 }
 
-                // Bitrate Distribution
+                // Bitrate Distribution (grouped into ranges)
                 if (state.bitrateDistribution.isNotEmpty()) {
                     SectionHeader("Bitrate")
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            val total = state.bitrateDistribution.sumOf { it.count }
-                            state.bitrateDistribution.forEach { item ->
-                                val label = if (item.label == "0") "Lossless" else "${item.label} kbps"
-                                BarRow(label, item.count, total)
+                            val grouped = state.bitrateDistribution
+                                .map { (it.label.toIntOrNull() ?: 0) to it.count }
+                                .groupBy { (bitrate, _) ->
+                                    when {
+                                        bitrate == 0 -> "Lossless"
+                                        bitrate >= 320 -> "320+ kbps"
+                                        bitrate >= 256 -> "256 kbps"
+                                        bitrate >= 192 -> "192 kbps"
+                                        bitrate >= 128 -> "128 kbps"
+                                        else -> "<128 kbps"
+                                    }
+                                }
+                                .map { (label, items) -> label to items.sumOf { it.second } }
+                                .sortedByDescending { it.second }
+                            val total = grouped.sumOf { it.second }
+                            grouped.forEach { (label, count) ->
+                                BarRow(label, count, total)
                             }
                         }
                     }
