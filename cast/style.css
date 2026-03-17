@@ -3,14 +3,14 @@
 }
 
 .logo {
-  background-image: url(https://raw.githubusercontent.com/Pr0zak/Zonik-mobile/main/cast/icon.svg);
+  background-image: url(https://cdn.jsdelivr.net/gh/Pr0zak/Zonik-mobile@main/cast/icon.png);
   background-size: 384px 384px;
   background-repeat: no-repeat;
   background-position: center;
 }
 
 .splash {
-  background-image: url(https://raw.githubusercontent.com/Pr0zak/Zonik-mobile/main/cast/icon.svg);
+  background-image: url(https://cdn.jsdelivr.net/gh/Pr0zak/Zonik-mobile@main/cast/icon.png);
   background-size: 384px 384px;
   background-repeat: no-repeat;
   background-position: center;
@@ -18,7 +18,7 @@
 }
 
 .watermark {
-  background-image: url(https://raw.githubusercontent.com/Pr0zak/Zonik-mobile/main/cast/icon.svg);
+  background-image: url(https://cdn.jsdelivr.net/gh/Pr0zak/Zonik-mobile@main/cast/icon.png);
   background-size: 57px 57px;
   background-repeat: no-repeat;
   background-position: bottom right;
