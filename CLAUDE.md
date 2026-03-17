@@ -1,14 +1,18 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Zonik Android App
 
 ## Project Overview
-A native Android music player app that streams music from a self-hosted [Zonik](https://github.com/Pr0zak/Zonik) server. Single-user sideloaded APK with Android Auto support. Self-updates from GitHub releases.
+A native Android music player app that streams music from a self-hosted [Zonik](https://github.com/Pr0zak/Zonik) server. Single-user sideloaded APK with Android Auto and Chromecast support. Self-updates from GitHub releases.
 
 **Repo:** https://github.com/Pr0zak/Zonik-mobile
 
 ## Tech Stack
 - **Language:** Kotlin
 - **UI:** Jetpack Compose + Material 3 + custom dark theme (teal/cyan accents)
-- **Playback:** AndroidX Media3 (ExoPlayer) + MediaLibraryService
+- **Playback:** AndroidX Media3 (ExoPlayer) + MediaLibraryService + Google Cast
 - **Networking:** Retrofit + OkHttp + Kotlinx Serialization
 - **Local DB:** Room (v2) + Paging 3
 - **DI:** Hilt (KSP)
@@ -71,6 +75,8 @@ app/src/main/java/com/zonik/app/
   media/
     ZonikMediaService.kt  # MediaLibraryService, ExoPlayer, Auto browse tree, onAddMediaItems
     PlaybackManager.kt    # MediaController wrapper, queue, playback state, smart bitrate
+    CastManager.kt        # Google Cast session management, remote media playback, queue transfer
+    CastOptionsProvider.kt # Cast Framework config, receiver app ID (B621DA15)
   model/          # Domain models (Track, Album, Artist, etc), SubsonicResponse wrappers
   ui/
     components/
@@ -122,6 +128,18 @@ app/src/main/java/com/zonik/app/
 - Cover art URIs include baked-in auth params (fetched by system UI)
 - **Sideloaded APK setup**: user must enable Developer Mode in Android Auto settings (tap version 10x), then enable "Unknown sources" in developer settings
 
+## Chromecast
+- Google Cast SDK (Play Services Cast Framework) + AndroidX MediaRouter
+- Styled Media Receiver registered in Cast Developer Console (app ID: `B621DA15`)
+- `CastOptionsProvider` configures receiver app ID + notification target activity
+- `CastManager` singleton: session lifecycle, `RemoteMediaClient` for playback, queue loading
+- `PlaybackManager` routes all playback commands through `CastManager` when casting is active
+- Auto-transfers current queue to Cast device when session starts, pauses local ExoPlayer
+- Cast button in Now Playing screen via `MediaRouteButton` wrapped in Compose `AndroidView`
+- `MediaRouteButton` requires `AppCompatActivity` + AppCompat theme (not `ComponentActivity`)
+- Receiver CSS hosted via jsdelivr CDN: `https://cdn.jsdelivr.net/gh/Pr0zak/Zonik-mobile@main/cast/style.css`
+- Cast receiver assets in `cast/` directory (icon.png, icon.svg, style.css)
+
 ## API Notes
 - Subsonic API at `{server}/rest/{endpoint}.view`
 - Auth params: `u`, `t` (md5(apiKey+salt)), `s` (random salt), `v=1.16.1`, `c=ZonikApp`, `f=json`
@@ -158,3 +176,6 @@ app/src/main/java/com/zonik/app/
 - DataStore emits on any field change — don't use `collect` on `isLoggedIn` to trigger sync (causes infinite loop); use `first()` instead
 - Room DB uses `fallbackToDestructiveMigration()` — bump version number when changing entities (no manual migration needed)
 - `markedForDeletion` flag must be preserved during sync — `syncAllTracks` and `getAlbumDetail` read existing marked IDs before upserting
+- Cast `MediaRouteButton` crashes without `AppCompatActivity` context — `MainActivity` extends `AppCompatActivity` (not `ComponentActivity`)
+- Cast initialization wrapped in try-catch — graceful fallback on devices without Google Play Services
+- Cast receiver CSS/images must use jsdelivr CDN URLs (raw GitHub returns wrong MIME types)
