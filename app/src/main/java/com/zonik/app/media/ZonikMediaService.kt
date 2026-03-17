@@ -126,6 +126,13 @@ class ZonikMediaService : MediaLibraryService() {
                 }
             }
 
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                // Update star button state for the new track
+                val trackId = mediaItem?.mediaId?.removePrefix(TRACK_PREFIX) ?: ""
+                val isStarred = trackId.isNotBlank() && trackId in starredTrackIds
+                mediaLibrarySession?.setCustomLayout(listOf(buildStarButton(isStarred)))
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val state = when (playbackState) {
                     androidx.media3.common.Player.STATE_IDLE -> "IDLE"
@@ -638,28 +645,16 @@ class ZonikMediaService : MediaLibraryService() {
     }
 
     private fun rootChildren(): List<MediaItem> {
-        return listOf(
-            buildBrowsableItem(
-                id = RECENT_ID,
-                title = "Recently Added",
-                extras = gridExtras()
-            ),
-            buildBrowsableItem(
-                id = LIBRARY_ID,
-                title = "Library",
-                extras = listExtras()
-            ),
-            buildBrowsableItem(
-                id = PLAYLISTS_ID,
-                title = "Playlists",
-                extras = listExtras()
-            ),
-            buildBrowsableItem(
-                id = MIX_ID,
-                title = "Mix",
-                extras = listExtras()
-            )
+        val tabOrder = runBlocking {
+            settingsRepository.autoTabOrder.first()
+        }
+        val tabMap = mapOf(
+            "mix" to buildBrowsableItem(id = MIX_ID, title = "Mix", extras = listExtras()),
+            "recent" to buildBrowsableItem(id = RECENT_ID, title = "Recently Added", extras = gridExtras()),
+            "library" to buildBrowsableItem(id = LIBRARY_ID, title = "Library", extras = listExtras()),
+            "playlists" to buildBrowsableItem(id = PLAYLISTS_ID, title = "Playlists", extras = listExtras())
         )
+        return tabOrder.mapNotNull { tabMap[it] }
     }
 
     private fun recentChildren(): List<MediaItem> {

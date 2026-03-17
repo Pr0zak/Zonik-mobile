@@ -245,6 +245,22 @@ class SettingsViewModel @Inject constructor(
         // Stub: clear media cache
     }
 
+    val autoTabOrder = settingsRepository.autoTabOrder
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("mix", "recent", "library", "playlists"))
+
+    fun setAutoTabOrder(order: List<String>) {
+        viewModelScope.launch { settingsRepository.setAutoTabOrder(order) }
+    }
+
+    fun moveAutoTab(from: Int, to: Int) {
+        val current = autoTabOrder.value.toMutableList()
+        if (from in current.indices && to in current.indices) {
+            val item = current.removeAt(from)
+            current.add(to, item)
+            viewModelScope.launch { settingsRepository.setAutoTabOrder(current) }
+        }
+    }
+
     fun disconnect() {
         viewModelScope.launch { settingsRepository.clearAll() }
     }

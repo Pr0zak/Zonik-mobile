@@ -107,6 +107,15 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    val autoTabOrder: Flow<List<String>> = dataStore.data.map { prefs ->
+        val raw = prefs[AUTO_TAB_ORDER]
+        if (raw != null) raw.split(",") else listOf("mix", "recent", "library", "playlists")
+    }
+
+    suspend fun setAutoTabOrder(order: List<String>) {
+        dataStore.edit { prefs -> prefs[AUTO_TAB_ORDER] = order.joinToString(",") }
+    }
+
     suspend fun clearAll() {
         dataStore.edit { it.clear() }
     }
@@ -123,5 +132,6 @@ class SettingsRepository @Inject constructor(
         private val SCROBBLING_ENABLED = booleanPreferencesKey("scrobbling_enabled")
         private val LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
         private val GITHUB_TOKEN = stringPreferencesKey("github_token")
+        private val AUTO_TAB_ORDER = stringPreferencesKey("auto_tab_order")
     }
 }

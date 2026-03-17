@@ -351,6 +351,10 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "Updates")
             UpdateSection(viewModel = viewModel)
 
+            // Android Auto section
+            SettingsSectionHeader(title = "Android Auto")
+            AutoTabOrderSection(viewModel = viewModel)
+
             // Debug logs section
             SettingsSectionHeader(title = "Debug")
             DebugLogsSection(viewModel = viewModel)
@@ -647,6 +651,65 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
+    val tabOrder by viewModel.autoTabOrder.collectAsState()
+    val tabLabels = mapOf(
+        "mix" to "Mix",
+        "recent" to "Recently Added",
+        "library" to "Library",
+        "playlists" to "Playlists"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Column {
+            ListItem(
+                headlineContent = { Text("Tab order") },
+                supportingContent = { Text("Reorder tabs shown in Android Auto") },
+                leadingContent = {
+                    Icon(Icons.Default.DirectionsCar, contentDescription = null)
+                }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            tabOrder.forEachIndexed { index, tabId ->
+                ListItem(
+                    headlineContent = { Text(tabLabels[tabId] ?: tabId) },
+                    leadingContent = {
+                        Text(
+                            "${index + 1}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    trailingContent = {
+                        Row {
+                            IconButton(
+                                onClick = { viewModel.moveAutoTab(index, index - 1) },
+                                enabled = index > 0
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move up")
+                            }
+                            IconButton(
+                                onClick = { viewModel.moveAutoTab(index, index + 1) },
+                                enabled = index < tabOrder.size - 1
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move down")
+                            }
+                        }
+                    }
+                )
+                if (index < tabOrder.size - 1) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                }
+            }
+        }
     }
 }
 
