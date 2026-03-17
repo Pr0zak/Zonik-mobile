@@ -1,6 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="384" height="384" viewBox="0 0 108 108">
-  <rect width="108" height="108" fill="#1A1A2E"/>
-  <path fill="#7C4DFF" d="M33,30 L75,30 L75,40 L48,68 L75,68 L75,78 L33,78 L33,68 L60,40 L33,40 Z"/>
-  <path fill="none" stroke="#00E5FF" stroke-width="2.5" d="M78,48 Q82,54 78,60"/>
-  <path fill="none" stroke="#00E5FF" stroke-width="2" d="M83,44 Q89,54 83,64"/>
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="c1"><rect x="0" y="0" width="240" height="240" rx="44"/></clipPath>
+  </defs>
+
+  <rect x="0" y="0" width="240" height="240" rx="44" fill="#090700"/>
+  <g clip-path="url(#c1)">
+    <circle cx="120" cy="120" r="108" fill="#100d02"/>
+    <circle cx="120" cy="120" r="104" fill="none" stroke="#32280a" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="97"  fill="none" stroke="#32280a" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="90"  fill="none" stroke="#362c0c" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="83"  fill="none" stroke="#362c0c" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="76"  fill="none" stroke="#3c300e" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="69"  fill="none" stroke="#3c300e" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="62"  fill="none" stroke="#42360e" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="55"  fill="none" stroke="#42360e" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="48"  fill="none" stroke="#4a3c10" stroke-width="1.5"/>
+    <circle cx="120" cy="120" r="108" fill="none" stroke="#5a4a18" stroke-width="0.5" opacity="0.5"/>
+    <path d="M 28,52 Q 120,14 212,52" fill="none" stroke="white" stroke-width="4" opacity="0.04"/>
+    <circle cx="120" cy="120" r="40" fill="#0e0b00"/>
+    <circle cx="120" cy="120" r="40" fill="none" stroke="#BA7517" stroke-width="1.5"/>
+    <path d="M 101,97 L 139,97 L 101,143 L 139,143"
+          fill="none" stroke="#EF9F27" stroke-width="9"
+          stroke-linecap="square" stroke-linejoin="miter"/>
+  </g>
 </svg>

@@ -76,22 +76,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun trueRandom() {
-        viewModelScope.launch {
-            try {
-                DebugLog.d("HomeViewModel", "Starting true random")
-                val tracks = libraryRepository.getRandomSongs(count = 50)
-                if (tracks.isNotEmpty()) {
-                    playbackManager.playTracks(tracks)
-                    DebugLog.d("HomeViewModel", "True random started with ${tracks.size} tracks")
-                } else {
-                    DebugLog.w("HomeViewModel", "True random: no tracks returned")
-                }
-            } catch (e: Exception) {
-                DebugLog.e("HomeViewModel", "True random failed", e)
-            }
-        }
-    }
 
     fun playTrack(track: Track) {
         playbackManager.playTracks(listOf(track))
@@ -182,28 +166,15 @@ fun HomeScreen(
             )
 
             // Quick actions
-            Row(
+            FilledTonalButton(
+                onClick = viewModel::shuffleMix,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 16.dp)
             ) {
-                FilledTonalButton(
-                    onClick = viewModel::shuffleMix,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Shuffle, contentDescription = "Shuffle Mix")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Shuffle Mix")
-                }
-                FilledTonalButton(
-                    onClick = viewModel::trueRandom,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Casino, contentDescription = "True Random")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("True Random")
-                }
+                Icon(Icons.Default.Shuffle, contentDescription = "Shuffle Mix")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Shuffle Mix")
             }
 
             // All Tracks button

@@ -152,8 +152,25 @@ class LibraryRepository @Inject constructor(
     fun markedForDeletionCount(): Flow<Int> =
         database.trackDao().markedForDeletionCount()
 
-    suspend fun star(id: String) { api.star(id = id) }
-    suspend fun unstar(id: String) { api.unstar(id = id) }
+    suspend fun star(id: String) {
+        api.star(id = id)
+        database.trackDao().getById(id)?.let {
+            database.trackDao().upsertAll(listOf(it.copy(starred = true)))
+        }
+        database.albumDao().getById(id)?.let {
+            database.albumDao().upsertAll(listOf(it.copy(starred = true)))
+        }
+    }
+
+    suspend fun unstar(id: String) {
+        api.unstar(id = id)
+        database.trackDao().getById(id)?.let {
+            database.trackDao().upsertAll(listOf(it.copy(starred = false)))
+        }
+        database.albumDao().getById(id)?.let {
+            database.albumDao().upsertAll(listOf(it.copy(starred = false)))
+        }
+    }
     suspend fun scrobble(id: String) { api.scrobble(id) }
     suspend fun setRating(id: String, rating: Int) { api.setRating(id, rating) }
 

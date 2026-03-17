@@ -49,7 +49,9 @@ class ZonikMediaService : MediaLibraryService() {
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private val starredTrackIds = mutableSetOf<String>()
+    private val markedForDeletionIds = mutableSetOf<String>()
     private val toggleStarCommand = SessionCommand(ACTION_TOGGLE_STAR, Bundle.EMPTY)
+    private val toggleDeleteCommand = SessionCommand(ACTION_TOGGLE_DELETE, Bundle.EMPTY)
 
     companion object {
         // Browse tree node IDs
@@ -68,6 +70,7 @@ class ZonikMediaService : MediaLibraryService() {
 
         // Custom session commands
         private const val ACTION_TOGGLE_STAR = "com.zonik.app.TOGGLE_STAR"
+        private const val ACTION_TOGGLE_DELETE = "com.zonik.app.TOGGLE_DELETE"
 
         // Prefixes for dynamic node IDs
         private const val ARTIST_PREFIX = "artist:"
@@ -129,10 +132,9 @@ class ZonikMediaService : MediaLibraryService() {
             }
 
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
-                // Update star button state for the new track
+                // Update custom buttons for the new track
                 val trackId = mediaItem?.mediaId?.removePrefix(TRACK_PREFIX) ?: ""
-                val isStarred = trackId.isNotBlank() && trackId in starredTrackIds
-                mediaLibrarySession?.setCustomLayout(listOf(buildStarButton(isStarred)))
+                mediaLibrarySession?.setCustomLayout(buildCustomLayout(trackId))
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -156,6 +158,13 @@ class ZonikMediaService : MediaLibraryService() {
             this, 0, sessionActivityIntent,
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
+
+        // Pre-populate starred and marked-for-deletion track IDs from DB
+        runBlocking {
+            database.trackDao().getStarred().forEach { starredTrackIds.add(it.id) }
+            database.trackDao().getMarkedForDeletionIds().forEach { markedForDeletionIds.add(it) }
+        }
+        com.zonik.app.data.DebugLog.d("MediaService", "Loaded ${starredTrackIds.size} starred, ${markedForDeletionIds.size} marked for deletion")
 
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, callback)
             .setSessionActivity(pendingIntent)
@@ -286,6 +295,22 @@ class ZonikMediaService : MediaLibraryService() {
             .setSessionCommand(toggleStarCommand)
             .setEnabled(true)
             .build()
+    }
+
+    private fun buildDeleteButton(isMarked: Boolean): CommandButton {
+        val iconRes = if (isMarked) R.drawable.ic_delete_filled else R.drawable.ic_delete_outline
+        return CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setDisplayName(if (isMarked) "Unmark" else "Mark for Deletion")
+            .setIconResId(iconRes)
+            .setSessionCommand(toggleDeleteCommand)
+            .setEnabled(true)
+            .build()
+    }
+
+    private fun buildCustomLayout(trackId: String): List<CommandButton> {
+        val isStarred = trackId.isNotBlank() && trackId in starredTrackIds
+        val isMarked = trackId.isNotBlank() && trackId in markedForDeletionIds
+        return listOf(buildStarButton(isStarred), buildDeleteButton(isMarked))
     }
 
     /**
@@ -556,10 +581,11 @@ class ZonikMediaService : MediaLibraryService() {
             val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
                 .buildUpon()
                 .add(toggleStarCommand)
+                .add(toggleDeleteCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
-                .setCustomLayout(listOf(buildStarButton(false)))
+                .setCustomLayout(buildCustomLayout(""))
                 .build()
         }
 
@@ -569,30 +595,11 @@ class ZonikMediaService : MediaLibraryService() {
             customCommand: SessionCommand,
             args: Bundle
         ): ListenableFuture<SessionResult> {
+            val trackId = resolveCurrentTrackId(session) ?: return Futures.immediateFuture(
+                SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE)
+            )
+
             if (customCommand.customAction == ACTION_TOGGLE_STAR) {
-                val player = session.player
-                if (player.mediaItemCount == 0) {
-                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
-                }
-                val currentItem = player.currentMediaItem ?: return Futures.immediateFuture(
-                    SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE)
-                )
-                // mediaId may be empty after IPC — fall back to DB lookup by metadata
-                var trackId = currentItem.mediaId.removePrefix(TRACK_PREFIX)
-                if (trackId.isBlank()) {
-                    val title = currentItem.mediaMetadata.title?.toString()
-                    val artist = currentItem.mediaMetadata.artist?.toString()
-                    if (title != null) {
-                        val match = runBlocking {
-                            database.trackDao().getAll().first()
-                        }.find { it.title == title && (artist == null || it.artist == artist) }
-                        trackId = match?.id ?: ""
-                    }
-                }
-                if (trackId.isBlank()) {
-                    com.zonik.app.data.DebugLog.w("MediaService", "Star toggle: could not determine track ID")
-                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
-                }
                 val isStarred = trackId in starredTrackIds
                 try {
                     runBlocking {
@@ -605,15 +612,55 @@ class ZonikMediaService : MediaLibraryService() {
                         }
                     }
                     com.zonik.app.data.DebugLog.d("MediaService", "Star toggled for $trackId: ${!isStarred}")
-                    session.setCustomLayout(listOf(buildStarButton(!isStarred)))
+                    session.setCustomLayout(buildCustomLayout(trackId))
                 } catch (e: Exception) {
                     com.zonik.app.data.DebugLog.e("MediaService", "Star toggle failed", e)
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_IO))
                 }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
+
+            if (customCommand.customAction == ACTION_TOGGLE_DELETE) {
+                val isMarked = trackId in markedForDeletionIds
+                try {
+                    runBlocking {
+                        database.trackDao().setMarkedForDeletion(trackId, !isMarked)
+                    }
+                    if (isMarked) markedForDeletionIds.remove(trackId) else markedForDeletionIds.add(trackId)
+                    com.zonik.app.data.DebugLog.d("MediaService", "Delete mark toggled for $trackId: ${!isMarked}")
+                    session.setCustomLayout(buildCustomLayout(trackId))
+                } catch (e: Exception) {
+                    com.zonik.app.data.DebugLog.e("MediaService", "Delete mark toggle failed", e)
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_IO))
+                }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+
             return super.onCustomCommand(session, controller, customCommand, args)
         }
+    }
+
+    /** Resolves the current track ID from the player, falling back to DB lookup by metadata */
+    private fun resolveCurrentTrackId(session: MediaSession): String? {
+        val player = session.player
+        if (player.mediaItemCount == 0) return null
+        val currentItem = player.currentMediaItem ?: return null
+        var trackId = currentItem.mediaId.removePrefix(TRACK_PREFIX)
+        if (trackId.isBlank()) {
+            val title = currentItem.mediaMetadata.title?.toString()
+            val artist = currentItem.mediaMetadata.artist?.toString()
+            if (title != null) {
+                val match = runBlocking {
+                    database.trackDao().getAll().first()
+                }.find { it.title == title && (artist == null || it.artist == artist) }
+                trackId = match?.id ?: ""
+            }
+        }
+        if (trackId.isBlank()) {
+            com.zonik.app.data.DebugLog.w("MediaService", "Could not determine current track ID")
+            return null
+        }
+        return trackId
     }
 
     // -- Browse tree resolution --

@@ -4,20 +4,22 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Bold Z letterform -->
+    <!-- Center label circle -->
     <path
-        android:fillColor="#7C4DFF"
-        android:pathData="M33,30 L75,30 L75,40 L48,68 L75,68 L75,78 L33,78 L33,68 L60,40 L33,40 Z"/>
-    <!-- Sound wave accent arc 1 -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeWidth="2.5"
-        android:strokeColor="#00E5FF"
-        android:pathData="M78,48 Q82,54 78,60"/>
-    <!-- Sound wave accent arc 2 -->
+        android:fillColor="#0e0b00"
+        android:pathData="M54,54m-18,0a18,18 0,1,1 36,0a18,18 0,1,1 -36,0"/>
+    <!-- Label ring -->
     <path
         android:fillColor="#00000000"
-        android:strokeWidth="2"
-        android:strokeColor="#00E5FF"
-        android:pathData="M83,44 Q89,54 83,64"/>
+        android:strokeColor="#BA7517"
+        android:strokeWidth="0.675"
+        android:pathData="M54,54m-18,0a18,18 0,1,1 36,0a18,18 0,1,1 -36,0"/>
+    <!-- Z letterform -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#EF9F27"
+        android:strokeWidth="4.05"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter"
+        android:pathData="M45.45,43.65 L62.55,43.65 L45.45,64.35 L62.55,64.35"/>
 </vector>
