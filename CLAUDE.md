@@ -90,9 +90,9 @@ app/src/main/java/com/zonik/app/
       search/     # SearchScreen — debounced search across library
       downloads/  # DownloadsScreen — Soulseek search/active transfers/job history (real Zonik API)
       playlists/  # PlaylistsScreen
-      nowplaying/ # NowPlayingScreen — Symfonium-style with blurred background, Palette colors
+      nowplaying/ # NowPlayingScreen — Symfonium-style with blurred background, Palette colors, queue (85% height, auto-scroll to current)
       login/      # LoginScreen — connection test (ping + auth verification)
-      settings/   # SettingsScreen — server, sync, playback, Last.fm, cache, updates, debug logs, dynamic version display
+      settings/   # SettingsScreen — server, sync, playback (bitrate, crossfade, keep screen on), cache (size, read-ahead), Android Auto (tab order), Last.fm, updates, debug logs
     theme/        # ZonikTheme — custom dark color scheme (dark brown/black + gold/amber accents)
     util/         # FormatUtils (duration, file size formatting)
   MainActivity.kt     # Main activity, nav host, bottom nav, Now Playing overlay with slide animation
@@ -110,6 +110,7 @@ app/src/main/java/com/zonik/app/
 - Smart bitrate: auto-detects Wi-Fi vs cellular, applies configured max bitrate
 - **Audio caching**: `SimpleCache` (Hilt singleton) with `LeastRecentlyUsedCacheEvictor`, custom `CacheKeyFactory` uses track ID (not full URL with auth salt). Configurable size (off/250MB–10GB, default 500MB).
 - **Read-ahead pre-caching**: on track transition (AUTO/SEEK), next N tracks are pre-cached via `CacheWriter` on IO thread. Configurable count (0–10, default 3).
+- **Keep screen on**: optional setting prevents display sleep while Now Playing is visible and playing (uses `FLAG_KEEP_SCREEN_ON`)
 - Now Playing auto-shows instantly on tap via `playbackRequested` SharedFlow (emits before buffering)
 - `currentTrack` set immediately in `playTracks()` for instant UI update
 - Slide animation: 250ms up / 200ms down
@@ -121,7 +122,9 @@ app/src/main/java/com/zonik/app/
 - Marked tracks show red title text as visual indicator
 - `markedForDeletion` flag stored in Room DB, preserved across library syncs
 - Available on: HomeScreen, LibraryScreen, AlbumDetailScreen, SearchScreen, TrackListItem component, Android Auto
-- **Star/Unstar**: updates both Subsonic API and local Room DB; available in Now Playing, Android Auto, AlbumDetailScreen
+- **Star/Unstar**: calls Subsonic `star`/`unstar` API then updates local Room DB; available in Now Playing, Android Auto, AlbumDetailScreen
+- Starred status synced bidirectionally: `getStarred2` API fetched during sync merges server-side stars with local DB
+- Now Playing reads starred status directly from Room DB (not stale in-memory Track object)
 
 ## Android Auto
 - MediaLibraryService with MediaLibrarySession.Callback
@@ -152,7 +155,7 @@ app/src/main/java/com/zonik/app/
 - Auth params: `u`, `t` (md5(apiKey+salt)), `s` (random salt), `v=1.16.1`, `c=ZonikApp`, `f=json`
 - Streaming: `GET /rest/stream.view?id={trackId}&estimateContentLength=true` (NO `f=json` — returns binary)
 - Cover art: `GET /rest/getCoverArt.view?id={coverId}&size={pixels}` (NO `f=json`)
-- Library sync: `search3` with empty query, 500 items per page (Symfonium approach)
+- Library sync: `search3` with empty query, 500 items per page (Symfonium approach) + `getStarred2` for starred status
 - Zonik native API: `POST /api/download/search`, `/api/download/trigger`, `GET /api/jobs` (`Accept: application/json` header required, response wrapped in `{"items": [...]}`)
 
 ## Debugging
@@ -176,6 +179,9 @@ app/src/main/java/com/zonik/app/
 - ExoPlayer uses `CacheDataSource` wrapping `OkHttpDataSource` with a clean client (no auth interceptor) — auth must be baked into stream URLs
 - Cache key factory must extract track ID from URL (not use full URL) because auth params include random salt
 - Play All / Shuffle must cap tracks at 500 to avoid `TransactionTooLargeException` (Binder 1MB IPC limit)
+- `starred` flag must be preserved during sync — `syncAllTracks` fetches `getStarred2` and merges server + local starred IDs before upserting
+- `search3` response may NOT include `starred` field reliably — always use `getStarred2` as authoritative source
+- Now Playing starred status must read from Room DB directly, not from in-memory Track objects (which may be stale)
 - Stream/cover art URLs must NOT include `f=json` (server returns binary audio/image, not JSON)
 - Zonik `/api/jobs` returns HTML without `Accept: application/json` header
 - Job history response is `{"items": [...]}` not a raw array
