@@ -244,7 +244,7 @@ class PlaybackManager @Inject constructor(
             buildMediaItem(track, serverUrl, config)
         }
 
-        _pendingStartIndex = startIndex
+        _pendingStartIndex = if (startIndex > 0) startIndex else -1
         DebugLog.d("Playback", "Playing ${tracks.size} tracks from index $startIndex")
         DebugLog.d("Playback", "Stream URL: ${mediaItems.firstOrNull()?.localConfiguration?.uri}")
         ctrl.setMediaItems(mediaItems, startIndex, 0)
