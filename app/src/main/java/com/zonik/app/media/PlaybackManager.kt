@@ -47,6 +47,8 @@ class PlaybackManager @Inject constructor(
     // Tracks a pending seek after setMediaItems to correct per-item IPC reordering.
     // The resulting SEEK transition is ignored for UI updates.
     private var _pendingSeekIndex: Int = -1
+    // Timestamp when playlist was set — ignore PLAYLIST_CHANGED only for a short window
+    private var _playlistSetTime: Long = 0L
 
     // Set by skipToIndex to prevent onMediaItemTransition from overriding
     // the correct track when manually seeking within the queue.
@@ -161,10 +163,14 @@ class PlaybackManager @Inject constructor(
                 }
 
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
-                    // Media3 fires spurious PLAYLIST_CHANGED transitions during per-item IPC.
-                    // Ignore them — the UI track was already set in playTracks().
-                    DebugLog.d("Playback", "Ignoring PLAYLIST_CHANGED transition")
-                    return
+                    val elapsed = System.currentTimeMillis() - _playlistSetTime
+                    if (elapsed < 5000) {
+                        // Ignore spurious transitions during per-item IPC setup (first 5s)
+                        DebugLog.d("Playback", "Ignoring PLAYLIST_CHANGED transition (${elapsed}ms after setup)")
+                        return
+                    }
+                    // After setup window, treat as normal transition — use metadata matching
+                    DebugLog.d("Playback", "PLAYLIST_CHANGED after setup window, matching by metadata")
                 }
                 // Ignore the SEEK transition caused by our correction seekTo in playTracks()
                 if (_pendingSeekIndex >= 0 && reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
@@ -243,6 +249,7 @@ class PlaybackManager @Inject constructor(
         }
 
         _pendingSeekIndex = startIndex
+        _playlistSetTime = System.currentTimeMillis()
         DebugLog.d("Playback", "Playing ${tracks.size} tracks from index $startIndex")
         DebugLog.d("Playback", "Stream URL: ${mediaItems.firstOrNull()?.localConfiguration?.uri}")
         ctrl.setMediaItems(mediaItems, startIndex, 0)
@@ -297,17 +304,24 @@ class PlaybackManager @Inject constructor(
         DebugLog.d("Playback", "skipToIndex: $index (mediaItemCount=${ctrl.mediaItemCount}, queueSize=${_queue.value.size})")
 
         // ExoPlayer's internal queue may differ from _queue due to IPC reordering.
-        // Find the track by mediaId in ExoPlayer's actual queue.
+        // Find the track by mediaId or metadata in ExoPlayer's actual queue.
         var exoIndex = -1
         for (i in 0 until ctrl.mediaItemCount) {
-            if (ctrl.getMediaItemAt(i).mediaId == track.id) {
+            val item = ctrl.getMediaItemAt(i)
+            if (item.mediaId == track.id) {
+                exoIndex = i
+                break
+            }
+            // Fallback: match by title (mediaId may be empty after IPC)
+            val title = item.mediaMetadata.title?.toString()
+            if (title != null && title == track.title) {
                 exoIndex = i
                 break
             }
         }
         if (exoIndex < 0) {
             DebugLog.w("Playback", "skipToIndex: track '${track.title}' (${track.id}) not found in ExoPlayer queue, falling back to index $index")
-            exoIndex = index
+            exoIndex = index.coerceIn(0, ctrl.mediaItemCount - 1)
         }
         if (exoIndex != index) {
             DebugLog.d("Playback", "skipToIndex: queue index $index maps to ExoPlayer index $exoIndex")
