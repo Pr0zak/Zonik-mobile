@@ -64,6 +64,7 @@ class ZonikMediaService : MediaLibraryService() {
     private val markedForDeletionIds = mutableSetOf<String>()
     private val toggleStarCommand = SessionCommand(ACTION_TOGGLE_STAR, Bundle.EMPTY)
     private val toggleDeleteCommand = SessionCommand(ACTION_TOGGLE_DELETE, Bundle.EMPTY)
+    private val playTracksCommand = SessionCommand(ACTION_PLAY_TRACKS, Bundle.EMPTY)
 
     companion object {
         // Browse tree node IDs
@@ -83,6 +84,9 @@ class ZonikMediaService : MediaLibraryService() {
         // Custom session commands
         private const val ACTION_TOGGLE_STAR = "com.zonik.app.TOGGLE_STAR"
         private const val ACTION_TOGGLE_DELETE = "com.zonik.app.TOGGLE_DELETE"
+        private const val ACTION_PLAY_TRACKS = "com.zonik.app.PLAY_TRACKS"
+        private const val EXTRA_TRACK_IDS = "track_ids"
+        private const val EXTRA_START_INDEX = "start_index"
 
         // Prefixes for dynamic node IDs
         private const val ARTIST_PREFIX = "artist:"
@@ -628,6 +632,7 @@ class ZonikMediaService : MediaLibraryService() {
                 .buildUpon()
                 .add(toggleStarCommand)
                 .add(toggleDeleteCommand)
+                .add(playTracksCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
@@ -641,6 +646,33 @@ class ZonikMediaService : MediaLibraryService() {
             customCommand: SessionCommand,
             args: Bundle
         ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == ACTION_PLAY_TRACKS) {
+                val trackIds = args.getStringArrayList(EXTRA_TRACK_IDS)
+                val startIndex = args.getInt(EXTRA_START_INDEX, 0)
+                if (trackIds.isNullOrEmpty()) {
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                }
+                com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: ${trackIds.size} tracks, startIndex=$startIndex")
+                try {
+                    val tracks = runBlocking {
+                        trackIds.mapNotNull { id -> database.trackDao().getById(id)?.toDomain() }
+                    }
+                    if (tracks.isEmpty()) {
+                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                    }
+                    val mediaItems = tracks.map { buildFullMediaItem(it) }
+                    val player = session.player
+                    player.setMediaItems(mediaItems, startIndex, 0)
+                    player.prepare()
+                    player.play()
+                    com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: set ${mediaItems.size} items, playing from $startIndex")
+                } catch (e: Exception) {
+                    com.zonik.app.data.DebugLog.e("MediaService", "PLAY_TRACKS failed", e)
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_IO))
+                }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+
             val trackId = resolveCurrentTrackId(session) ?: return Futures.immediateFuture(
                 SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE)
             )

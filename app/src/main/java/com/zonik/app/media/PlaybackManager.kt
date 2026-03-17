@@ -44,11 +44,6 @@ class PlaybackManager @Inject constructor(
     private var controller: MediaController? = null
 
     private var _pendingStartIndex: Int = -1  // Legacy, kept for log compatibility
-    // Tracks a pending seek after setMediaItems to correct per-item IPC reordering.
-    // The resulting SEEK transition is ignored for UI updates.
-    private var _pendingSeekIndex: Int = -1
-    // Timestamp when playlist was set — ignore PLAYLIST_CHANGED only for a short window
-    private var _playlistSetTime: Long = 0L
 
     // Set by skipToIndex to prevent onMediaItemTransition from overriding
     // the correct track when manually seeking within the queue.
@@ -162,8 +157,7 @@ class PlaybackManager @Inject constructor(
                     return
                 }
 
-                // PLAYLIST_CHANGED fires when setMediaItems completes — update track from metadata
-                // (no longer needs to be ignored since onSetMediaItems resolves items atomically)
+                // PLAYLIST_CHANGED fires when the service sets items on the player directly
                 // Match by metadata first (more reliable than index after shuffle/IPC)
                 if (metaTitle != null) {
                     val match = findTrackByMetadata(metaTitle, metaArtist)
@@ -230,15 +224,18 @@ class PlaybackManager @Inject constructor(
             return
         }
 
-        val mediaItems = tracks.map { track ->
-            buildMediaItem(track, serverUrl, config)
-        }
-
         DebugLog.d("Playback", "Playing ${tracks.size} tracks from index $startIndex")
-        DebugLog.d("Playback", "Stream URL: ${mediaItems.firstOrNull()?.localConfiguration?.uri}")
-        ctrl.setMediaItems(mediaItems, startIndex, 0)
-        ctrl.prepare()
-        ctrl.play()
+
+        // Send track IDs via custom command to avoid Media3 per-item IPC reordering.
+        // The service sets items directly on the player, preserving order.
+        val args = android.os.Bundle().apply {
+            putStringArrayList("track_ids", ArrayList(tracks.map { it.id }))
+            putInt("start_index", startIndex)
+        }
+        ctrl.sendCustomCommand(
+            androidx.media3.session.SessionCommand("com.zonik.app.PLAY_TRACKS", android.os.Bundle.EMPTY),
+            args
+        )
     }
 
     fun playNext(track: Track) {
