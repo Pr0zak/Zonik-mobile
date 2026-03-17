@@ -37,6 +37,15 @@ class CastManager @Inject constructor(
     private val _castDeviceName = MutableStateFlow<String?>(null)
     val castDeviceName: StateFlow<String?> = _castDeviceName.asStateFlow()
 
+    /** Emits the title of the currently playing track on Cast when it changes */
+    private val _castTrackTitle = MutableStateFlow<String?>(null)
+    val castTrackTitle: StateFlow<String?> = _castTrackTitle.asStateFlow()
+
+    private val _castTrackArtist = MutableStateFlow<String?>(null)
+    val castTrackArtist: StateFlow<String?> = _castTrackArtist.asStateFlow()
+
+    private var remoteMediaClientCallback: RemoteMediaClient.Callback? = null
+
     private val sessionListener = object : SessionManagerListener<CastSession> {
         override fun onSessionStarting(session: CastSession) {
             DebugLog.d(TAG, "Cast session starting")
@@ -46,6 +55,7 @@ class CastManager @Inject constructor(
             DebugLog.d(TAG, "Cast session started: ${session.castDevice?.friendlyName}")
             _isCasting.value = true
             _castDeviceName.value = session.castDevice?.friendlyName
+            registerMediaCallback(session)
         }
 
         override fun onSessionStartFailed(session: CastSession, error: Int) {
@@ -60,8 +70,11 @@ class CastManager @Inject constructor(
 
         override fun onSessionEnded(session: CastSession, error: Int) {
             DebugLog.d(TAG, "Cast session ended")
+            unregisterMediaCallback(session)
             _isCasting.value = false
             _castDeviceName.value = null
+            _castTrackTitle.value = null
+            _castTrackArtist.value = null
         }
 
         override fun onSessionResuming(session: CastSession, sessionId: String) {}
@@ -70,6 +83,7 @@ class CastManager @Inject constructor(
             DebugLog.d(TAG, "Cast session resumed")
             _isCasting.value = true
             _castDeviceName.value = session.castDevice?.friendlyName
+            registerMediaCallback(session)
         }
 
         override fun onSessionResumeFailed(session: CastSession, error: Int) {
@@ -89,6 +103,33 @@ class CastManager @Inject constructor(
         } catch (e: Exception) {
             DebugLog.w(TAG, "Cast SDK not available: ${e.message}")
         }
+    }
+
+    private fun registerMediaCallback(session: CastSession) {
+        val client = session.remoteMediaClient ?: return
+        unregisterMediaCallback(session) // avoid double-register
+        val callback = object : RemoteMediaClient.Callback() {
+            override fun onStatusUpdated() {
+                val mediaInfo = client.mediaInfo
+                val metadata = mediaInfo?.metadata
+                val title = metadata?.getString(MediaMetadata.KEY_TITLE)
+                val artist = metadata?.getString(MediaMetadata.KEY_ARTIST)
+                if (title != null && title != _castTrackTitle.value) {
+                    DebugLog.d(TAG, "Cast track changed: $title by $artist")
+                    _castTrackTitle.value = title
+                    _castTrackArtist.value = artist
+                }
+            }
+        }
+        remoteMediaClientCallback = callback
+        client.registerCallback(callback)
+        DebugLog.d(TAG, "Registered RemoteMediaClient callback")
+    }
+
+    private fun unregisterMediaCallback(session: CastSession) {
+        val callback = remoteMediaClientCallback ?: return
+        session.remoteMediaClient?.unregisterCallback(callback)
+        remoteMediaClientCallback = null
     }
 
     fun getCastContext(): CastContext? = castContext

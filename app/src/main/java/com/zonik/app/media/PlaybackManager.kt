@@ -91,6 +91,20 @@ class PlaybackManager @Inject constructor(
 
         DebugLog.d("Playback", "Connected to MediaService")
 
+        // Track Cast track changes and update currentTrack
+        scope.launch {
+            castManager.castTrackTitle.collect { title ->
+                if (title != null && castManager.isCasting.value) {
+                    val artist = castManager.castTrackArtist.value
+                    val match = _queue.value.find { it.title == title && (artist == null || it.artist == artist) }
+                    if (match != null && match.id != _currentTrack.value?.id) {
+                        setCurrentTrack(match)
+                        DebugLog.d("Playback", "Cast track update: ${match.title} by ${match.artist}")
+                    }
+                }
+            }
+        }
+
         // When Cast session starts, transfer current playback to Cast device
         scope.launch(Dispatchers.Main) {
             castManager.isCasting.collect { casting ->

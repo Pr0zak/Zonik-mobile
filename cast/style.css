@@ -1,0 +1,29 @@
+.background {
+  background-color: #1A1A2E;
+}
+
+.logo {
+  background-image: url(https://raw.githubusercontent.com/Pr0zak/Zonik-mobile/main/cast/icon.svg);
+  background-size: 384px 384px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.splash {
+  background-image: url(https://raw.githubusercontent.com/Pr0zak/Zonik-mobile/main/cast/icon.svg);
+  background-size: 384px 384px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #1A1A2E;
+}
+
+.watermark {
+  background-image: url(https://raw.githubusercontent.com/Pr0zak/Zonik-mobile/main/cast/icon.svg);
+  background-size: 57px 57px;
+  background-repeat: no-repeat;
+  background-position: bottom right;
+}
+
+.progressBar {
+  background-color: #7C4DFF;
+}
