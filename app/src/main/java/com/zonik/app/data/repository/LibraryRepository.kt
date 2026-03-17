@@ -249,11 +249,15 @@ class LibraryRepository @Inject constructor(
             onProgress(allTracks.size)
         }
 
-        // Preserve markedForDeletion flags from existing local tracks
+        // Preserve local flags (markedForDeletion, starred) from existing tracks
         val existingMarked = database.trackDao().getMarkedForDeletionIds()
+        val existingStarredIds = database.trackDao().getStarred().map { it.id }.toSet()
         val entities = allTracks.map { subsonicTrack ->
-            val entity = TrackEntity.fromDomain(subsonicTrack.toDomain())
-            if (entity.id in existingMarked) entity.copy(markedForDeletion = true) else entity
+            var entity = TrackEntity.fromDomain(subsonicTrack.toDomain())
+            if (entity.id in existingMarked) entity = entity.copy(markedForDeletion = true)
+            // Preserve starred: true if either server or local DB says starred
+            if (entity.id in existingStarredIds && !entity.starred) entity = entity.copy(starred = true)
+            entity
         }
         database.trackDao().upsertAll(entities)
         return entities.size
