@@ -162,22 +162,8 @@ class PlaybackManager @Inject constructor(
                     return
                 }
 
-                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
-                    val elapsed = System.currentTimeMillis() - _playlistSetTime
-                    if (elapsed < 5000) {
-                        // Ignore spurious transitions during per-item IPC setup (first 5s)
-                        DebugLog.d("Playback", "Ignoring PLAYLIST_CHANGED transition (${elapsed}ms after setup)")
-                        return
-                    }
-                    // After setup window, treat as normal transition — use metadata matching
-                    DebugLog.d("Playback", "PLAYLIST_CHANGED after setup window, matching by metadata")
-                }
-                // Ignore the SEEK transition caused by our correction seekTo in playTracks()
-                if (_pendingSeekIndex >= 0 && reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
-                    DebugLog.d("Playback", "Ignoring correction seek transition (pendingSeek=$_pendingSeekIndex)")
-                    _pendingSeekIndex = -1
-                    return
-                }
+                // PLAYLIST_CHANGED fires when setMediaItems completes — update track from metadata
+                // (no longer needs to be ignored since onSetMediaItems resolves items atomically)
                 // Match by metadata first (more reliable than index after shuffle/IPC)
                 if (metaTitle != null) {
                     val match = findTrackByMetadata(metaTitle, metaArtist)
@@ -248,17 +234,11 @@ class PlaybackManager @Inject constructor(
             buildMediaItem(track, serverUrl, config)
         }
 
-        _pendingSeekIndex = startIndex
-        _playlistSetTime = System.currentTimeMillis()
         DebugLog.d("Playback", "Playing ${tracks.size} tracks from index $startIndex")
         DebugLog.d("Playback", "Stream URL: ${mediaItems.firstOrNull()?.localConfiguration?.uri}")
         ctrl.setMediaItems(mediaItems, startIndex, 0)
         ctrl.prepare()
         ctrl.play()
-        // Media3 per-item IPC leaves the player at the wrong index.
-        // seekTo corrects it. The transition handler ignores PLAYLIST_CHANGED
-        // and the resulting SEEK transition for UI purposes.
-        ctrl.seekTo(startIndex, 0)
     }
 
     fun playNext(track: Track) {

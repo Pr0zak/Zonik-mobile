@@ -427,26 +427,46 @@ class ZonikMediaService : MediaLibraryService() {
             startIndex: Int,
             startPositionMs: Long
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            // Handle single-item mix lookups (Shuffle, Favorites, etc.)
             if (mediaItems.size == 1) {
                 val id = mediaItems[0].mediaId
                 val mixTracks = resolveMixTracks(id)
                 if (mixTracks != null) {
-                    com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: resolving $id")
+                    com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: resolving mix $id")
                     if (mixTracks.isEmpty()) {
-                        com.zonik.app.data.DebugLog.w("MediaService", "onSetMediaItems: $id returned 0 tracks")
                         return Futures.immediateFuture(
                             MediaSession.MediaItemsWithStartPosition(mutableListOf(), 0, 0L)
                         )
                     }
                     val resolved = mixTracks.map { buildFullMediaItem(it) }
-                    com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: $id resolved to ${resolved.size} tracks")
                     return Futures.immediateFuture(
                         MediaSession.MediaItemsWithStartPosition(resolved, 0, 0L)
                     )
                 }
             }
-            // For everything else, delegate to default (which calls onAddMediaItems)
-            return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
+
+            // Resolve ALL items here to avoid per-item onAddMediaItems IPC reordering.
+            // Reconstruct URIs from requestMetadata.mediaUri (survives IPC).
+            val resolved = mediaItems.map { item ->
+                val uri = item.requestMetadata.mediaUri ?: item.localConfiguration?.uri
+                if (uri != null) {
+                    item.buildUpon().setUri(uri).build()
+                } else {
+                    val rawId = item.mediaId
+                    val trackId = if (rawId.startsWith(TRACK_PREFIX)) rawId.removePrefix(TRACK_PREFIX) else rawId
+                    val track = runBlocking { database.trackDao().getById(trackId)?.toDomain() }
+                    if (track != null) {
+                        buildFullMediaItem(track)
+                    } else {
+                        item.buildUpon().setUri(buildStreamUrlForTrack(trackId)).build()
+                    }
+                }
+            }
+            val actualStart = if (startIndex >= 0 && startIndex < resolved.size) startIndex else 0
+            com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: resolved ${resolved.size} items, startIndex=$actualStart")
+            return Futures.immediateFuture(
+                MediaSession.MediaItemsWithStartPosition(resolved, actualStart, startPositionMs.coerceAtLeast(0L))
+            )
         }
 
         override fun onAddMediaItems(
