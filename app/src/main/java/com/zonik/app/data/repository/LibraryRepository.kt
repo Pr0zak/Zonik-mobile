@@ -51,6 +51,12 @@ class LibraryRepository @Inject constructor(
             entities.map { it.toDomain() }
         }
 
+    suspend fun getStarredTracks(): List<Track> =
+        database.trackDao().getStarred().map { it.toDomain() }
+
+    suspend fun getUnstarredTracks(): List<Track> =
+        database.trackDao().getUnstarred().map { it.toDomain() }
+
     fun getAllTracks(): Flow<List<Track>> =
         database.trackDao().getAll().map { entities ->
             entities.map { it.toDomain() }

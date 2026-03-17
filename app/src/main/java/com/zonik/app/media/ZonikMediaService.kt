@@ -63,6 +63,9 @@ class ZonikMediaService : MediaLibraryService() {
         private const val GENRES_ID = "genres"
         private const val SHUFFLE_MIX_ID = "shuffle_mix"
         private const val TRUE_RANDOM_ID = "true_random"
+        private const val NEWLY_ADDED_ID = "newly_added"
+        private const val FAVORITES_ID = "favorites"
+        private const val NON_FAVORITES_ID = "non_favorites"
 
         // Custom session commands
         private const val ACTION_TOGGLE_STAR = "com.zonik.app.TOGGLE_STAR"
@@ -255,6 +258,7 @@ class ZonikMediaService : MediaLibraryService() {
         title: String,
         artist: String? = null,
         album: String? = null,
+        subtitle: String? = null,
         artworkUri: Uri? = null,
         trackNumber: Int? = null
     ): MediaItem {
@@ -265,6 +269,7 @@ class ZonikMediaService : MediaLibraryService() {
             .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
         if (artist != null) metadata.setArtist(artist)
         if (album != null) metadata.setAlbumTitle(album)
+        if (subtitle != null) metadata.setSubtitle(subtitle)
         if (artworkUri != null) metadata.setArtworkUri(artworkUri)
         if (trackNumber != null) metadata.setTrackNumber(trackNumber)
         return MediaItem.Builder()
@@ -374,29 +379,20 @@ class ZonikMediaService : MediaLibraryService() {
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             if (mediaItems.size == 1) {
                 val id = mediaItems[0].mediaId
-                if (id == SHUFFLE_MIX_ID || id == TRUE_RANDOM_ID) {
+                val mixTracks = resolveMixTracks(id)
+                if (mixTracks != null) {
                     com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: resolving $id")
-                    try {
-                        val tracks = runBlocking {
-                            libraryRepository.getRandomSongs(count = if (id == SHUFFLE_MIX_ID) 100 else 50)
-                        }
-                        if (tracks.isEmpty()) {
-                            com.zonik.app.data.DebugLog.w("MediaService", "onSetMediaItems: $id returned 0 tracks")
-                            return Futures.immediateFuture(
-                                MediaSession.MediaItemsWithStartPosition(mutableListOf(), 0, 0L)
-                            )
-                        }
-                        val resolved = tracks.map { buildFullMediaItem(it) }
-                        com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: $id resolved to ${resolved.size} tracks")
-                        return Futures.immediateFuture(
-                            MediaSession.MediaItemsWithStartPosition(resolved, 0, 0L)
-                        )
-                    } catch (e: Exception) {
-                        com.zonik.app.data.DebugLog.e("MediaService", "onSetMediaItems: $id failed: ${e.message}")
+                    if (mixTracks.isEmpty()) {
+                        com.zonik.app.data.DebugLog.w("MediaService", "onSetMediaItems: $id returned 0 tracks")
                         return Futures.immediateFuture(
                             MediaSession.MediaItemsWithStartPosition(mutableListOf(), 0, 0L)
                         )
                     }
+                    val resolved = mixTracks.map { buildFullMediaItem(it) }
+                    com.zonik.app.data.DebugLog.d("MediaService", "onSetMediaItems: $id resolved to ${resolved.size} tracks")
+                    return Futures.immediateFuture(
+                        MediaSession.MediaItemsWithStartPosition(resolved, 0, 0L)
+                    )
                 }
             }
             // For everything else, delegate to default (which calls onAddMediaItems)
@@ -408,15 +404,12 @@ class ZonikMediaService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>
         ): ListenableFuture<MutableList<MediaItem>> {
-            // Handle shuffle/random if they come through addMediaItem path too
             if (mediaItems.size == 1) {
                 val id = mediaItems[0].mediaId
-                if (id == SHUFFLE_MIX_ID || id == TRUE_RANDOM_ID) {
+                val mixTracks = resolveMixTracks(id)
+                if (mixTracks != null) {
                     com.zonik.app.data.DebugLog.d("MediaService", "onAddMediaItems: resolving $id")
-                    val tracks = runBlocking {
-                        libraryRepository.getRandomSongs(count = if (id == SHUFFLE_MIX_ID) 100 else 50)
-                    }
-                    return Futures.immediateFuture(tracks.map { buildFullMediaItem(it) }.toMutableList())
+                    return Futures.immediateFuture(mixTracks.map { buildFullMediaItem(it) }.toMutableList())
                 }
             }
 
@@ -714,31 +707,34 @@ class ZonikMediaService : MediaLibraryService() {
 
     private fun mixChildren(): List<MediaItem> {
         return listOf(
-            MediaItem.Builder()
-                .setMediaId(SHUFFLE_MIX_ID)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle("Shuffle Mix")
-                        .setSubtitle("Shuffled random songs")
-                        .setIsBrowsable(false)
-                        .setIsPlayable(true)
-                        .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST)
-                        .build()
-                )
-                .build(),
-            MediaItem.Builder()
-                .setMediaId(TRUE_RANDOM_ID)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle("True Random")
-                        .setSubtitle("Completely random songs")
-                        .setIsBrowsable(false)
-                        .setIsPlayable(true)
-                        .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST)
-                        .build()
-                )
-                .build()
+            buildPlayableItem(id = SHUFFLE_MIX_ID, title = "Shuffle Mix", subtitle = "Shuffled random songs"),
+            buildPlayableItem(id = TRUE_RANDOM_ID, title = "True Random", subtitle = "Completely random songs"),
+            buildPlayableItem(id = NEWLY_ADDED_ID, title = "Newly Added", subtitle = "Recently added tracks"),
+            buildPlayableItem(id = FAVORITES_ID, title = "Favorites", subtitle = "Starred tracks"),
+            buildPlayableItem(id = NON_FAVORITES_ID, title = "Non-Favorites", subtitle = "Unstarred tracks")
         )
+    }
+
+    /** Returns tracks for mix-type IDs, or null if not a mix ID */
+    private fun resolveMixTracks(id: String): List<Track>? {
+        return runBlocking {
+            when (id) {
+                SHUFFLE_MIX_ID -> libraryRepository.getRandomSongs(count = 100)
+                TRUE_RANDOM_ID -> libraryRepository.getRandomSongs(count = 50)
+                NEWLY_ADDED_ID -> {
+                    libraryRepository.getRecentTracks(limit = 100).first()
+                }
+                FAVORITES_ID -> {
+                    val starred = libraryRepository.getStarredTracks()
+                    starred.shuffled()
+                }
+                NON_FAVORITES_ID -> {
+                    val unstarred = libraryRepository.getUnstarredTracks()
+                    unstarred.shuffled().take(100)
+                }
+                else -> null
+            }
+        }
     }
 
     private fun dynamicChildren(parentId: String): List<MediaItem> {
@@ -791,6 +787,9 @@ class ZonikMediaService : MediaLibraryService() {
             mediaId == GENRES_ID -> buildBrowsableItem(id = GENRES_ID, title = "Genres")
             mediaId == SHUFFLE_MIX_ID -> buildPlayableItem(id = SHUFFLE_MIX_ID, title = "Shuffle Mix")
             mediaId == TRUE_RANDOM_ID -> buildPlayableItem(id = TRUE_RANDOM_ID, title = "True Random")
+            mediaId == NEWLY_ADDED_ID -> buildPlayableItem(id = NEWLY_ADDED_ID, title = "Newly Added")
+            mediaId == FAVORITES_ID -> buildPlayableItem(id = FAVORITES_ID, title = "Favorites")
+            mediaId == NON_FAVORITES_ID -> buildPlayableItem(id = NON_FAVORITES_ID, title = "Non-Favorites")
             mediaId.startsWith(TRACK_PREFIX) -> {
                 // For individual tracks, return a minimal playable item
                 buildPlayableItem(id = mediaId, title = mediaId.removePrefix(TRACK_PREFIX))

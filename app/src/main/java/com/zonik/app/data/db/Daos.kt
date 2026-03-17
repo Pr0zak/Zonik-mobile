@@ -65,6 +65,12 @@ interface TrackDao {
     @Query("SELECT * FROM tracks ORDER BY rowid DESC LIMIT :limit")
     fun getRecent(limit: Int = 20): Flow<List<TrackEntity>>
 
+    @Query("SELECT * FROM tracks WHERE starred = 1 ORDER BY title COLLATE NOCASE")
+    suspend fun getStarred(): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE starred = 0 ORDER BY title COLLATE NOCASE")
+    suspend fun getUnstarred(): List<TrackEntity>
+
     @Query("SELECT COUNT(*) FROM tracks")
     fun count(): Flow<Int>
 
