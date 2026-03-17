@@ -90,7 +90,13 @@ class NowPlayingViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             currentTrack.collect { track ->
-                _isStarred.value = track?.starred ?: false
+                if (track != null) {
+                    // Read current starred status from DB (not the in-memory Track object)
+                    val dbTrack = libraryRepository.getTrackById(track.id)
+                    _isStarred.value = dbTrack?.starred ?: track.starred
+                } else {
+                    _isStarred.value = false
+                }
             }
         }
     }

@@ -51,6 +51,9 @@ class LibraryRepository @Inject constructor(
             entities.map { it.toDomain() }
         }
 
+    suspend fun getTrackById(id: String): Track? =
+        database.trackDao().getById(id)?.toDomain()
+
     suspend fun getStarredTracks(): List<Track> =
         database.trackDao().getStarred().map { it.toDomain() }
 
