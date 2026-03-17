@@ -610,10 +610,21 @@ fun NowPlayingScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                     HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+                    // Auto-scroll to currently playing track when queue opens
+                    val currentIndex = queue.indexOfFirst { it.id == track?.id }
+                    LaunchedEffect(currentIndex) {
+                        if (currentIndex >= 0) {
+                            lazyListState.animateScrollToItem(
+                                index = maxOf(0, currentIndex - 2) // show 2 items above for context
+                            )
+                        }
+                    }
                     LazyColumn(
+                        state = lazyListState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 400.dp),
+                            .fillMaxHeight(0.85f),
                         contentPadding = PaddingValues(bottom = 32.dp)
                     ) {
                         itemsIndexed(queue, key = { index, t -> "$index-${t.id}" }) { index, queueTrack ->
