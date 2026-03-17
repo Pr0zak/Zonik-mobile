@@ -43,10 +43,10 @@ class PlaybackManager @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.IO)
     private var controller: MediaController? = null
 
-    // Tracks expected start index during playlist setup to work around Media3
-    // calling onAddMediaItems individually per item, which causes a spurious
-    // PLAYLIST_CHANGED transition to the wrong index.
-    private var _pendingStartIndex: Int = -1
+    private var _pendingStartIndex: Int = -1  // Legacy, kept for log compatibility
+    // Tracks a pending seek after setMediaItems to correct per-item IPC reordering.
+    // The resulting SEEK transition is ignored for UI updates.
+    private var _pendingSeekIndex: Int = -1
 
     // Set by skipToIndex to prevent onMediaItemTransition from overriding
     // the correct track when manually seeking within the queue.
@@ -166,6 +166,12 @@ class PlaybackManager @Inject constructor(
                     DebugLog.d("Playback", "Ignoring PLAYLIST_CHANGED transition")
                     return
                 }
+                // Ignore the SEEK transition caused by our correction seekTo in playTracks()
+                if (_pendingSeekIndex >= 0 && reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
+                    DebugLog.d("Playback", "Ignoring correction seek transition (pendingSeek=$_pendingSeekIndex)")
+                    _pendingSeekIndex = -1
+                    return
+                }
                 // Match by metadata first (more reliable than index after shuffle/IPC)
                 if (metaTitle != null) {
                     val match = findTrackByMetadata(metaTitle, metaArtist)
@@ -236,12 +242,16 @@ class PlaybackManager @Inject constructor(
             buildMediaItem(track, serverUrl, config)
         }
 
-        _pendingStartIndex = -1  // No longer used for correction
+        _pendingSeekIndex = startIndex
         DebugLog.d("Playback", "Playing ${tracks.size} tracks from index $startIndex")
         DebugLog.d("Playback", "Stream URL: ${mediaItems.firstOrNull()?.localConfiguration?.uri}")
         ctrl.setMediaItems(mediaItems, startIndex, 0)
         ctrl.prepare()
         ctrl.play()
+        // Media3 per-item IPC leaves the player at the wrong index.
+        // seekTo corrects it. The transition handler ignores PLAYLIST_CHANGED
+        // and the resulting SEEK transition for UI purposes.
+        ctrl.seekTo(startIndex, 0)
     }
 
     fun playNext(track: Track) {
