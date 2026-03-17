@@ -156,8 +156,11 @@ class ZonikMediaService : MediaLibraryService() {
                 // Update custom buttons for the new track
                 val trackId = mediaItem?.mediaId?.removePrefix(TRACK_PREFIX) ?: ""
                 mediaLibrarySession?.setCustomLayout(buildCustomLayout(trackId))
-                // Pre-cache upcoming tracks
-                preCacheUpcoming(player)
+                // Pre-cache upcoming tracks (skip during playlist setup)
+                if (reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+                    || reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
+                    preCacheUpcoming(player)
+                }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -689,26 +692,32 @@ class ZonikMediaService : MediaLibraryService() {
     private fun preCacheUpcoming(player: androidx.media3.common.Player) {
         preCacheJob?.cancel()
         val factory = cacheDataSourceFactory ?: return
-        val currentIndex = player.currentMediaItemIndex
-        val itemCount = player.mediaItemCount
-        val readAhead = runBlocking { settingsRepository.cacheReadAhead.first() }
-        if (readAhead <= 0 || itemCount == 0) return
-
-        val upcoming = mutableListOf<Uri>()
-        for (i in 1..readAhead) {
-            val idx = currentIndex + i
-            if (idx >= itemCount) break
-            val item = player.getMediaItemAt(idx)
-            val uri = item.requestMetadata.mediaUri ?: item.localConfiguration?.uri
-            if (uri != null) upcoming.add(uri)
+        val allUpcoming = mutableListOf<Uri>()
+        try {
+            val currentIndex = player.currentMediaItemIndex
+            val itemCount = player.mediaItemCount
+            if (itemCount == 0) return
+            val maxPossible = minOf(10, itemCount - currentIndex - 1)
+            if (maxPossible <= 0) return
+            for (i in 1..maxPossible) {
+                val idx = currentIndex + i
+                if (idx >= itemCount) break
+                val item = player.getMediaItemAt(idx)
+                val uri = item.requestMetadata.mediaUri ?: item.localConfiguration?.uri
+                if (uri != null) allUpcoming.add(uri)
+            }
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("MediaService", "Pre-cache setup failed: ${e.message}")
         }
-        if (upcoming.isEmpty()) return
+        if (allUpcoming.isEmpty()) return
 
         preCacheJob = preCacheScope.launch {
+            val readAhead = settingsRepository.cacheReadAhead.first()
+            if (readAhead <= 0) return@launch
+            val upcoming = allUpcoming.take(readAhead)
             for (uri in upcoming) {
                 try {
                     val trackId = uri.getQueryParameter("id") ?: continue
-                    // Skip if already fully cached
                     if (simpleCache.isCached(trackId, 0, Long.MAX_VALUE)) continue
                     com.zonik.app.data.DebugLog.d("MediaService", "Pre-caching track: $trackId")
                     val dataSpec = DataSpec(uri)

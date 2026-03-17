@@ -331,7 +331,10 @@ fun SettingsScreen(
                 Column {
                     ListItem(
                         headlineContent = { Text("Audio cache") },
-                        supportingContent = { Text(formatLargeFileSize(uiState.cacheSizeBytes)) },
+                        supportingContent = {
+                            val maxLabel = if (uiState.maxCacheSizeMb >= 1024) "${uiState.maxCacheSizeMb / 1024} GB" else "${uiState.maxCacheSizeMb} MB"
+                            Text("${formatLargeFileSize(uiState.cacheSizeBytes)} / $maxLabel")
+                        },
                         leadingContent = {
                             Icon(Icons.Default.Storage, contentDescription = null)
                         }
@@ -917,7 +920,7 @@ private fun CacheSizeDropdown(
         supportingContent = {
             Text(
                 if (currentSizeMb == 0) "Caching disabled"
-                else "$currentLabel (restart to apply)"
+                else "$currentLabel (restart app to apply)"
             )
         },
         leadingContent = {

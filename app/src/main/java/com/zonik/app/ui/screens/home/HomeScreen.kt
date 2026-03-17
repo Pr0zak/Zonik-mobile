@@ -64,7 +64,7 @@ class HomeViewModel @Inject constructor(
                 DebugLog.d("HomeViewModel", "Starting shuffle mix")
                 val tracks = libraryRepository.getRandomSongs(count = 100)
                 if (tracks.isNotEmpty()) {
-                    playbackManager.setShuffleEnabled(true)
+                    playbackManager.setShuffleEnabled(false)
                     playbackManager.playTracks(tracks)
                     DebugLog.d("HomeViewModel", "Shuffle mix started with ${tracks.size} tracks")
                 } else {

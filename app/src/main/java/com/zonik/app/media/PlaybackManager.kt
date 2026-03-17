@@ -206,7 +206,16 @@ class PlaybackManager @Inject constructor(
     fun playTracks(tracks: List<Track>, startIndex: Int = 0) {
         val config = getServerConfig() ?: return
         val serverUrl = config.url
-        _queue.value = tracks
+        // Cap track list to avoid TransactionTooLargeException (Binder 1MB limit)
+        val maxTracks = 500
+        val cappedTracks = if (tracks.size > maxTracks) {
+            val start = maxOf(0, startIndex - 50) // keep some context before start
+            val end = minOf(tracks.size, start + maxTracks)
+            val adjustedIndex = startIndex - start
+            DebugLog.d("Playback", "Capping ${tracks.size} tracks to $maxTracks (offset $start, adjusted index $adjustedIndex)")
+            return playTracks(tracks.subList(start, end), adjustedIndex)
+        } else tracks
+        _queue.value = cappedTracks
         // Set current track immediately for instant UI update (don't wait for ExoPlayer callback)
         if (startIndex in tracks.indices) {
             _currentTrack.value = tracks[startIndex]
