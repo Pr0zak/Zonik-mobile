@@ -11,8 +11,8 @@ A native Android music player app that streams music from a self-hosted [Zonik](
 
 ## Tech Stack
 - **Language:** Kotlin
-- **UI:** Jetpack Compose + Material 3 + custom dark theme (teal/cyan accents)
-- **Playback:** AndroidX Media3 (ExoPlayer) + MediaLibraryService + Google Cast
+- **UI:** Jetpack Compose + Material 3 + custom dark theme (gold/amber accents, vinyl record logo)
+- **Playback:** AndroidX Media3 (ExoPlayer) + MediaLibraryService + Google Cast + SimpleCache
 - **Networking:** Retrofit + OkHttp + Kotlinx Serialization
 - **Local DB:** Room (v2) + Paging 3
 - **DI:** Hilt (KSP)
@@ -58,8 +58,8 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 - All network calls go through repository layer
 - Subsonic auth: token auth `md5(apiKey + salt)` as query params
 - Stream/cover art URLs: auth baked directly into URL (not via interceptor) because ExoPlayer uses its own HTTP stack
-- Media3 IPC: `requestMetadata.mediaUri` carries stream URL across controller↔service boundary (`localConfiguration` is stripped during IPC)
-- Track identification after IPC: use `currentMediaItemIndex` not `mediaId` (mediaId lost in IPC)
+- Playlist playback: `PlaybackManager` sends track IDs via custom `SessionCommand` (`PLAY_TRACKS`), service builds MediaItems and sets them directly on the player — bypasses Media3 per-item IPC which reorders playlists
+- Track identification: use metadata matching (title/artist) for transitions — `mediaId` and index are unreliable after IPC
 - Keep UI state in ViewModels using StateFlow
 - All track lists support long-press context menus (Play, Play Next, Add to Queue, Mark for Deletion)
 
@@ -71,7 +71,7 @@ app/src/main/java/com/zonik/app/
     db/           # Room entities, DAOs, ZonikDatabase (v2)
     repository/   # LibraryRepository, SettingsRepository, SyncManager
     DebugLog.kt   # In-memory debug log buffer (500 entries)
-  di/             # AppModule (Hilt — OkHttpClient, Retrofit, Room, dynamic base URL)
+  di/             # AppModule (Hilt — OkHttpClient, Retrofit, Room, SimpleCache, dynamic base URL)
   media/
     ZonikMediaService.kt  # MediaLibraryService, ExoPlayer, Auto browse tree, onAddMediaItems
     PlaybackManager.kt    # MediaController wrapper, queue, playback state, smart bitrate
@@ -93,37 +93,44 @@ app/src/main/java/com/zonik/app/
       nowplaying/ # NowPlayingScreen — Symfonium-style with blurred background, Palette colors
       login/      # LoginScreen — connection test (ping + auth verification)
       settings/   # SettingsScreen — server, sync, playback, Last.fm, cache, updates, debug logs, dynamic version display
-    theme/        # ZonikTheme — custom dark color scheme (deep dark + teal/cyan accents)
+    theme/        # ZonikTheme — custom dark color scheme (dark brown/black + gold/amber accents)
     util/         # FormatUtils (duration, file size formatting)
   MainActivity.kt     # Main activity, nav host, bottom nav, Now Playing overlay with slide animation
   ZonikApplication.kt # Hilt app, notification channels, WorkManager, Coil ImageLoader
 ```
 
 ## Playback Architecture
-- ExoPlayer in `ZonikMediaService` with `OkHttpDataSource` (clean client without auth interceptor)
+- ExoPlayer in `ZonikMediaService` with `CacheDataSource` wrapping `OkHttpDataSource`
 - Auth params baked into stream URLs (ExoPlayer doesn't go through app's OkHttp interceptors)
-- `onAddMediaItems` resolves URIs from `requestMetadata.mediaUri` (survives IPC)
+- **Playlist loading**: `PlaybackManager` sends track IDs via custom `PLAY_TRACKS` SessionCommand → service looks up tracks from Room DB, builds MediaItems, sets them directly on ExoPlayer. This bypasses Media3's per-item `onAddMediaItems` IPC which reorders playlists.
+- `onAddMediaItems` still handles Android Auto browse-tree playback and single-item URI resolution
 - `PlaybackManager` connects via `MediaController`, tracks queue locally
-- Track transitions identified by `currentMediaItemIndex` (mediaId lost in IPC)
+- Track transitions matched by metadata (title/artist) — `mediaId` and index are unreliable after IPC
 - Skip next/previous: use `seekToNext()` / `seekToPrevious()` (NOT `seekToNextMediaItem()` — command availability issues)
-- Media3 calls `onAddMediaItems` per-item (not batched) — `_pendingStartIndex` + explicit `seekTo` corrects playlist start position
 - Smart bitrate: auto-detects Wi-Fi vs cellular, applies configured max bitrate
+- **Audio caching**: `SimpleCache` (Hilt singleton) with `LeastRecentlyUsedCacheEvictor`, custom `CacheKeyFactory` uses track ID (not full URL with auth salt). Configurable size (off/250MB–10GB, default 500MB).
+- **Read-ahead pre-caching**: on track transition (AUTO/SEEK), next N tracks are pre-cached via `CacheWriter` on IO thread. Configurable count (0–10, default 3).
 - Now Playing auto-shows instantly on tap via `playbackRequested` SharedFlow (emits before buffering)
 - `currentTrack` set immediately in `playTracks()` for instant UI update
 - Slide animation: 250ms up / 200ms down
 - Seek bar polling: 100ms (Now Playing), 200ms (MiniPlayer)
+- Play All / Shuffle capped to 500 tracks to avoid Binder `TransactionTooLargeException`
 
 ## Track Management
-- **Mark for Deletion**: tracks can be marked/unmarked via long-press context menu on any track list
+- **Mark for Deletion**: tracks can be marked/unmarked via long-press context menu on any track list, and via Android Auto now playing button
 - Marked tracks show red title text as visual indicator
 - `markedForDeletion` flag stored in Room DB, preserved across library syncs
-- Available on: HomeScreen, LibraryScreen, AlbumDetailScreen, SearchScreen, TrackListItem component
+- Available on: HomeScreen, LibraryScreen, AlbumDetailScreen, SearchScreen, TrackListItem component, Android Auto
+- **Star/Unstar**: updates both Subsonic API and local Room DB; available in Now Playing, Android Auto, AlbumDetailScreen
 
 ## Android Auto
 - MediaLibraryService with MediaLibrarySession.Callback
-- 4 root tabs: Recent, Library, Playlists, Mix
+- 4 root tabs (configurable order in Settings): Mix, Recent, Library, Playlists
+- Mix section: Shuffle, Newly Added, Favorites, Non-Favorites
 - Content style: GRID for albums/artists, LIST for tracks/playlists
 - Voice search with empty query handling
+- Custom buttons in now playing: Star/Unstar (heart) + Mark for Deletion (trash)
+- `starredTrackIds` and `markedForDeletionIds` loaded from Room DB on service startup
 - Browse tree works without Activity; rebuilds from scratch on force-stop
 - Cover art URIs include baked-in auth params (fetched by system UI)
 - **Sideloaded APK setup**: user must enable Developer Mode in Android Auto settings (tap version 10x), then enable "Unknown sources" in developer settings
@@ -161,12 +168,14 @@ app/src/main/java/com/zonik/app/
 4. `/update-release` for hotfixes without version bump
 
 ## Known Gotchas
-- Media3 strips `localConfiguration` (URI) during controller↔service IPC — must use `requestMetadata.mediaUri`
-- Media3 `mediaId` becomes empty after IPC — track by queue index not mediaId
-- Media3 calls `onAddMediaItems` once per item (not batched) — causes wrong start index; fixed with `_pendingStartIndex` guard + explicit `seekTo(startIndex)` after play
-- `onAddMediaItems` callback MUST be implemented or setMediaItems silently does nothing (ExoPlayer goes BUFFERING→ENDED with no error)
+- **DO NOT use `controller.setMediaItems()` for playlist playback** — Media3 decomposes items and calls `onAddMediaItems` per-item over IPC, reordering the playlist. Use the custom `PLAY_TRACKS` SessionCommand instead (sends track IDs, service builds and sets items directly on player).
+- Media3 strips `localConfiguration` (URI) during controller↔service IPC — `onAddMediaItems` must reconstruct from `requestMetadata.mediaUri`
+- Media3 `mediaId` becomes empty after IPC — use metadata matching (title/artist) not mediaId
+- `onAddMediaItems` callback MUST be implemented for Android Auto browse-tree playback (ExoPlayer goes BUFFERING→ENDED without it)
 - Use `seekToNext()` / `seekToPrevious()` not `seekToNextMediaItem()` / `seekToPreviousMediaItem()` — the MediaItem variants require `COMMAND_SEEK_TO_NEXT_MEDIA_ITEM` which may not be available on the MediaController after playlist changes
-- ExoPlayer uses `OkHttpDataSource` with a clean client (no auth interceptor) — auth must be baked into stream URLs
+- ExoPlayer uses `CacheDataSource` wrapping `OkHttpDataSource` with a clean client (no auth interceptor) — auth must be baked into stream URLs
+- Cache key factory must extract track ID from URL (not use full URL) because auth params include random salt
+- Play All / Shuffle must cap tracks at 500 to avoid `TransactionTooLargeException` (Binder 1MB IPC limit)
 - Stream/cover art URLs must NOT include `f=json` (server returns binary audio/image, not JSON)
 - Zonik `/api/jobs` returns HTML without `Accept: application/json` header
 - Job history response is `{"items": [...]}` not a raw array
