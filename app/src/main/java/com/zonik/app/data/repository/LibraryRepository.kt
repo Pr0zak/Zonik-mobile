@@ -253,15 +253,28 @@ class LibraryRepository @Inject constructor(
             onProgress(allTracks.size)
         }
 
+        // Fetch server-side starred tracks for authoritative starred status
+        val serverStarredIds = try {
+            val starred2 = api.getStarred2()
+            val ids = mutableSetOf<String>()
+            starred2.response.starred2?.song?.forEach { ids.add(it.id) }
+            com.zonik.app.data.DebugLog.d("Sync", "Server has ${ids.size} starred tracks")
+            ids
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("Sync", "Failed to fetch starred2: ${e.message}")
+            emptySet()
+        }
+
         // Preserve local flags (markedForDeletion, starred) from existing tracks
         val existingMarked = database.trackDao().getMarkedForDeletionIds()
         val existingStarredIds = database.trackDao().getStarred().map { it.id }.toSet()
-        com.zonik.app.data.DebugLog.d("Sync", "Preserving ${existingStarredIds.size} starred, ${existingMarked.size} marked for deletion")
+        // Merge: starred if server OR local DB says so
+        val allStarredIds = serverStarredIds + existingStarredIds
+        com.zonik.app.data.DebugLog.d("Sync", "Preserving ${allStarredIds.size} starred (${serverStarredIds.size} server + ${existingStarredIds.size} local), ${existingMarked.size} marked for deletion")
         val entities = allTracks.map { subsonicTrack ->
             var entity = TrackEntity.fromDomain(subsonicTrack.toDomain())
             if (entity.id in existingMarked) entity = entity.copy(markedForDeletion = true)
-            // Preserve starred: true if either server or local DB says starred
-            if (entity.id in existingStarredIds && !entity.starred) entity = entity.copy(starred = true)
+            if (entity.id in allStarredIds) entity = entity.copy(starred = true)
             entity
         }
         database.trackDao().upsertAll(entities)

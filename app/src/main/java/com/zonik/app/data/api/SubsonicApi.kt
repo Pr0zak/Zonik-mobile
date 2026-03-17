@@ -51,6 +51,9 @@ interface SubsonicApi {
     @GET("rest/getPlaylist.view")
     suspend fun getPlaylist(@Query("id") id: String): PlaylistDetailResponse
 
+    @GET("rest/getStarred2.view")
+    suspend fun getStarred2(): com.zonik.app.model.Starred2Response
+
     @GET("rest/star.view")
     suspend fun star(
         @Query("id") id: String? = null,

@@ -339,6 +339,26 @@ data class SubsonicPlaylistDetail(
 )
 
 @Serializable
+data class Starred2Data(
+    val song: List<SubsonicTrack>? = null,
+    val album: List<SubsonicAlbum>? = null,
+    val artist: List<SubsonicArtist>? = null
+)
+
+@Serializable
+data class Starred2Envelope(
+    val status: String,
+    val version: String,
+    val starred2: Starred2Data? = null
+)
+
+@Serializable
+data class Starred2Response(
+    @SerialName("subsonic-response")
+    val response: Starred2Envelope
+)
+
+@Serializable
 data class StarResponse(
     @SerialName("subsonic-response")
     val response: SubsonicEnvelope<Unit>
