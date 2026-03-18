@@ -69,6 +69,7 @@ class ZonikMediaService : MediaLibraryService() {
     private val toggleDeleteCommand = SessionCommand(ACTION_TOGGLE_DELETE, Bundle.EMPTY)
     private val playTracksCommand = SessionCommand(ACTION_PLAY_TRACKS, Bundle.EMPTY)
     private val setEqCommand = SessionCommand(ACTION_SET_EQ, Bundle.EMPTY)
+    private val toggleShuffleCommand = SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY)
 
     companion object {
         // Browse tree node IDs
@@ -90,6 +91,7 @@ class ZonikMediaService : MediaLibraryService() {
         private const val ACTION_TOGGLE_DELETE = "com.zonik.app.TOGGLE_DELETE"
         private const val ACTION_PLAY_TRACKS = "com.zonik.app.PLAY_TRACKS"
         private const val ACTION_SET_EQ = "com.zonik.app.SET_EQ"
+        private const val ACTION_TOGGLE_SHUFFLE = "com.zonik.app.TOGGLE_SHUFFLE"
         private const val EXTRA_TRACK_IDS = "track_ids"
         private const val EXTRA_START_INDEX = "start_index"
         private const val EXTRA_EQ_ENABLED = "eq_enabled"
@@ -459,10 +461,20 @@ class ZonikMediaService : MediaLibraryService() {
             .build()
     }
 
+    private fun buildShuffleButton(isShuffled: Boolean): CommandButton {
+        return CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setDisplayName(if (isShuffled) "Shuffle On" else "Shuffle Off")
+            .setIconResId(R.drawable.ic_shuffle)
+            .setSessionCommand(toggleShuffleCommand)
+            .setEnabled(true)
+            .build()
+    }
+
     private fun buildCustomLayout(trackId: String): List<CommandButton> {
         val isStarred = trackId.isNotBlank() && trackId in starredTrackIds
         val isMarked = trackId.isNotBlank() && trackId in markedForDeletionIds
-        return listOf(buildStarButton(isStarred), buildDeleteButton(isMarked))
+        val isShuffled = mediaLibrarySession?.player?.shuffleModeEnabled ?: false
+        return listOf(buildStarButton(isStarred), buildShuffleButton(isShuffled), buildDeleteButton(isMarked))
     }
 
     /**
@@ -756,6 +768,7 @@ class ZonikMediaService : MediaLibraryService() {
                 .add(toggleDeleteCommand)
                 .add(playTracksCommand)
                 .add(setEqCommand)
+                .add(toggleShuffleCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
@@ -769,6 +782,15 @@ class ZonikMediaService : MediaLibraryService() {
             customCommand: SessionCommand,
             args: Bundle
         ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == ACTION_TOGGLE_SHUFFLE) {
+                val player = session.player
+                player.shuffleModeEnabled = !player.shuffleModeEnabled
+                com.zonik.app.data.DebugLog.d("MediaService", "Shuffle toggled: ${player.shuffleModeEnabled}")
+                val trackId = player.currentMediaItem?.mediaId?.removePrefix(TRACK_PREFIX) ?: ""
+                session.setCustomLayout(buildCustomLayout(trackId))
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+
             if (customCommand.customAction == ACTION_SET_EQ) {
                 val enabled = args.getBoolean(EXTRA_EQ_ENABLED, false)
                 val preset = args.getInt(EXTRA_EQ_PRESET, 0)
