@@ -246,8 +246,8 @@ class PlaybackManager @Inject constructor(
             }
         })
 
-        // Restore equalizer settings
-        scope.launch {
+        // Restore equalizer settings (must be on main thread for MediaController)
+        kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
             try {
                 val enabled = settingsRepository.eqEnabled.first()
                 val preset = settingsRepository.eqPreset.first()
