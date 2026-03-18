@@ -82,6 +82,9 @@ class NowPlayingViewModel @Inject constructor(
     private val _isStarred = MutableStateFlow(false)
     val isStarred: StateFlow<Boolean> = _isStarred.asStateFlow()
 
+    private val _isMarkedForDeletion = MutableStateFlow(false)
+    val isMarkedForDeletion: StateFlow<Boolean> = _isMarkedForDeletion.asStateFlow()
+
     private val _playbackSpeed = MutableStateFlow(1.0f)
     val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
 
@@ -92,12 +95,13 @@ class NowPlayingViewModel @Inject constructor(
         viewModelScope.launch {
             currentTrack.collect { track ->
                 if (track != null) {
-                    // Read starred status directly from DB (not the in-memory Track object)
                     val starred = database.trackDao().isStarred(track.id)
                     _isStarred.value = starred ?: false
-                    com.zonik.app.data.DebugLog.d("NowPlaying", "Track '${track.title}' starred=$starred (track.starred=${track.starred})")
+                    val dbTrack = database.trackDao().getById(track.id)
+                    _isMarkedForDeletion.value = dbTrack?.markedForDeletion ?: false
                 } else {
                     _isStarred.value = false
+                    _isMarkedForDeletion.value = false
                 }
             }
         }
@@ -145,6 +149,15 @@ class NowPlayingViewModel @Inject constructor(
         }
     }
 
+    fun toggleMarkForDeletion() {
+        val track = currentTrack.value ?: return
+        viewModelScope.launch {
+            val newValue = !_isMarkedForDeletion.value
+            database.trackDao().setMarkedForDeletion(track.id, newValue)
+            _isMarkedForDeletion.value = newValue
+        }
+    }
+
     fun cyclePlaybackSpeed() {
         val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
         val currentIndex = speeds.indexOf(_playbackSpeed.value)
@@ -168,6 +181,7 @@ fun NowPlayingScreen(
     val shuffleEnabled by viewModel.shuffleEnabled.collectAsState()
     val repeatState by viewModel.repeatState.collectAsState()
     val isStarred by viewModel.isStarred.collectAsState()
+    val isMarkedForDeletion by viewModel.isMarkedForDeletion.collectAsState()
     val playbackSpeed by viewModel.playbackSpeed.collectAsState()
     val isCasting by viewModel.isCasting.collectAsState()
     val castDeviceName by viewModel.castDeviceName.collectAsState()
@@ -503,6 +517,14 @@ fun NowPlayingScreen(
                         imageVector = if (isStarred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Favorite",
                         tint = if (isStarred) animatedAccent else Color.White.copy(alpha = 0.5f)
+                    )
+                }
+
+                IconButton(onClick = { viewModel.toggleMarkForDeletion() }) {
+                    Icon(
+                        imageVector = if (isMarkedForDeletion) Icons.Default.Delete else Icons.Default.DeleteOutline,
+                        contentDescription = "Mark for Deletion",
+                        tint = if (isMarkedForDeletion) MaterialTheme.colorScheme.error else Color.White.copy(alpha = 0.5f)
                     )
                 }
 

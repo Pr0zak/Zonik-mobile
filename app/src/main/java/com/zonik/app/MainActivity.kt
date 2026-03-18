@@ -75,13 +75,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             playbackManager.connect()
         }
-        // Auto-sync library once on startup if logged in
-        viewModelScope.launch {
-            val loggedIn = settingsRepository.isLoggedIn.first()
-            if (loggedIn) {
-                syncManager.fullSync()
-            }
-        }
+        // Sync is manual or scheduled — no auto-sync on startup
     }
 
     fun syncNow() {
