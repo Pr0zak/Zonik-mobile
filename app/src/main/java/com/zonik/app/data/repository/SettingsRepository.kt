@@ -124,7 +124,7 @@ class SettingsRepository @Inject constructor(
     }
 
     val cacheReadAhead: Flow<Int> = dataStore.data.map { prefs ->
-        prefs[CACHE_READ_AHEAD] ?: 3
+        prefs[CACHE_READ_AHEAD] ?: 5
     }
 
     suspend fun setCacheReadAhead(count: Int) {

@@ -92,6 +92,7 @@ app/src/main/java/com/zonik/app/
       playlists/  # PlaylistsScreen
       nowplaying/ # NowPlayingScreen — Symfonium-style with blurred background, Palette colors, queue (85% height, auto-scroll to current)
       login/      # LoginScreen — connection test (ping + auth verification)
+      stats/      # StatsScreen — library overview, format/bitrate/genre/decade distributions, most played, top artists
       settings/   # SettingsScreen — server, sync, playback (bitrate, crossfade, keep screen on), cache (size, read-ahead), Android Auto (tab order), Last.fm, updates, debug logs
     theme/        # ZonikTheme — custom dark color scheme (dark brown/black + gold/amber accents)
     util/         # FormatUtils (duration, file size formatting)
@@ -107,9 +108,11 @@ app/src/main/java/com/zonik/app/
 - `PlaybackManager` connects via `MediaController`, tracks queue locally
 - Track transitions matched by metadata (title/artist) — `mediaId` and index are unreliable after IPC
 - Skip next/previous: use `seekToNext()` / `seekToPrevious()` (NOT `seekToNextMediaItem()` — command availability issues)
-- Smart bitrate: auto-detects Wi-Fi vs cellular, applies configured max bitrate
+- **Smart bitrate**: auto-detects Wi-Fi vs cellular, applies configured max bitrate. Adaptive degradation on slow connections (steps down 320→256→192→128→64 after 3 consecutive buffering events, auto-restores after 3 stable tracks).
+- **Connection resilience**: custom `LoadErrorHandlingPolicy` with 10 retries + exponential backoff (up to 16s). `DefaultLoadControl` with 30s min / 2min max buffer. 60s read timeout. `ConnectivityManager.NetworkCallback` auto-resumes playback when network returns. `onPlayerError` auto-prepares on IO errors.
 - **Audio caching**: `SimpleCache` (Hilt singleton) with `LeastRecentlyUsedCacheEvictor`, custom `CacheKeyFactory` uses track ID (not full URL with auth salt). Configurable size (off/250MB–10GB, default 500MB).
-- **Read-ahead pre-caching**: on track transition (AUTO/SEEK), next N tracks are pre-cached via `CacheWriter` on IO thread. Configurable count (0–10, default 3).
+- **Read-ahead pre-caching**: on track transition (AUTO/SEEK) and on queue load (`PLAY_TRACKS`), next N tracks are pre-cached via `CacheWriter` on IO thread. Configurable count (0–10, default 5).
+- **Buffering UI**: Now Playing shows spinner on play button when buffering, error banner for connection issues. Android Auto gets buffering state automatically via MediaSession.
 - **Keep screen on**: optional setting prevents display sleep while Now Playing is visible and playing (uses `FLAG_KEEP_SCREEN_ON`)
 - Now Playing auto-shows instantly on tap via `playbackRequested` SharedFlow (emits before buffering)
 - `currentTrack` set immediately in `playTracks()` for instant UI update
@@ -118,7 +121,7 @@ app/src/main/java/com/zonik/app/
 - Play All / Shuffle capped to 500 tracks to avoid Binder `TransactionTooLargeException`
 
 ## Track Management
-- **Mark for Deletion**: tracks can be marked/unmarked via long-press context menu on any track list, and via Android Auto now playing button
+- **Mark for Deletion**: tracks can be marked/unmarked via long-press context menu on any track list, Now Playing screen, and Android Auto now playing button
 - Marked tracks show red title text as visual indicator
 - `markedForDeletion` flag stored in Room DB, preserved across library syncs
 - Available on: HomeScreen, LibraryScreen, AlbumDetailScreen, SearchScreen, TrackListItem component, Android Auto
@@ -182,6 +185,10 @@ app/src/main/java/com/zonik/app/
 - `starred` flag must be preserved during sync — `syncAllTracks` fetches `getStarred2` and merges server + local starred IDs before upserting
 - `search3` response may NOT include `starred` field reliably — always use `getStarred2` as authoritative source
 - Now Playing starred status must read from Room DB directly, not from in-memory Track objects (which may be stale)
+- Network callback must be registered/unregistered in `onCreate`/`onDestroy` and must post to main thread (ExoPlayer threading requirement)
+- `SimpleCache.isCached()` with `Long.MAX_VALUE` always returns false — use `getCachedBytes() > 0` instead
+- `CacheWriter.cache()` is blocking and not coroutine-cancellation-aware — cancel the job between tracks, not mid-download
+- Adaptive bitrate `bitrateOverride` must be `@Volatile` — accessed from both UI and player threads
 - Stream/cover art URLs must NOT include `f=json` (server returns binary audio/image, not JSON)
 - Zonik `/api/jobs` returns HTML without `Accept: application/json` header
 - Job history response is `{"items": [...]}` not a raw array

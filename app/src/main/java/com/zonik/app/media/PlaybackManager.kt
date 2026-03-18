@@ -59,6 +59,18 @@ class PlaybackManager @Inject constructor(
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
+    private val _isBuffering = MutableStateFlow(false)
+    val isBuffering: StateFlow<Boolean> = _isBuffering.asStateFlow()
+
+    private val _playbackError = MutableStateFlow<String?>(null)
+    val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
+
+    // Adaptive bitrate: step down on connection issues, restore when stable
+    private val bitrateSteps = listOf(0, 320, 256, 192, 128, 64) // 0 = original
+    @Volatile private var bitrateOverride: Int? = null
+    @Volatile private var consecutiveBuffers = 0
+    @Volatile private var stableTrackCount = 0
+
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
 
@@ -172,6 +184,10 @@ class PlaybackManager @Inject constructor(
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 DebugLog.e("Playback", "Player error: ${error.errorCodeName} - ${error.message}")
                 DebugLog.e("Playback", "Error cause: ${error.cause?.message}")
+                val isNetworkError = error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+                    || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+                    || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+                _playbackError.value = if (isNetworkError) "Connection lost — retrying..." else "Playback error"
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -183,6 +199,24 @@ class PlaybackManager @Inject constructor(
                     else -> "UNKNOWN($playbackState)"
                 }
                 DebugLog.d("Playback", "State: $state")
+                _isBuffering.value = playbackState == Player.STATE_BUFFERING
+                if (playbackState == Player.STATE_READY) {
+                    _playbackError.value = null
+                    consecutiveBuffers = 0
+                    // Auto-restore bitrate after 3 consecutive stable tracks
+                    if (bitrateOverride != null) {
+                        stableTrackCount++
+                        if (stableTrackCount >= 3) {
+                            resetBitrate()
+                        }
+                    }
+                }
+                if (playbackState == Player.STATE_BUFFERING) {
+                    consecutiveBuffers++
+                    if (consecutiveBuffers >= 3) {
+                        degradeBitrate()
+                    }
+                }
             }
         })
     }
@@ -468,6 +502,9 @@ class PlaybackManager @Inject constructor(
     }
 
     private fun getMaxBitRate(): Int {
+        // Use degraded bitrate if connection is poor
+        bitrateOverride?.let { return it }
+
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork
         val capabilities = connectivityManager.getNetworkCapabilities(network)
@@ -479,6 +516,33 @@ class PlaybackManager @Inject constructor(
             else settingsRepository.cellularBitrate.first()
         }
         return bitrate
+    }
+
+    private fun degradeBitrate() {
+        val current = bitrateOverride ?: getMaxBitRate()
+        val currentIndex = bitrateSteps.indexOf(current)
+        val nextIndex = if (currentIndex < 0) {
+            // Current bitrate not in steps — find first step lower than current
+            val lowerIndex = bitrateSteps.indexOfFirst { it in 1 until current }
+            if (lowerIndex >= 0) lowerIndex else bitrateSteps.lastIndex
+        } else {
+            minOf(currentIndex + 1, bitrateSteps.lastIndex)
+        }
+        val newBitrate = bitrateSteps[nextIndex]
+        if (newBitrate != bitrateOverride) {
+            bitrateOverride = newBitrate
+            stableTrackCount = 0
+            DebugLog.d("Playback", "Degraded bitrate to ${newBitrate}kbps due to slow connection")
+            _playbackError.value = "Slow connection — reduced to ${newBitrate}kbps"
+        }
+    }
+
+    fun resetBitrate() {
+        if (bitrateOverride != null) {
+            DebugLog.d("Playback", "Restored original bitrate")
+            bitrateOverride = null
+            consecutiveBuffers = 0
+        }
     }
 
     private fun addToRecentlyPlayed(track: Track) {

@@ -70,6 +70,8 @@ class NowPlayingViewModel @Inject constructor(
     val queue: StateFlow<List<Track>> = playbackManager.queue
     val isCasting: StateFlow<Boolean> = playbackManager.castManager.isCasting
     val castDeviceName: StateFlow<String?> = playbackManager.castManager.castDeviceName
+    val isBuffering: StateFlow<Boolean> = playbackManager.isBuffering
+    val playbackError: StateFlow<String?> = playbackManager.playbackError
 
     fun getCastContext() = playbackManager.castManager.getCastContext()
 
@@ -186,6 +188,8 @@ fun NowPlayingScreen(
     val isCasting by viewModel.isCasting.collectAsState()
     val castDeviceName by viewModel.castDeviceName.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
+    val isBuffering by viewModel.isBuffering.collectAsState()
+    val playbackError by viewModel.playbackError.collectAsState()
 
     // Keep screen on while Now Playing is visible (if enabled in settings)
     val activity = LocalContext.current as? android.app.Activity
@@ -465,7 +469,7 @@ fun NowPlayingScreen(
                     )
                 }
 
-                // Play/Pause — large circle
+                // Play/Pause — large circle (shows spinner when buffering)
                 FloatingActionButton(
                     onClick = { viewModel.togglePlayPause() },
                     shape = CircleShape,
@@ -473,11 +477,19 @@ fun NowPlayingScreen(
                     contentColor = Color.Black,
                     modifier = Modifier.size(72.dp)
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(40.dp)
-                    )
+                    if (isBuffering) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(36.dp),
+                            strokeWidth = 3.dp,
+                            color = Color.Black
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
                 }
 
                 IconButton(
@@ -592,6 +604,34 @@ fun NowPlayingScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = animatedAccent
                     )
+                }
+            }
+
+            // Connection error banner
+            if (playbackError != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (playbackError?.contains("retrying") == true || playbackError?.contains("Slow") == true) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = playbackError ?: "",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
                 }
             }
 
