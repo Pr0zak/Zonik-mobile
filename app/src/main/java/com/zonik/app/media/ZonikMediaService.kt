@@ -43,7 +43,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
-import java.security.MessageDigest
+import com.zonik.app.util.md5
 import javax.inject.Inject
 
 @OptIn(UnstableApi::class)
@@ -334,12 +334,6 @@ class ZonikMediaService : MediaLibraryService() {
         val token = md5("${config.apiKey}$salt")
         val separator = if (baseUrl.contains('?')) '&' else '?'
         return "${baseUrl}${separator}u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp"
-    }
-
-    private fun md5(input: String): String {
-        val digest = MessageDigest.getInstance("MD5")
-        val bytes = digest.digest(input.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     private fun gridExtras(): Bundle = Bundle().apply {
@@ -840,8 +834,9 @@ class ZonikMediaService : MediaLibraryService() {
             val artist = currentItem.mediaMetadata.artist?.toString()
             if (title != null) {
                 val match = runBlocking {
-                    database.trackDao().getAll().first()
-                }.find { it.title == title && (artist == null || it.artist == artist) }
+                    if (artist != null) database.trackDao().findByTitleAndArtist(title, artist)
+                    else database.trackDao().findByTitle(title)
+                }
                 trackId = match?.id ?: ""
             }
         }

@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import java.security.MessageDigest
+import com.zonik.app.util.md5
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -42,6 +42,27 @@ class PlaybackManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var controller: MediaController? = null
+    @Volatile private var cachedServerConfig: ServerConfig? = null
+    @Volatile private var cachedWifiBitrate: Int = 0
+    @Volatile private var cachedCellularBitrate: Int = 192
+
+    init {
+        scope.launch {
+            settingsRepository.serverConfig.collect { config ->
+                cachedServerConfig = config
+            }
+        }
+        scope.launch {
+            settingsRepository.wifiBitrate.collect { bitrate ->
+                cachedWifiBitrate = bitrate
+            }
+        }
+        scope.launch {
+            settingsRepository.cellularBitrate.collect { bitrate ->
+                cachedCellularBitrate = bitrate
+            }
+        }
+    }
 
     private var _pendingStartIndex: Int = -1  // Legacy, kept for log compatibility
 
@@ -381,6 +402,10 @@ class PlaybackManager @Inject constructor(
         controller?.repeatMode = mode
     }
 
+    fun setPlaybackSpeed(speed: Float) {
+        controller?.setPlaybackParameters(androidx.media3.common.PlaybackParameters(speed))
+    }
+
     fun getCurrentPosition(): Long {
         if (castManager.isCasting.value) {
             val pos = castManager.getCurrentPosition()
@@ -400,7 +425,7 @@ class PlaybackManager @Inject constructor(
     private fun checkScrobble(positionMs: Long) {
         val track = _currentTrack.value ?: return
         if (track.id == scrobbledTrackId) return
-        val duration = controller?.duration ?: 0L
+        val duration = getDuration()
         if (duration <= 0) return
         if (positionMs > duration / 2) {
             scrobbledTrackId = track.id
@@ -467,12 +492,6 @@ class PlaybackManager @Inject constructor(
         return "&u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp"
     }
 
-    private fun md5(input: String): String {
-        val digest = MessageDigest.getInstance("MD5")
-        val bytes = digest.digest(input.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
-
     private fun findTrackByMetadata(title: String, artist: String?): Track? {
         val queue = _queue.value
         return queue.find { it.title == title && (artist == null || it.artist == artist) }
@@ -496,9 +515,7 @@ class PlaybackManager @Inject constructor(
     }
 
     private fun getServerConfig(): ServerConfig? {
-        return kotlinx.coroutines.runBlocking {
-            settingsRepository.serverConfig.first()
-        }
+        return cachedServerConfig
     }
 
     private fun getMaxBitRate(): Int {
@@ -511,11 +528,7 @@ class PlaybackManager @Inject constructor(
 
         val isWifi = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
 
-        val bitrate = kotlinx.coroutines.runBlocking {
-            if (isWifi) settingsRepository.wifiBitrate.first()
-            else settingsRepository.cellularBitrate.first()
-        }
-        return bitrate
+        return if (isWifi) cachedWifiBitrate else cachedCellularBitrate
     }
 
     private fun degradeBitrate() {

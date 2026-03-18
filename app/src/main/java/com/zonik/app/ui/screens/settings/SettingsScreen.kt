@@ -1,6 +1,5 @@
 package com.zonik.app.ui.screens.settings
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -189,34 +188,6 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
-                        headlineContent = { Text("Crossfade") },
-                        leadingContent = {
-                            Icon(Icons.Default.Tune, contentDescription = null)
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = uiState.crossfadeEnabled,
-                                onCheckedChange = viewModel::setCrossfadeEnabled
-                            )
-                        }
-                    )
-                    AnimatedVisibility(visible = uiState.crossfadeEnabled) {
-                        ListItem(
-                            headlineContent = {
-                                Text("Duration: ${uiState.crossfadeDuration}s")
-                            },
-                            supportingContent = {
-                                Slider(
-                                    value = uiState.crossfadeDuration.toFloat(),
-                                    onValueChange = { viewModel.setCrossfadeDuration(it.toInt()) },
-                                    valueRange = 1f..10f,
-                                    steps = 8
-                                )
-                            }
-                        )
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ListItem(
                         headlineContent = { Text("Keep screen on") },
                         supportingContent = { Text("Prevent sleep while Now Playing is visible") },
                         leadingContent = {
@@ -277,13 +248,8 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
                         headlineContent = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                OutlinedButton(onClick = viewModel::syncNow) {
-                                    Text("Sync Now")
-                                }
-                                OutlinedButton(onClick = viewModel::fullResync) {
-                                    Text("Full Resync")
-                                }
+                            OutlinedButton(onClick = viewModel::syncNow) {
+                                Text("Sync Now")
                             }
                         }
                     )

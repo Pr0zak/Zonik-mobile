@@ -15,8 +15,8 @@ android {
         applicationId = "com.zonik.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 69
-        versionName = "0.2.49"
+        versionCode = 70
+        versionName = "0.2.50"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

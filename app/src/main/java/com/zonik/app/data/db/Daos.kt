@@ -128,6 +128,15 @@ interface TrackDao {
 
     @Query("SELECT COUNT(*) FROM tracks WHERE markedForDeletion = 1")
     suspend fun markedCount(): Int
+
+    @Query("SELECT * FROM tracks WHERE title = :title AND artist = :artist LIMIT 1")
+    suspend fun findByTitleAndArtist(title: String, artist: String): TrackEntity?
+
+    @Query("SELECT * FROM tracks WHERE title = :title LIMIT 1")
+    suspend fun findByTitle(title: String): TrackEntity?
+
+    @Query("DELETE FROM tracks WHERE id NOT IN (:ids)")
+    suspend fun deleteNotIn(ids: List<String>)
 }
 
 data class StatCount(val label: String, val count: Int)

@@ -15,7 +15,7 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.security.MessageDigest
+import com.zonik.app.util.md5
 
 /**
  * ContentProvider that serves cover art images from the Subsonic server.
@@ -85,12 +85,6 @@ class CoverArtProvider : ContentProvider() {
             DebugLog.w("CoverArtProvider", "Failed to fetch cover art: ${e.message}")
             null
         }
-    }
-
-    private fun md5(input: String): String {
-        val digest = MessageDigest.getInstance("MD5")
-        val bytes = digest.digest(input.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? = null

@@ -34,8 +34,6 @@ data class SettingsUiState(
     val lastSyncTime: Long = 0L,
     val wifiBitrate: Int = 0,
     val cellularBitrate: Int = 192,
-    val crossfadeEnabled: Boolean = false,
-    val crossfadeDuration: Int = 3,
     val lastFmConnected: Boolean = false,
     val scrobblingEnabled: Boolean = false,
     val pendingScrobbleCount: Int = 0,
@@ -95,8 +93,6 @@ class SettingsViewModel @Inject constructor(
     private val _serverVersion = MutableStateFlow("")
     private val _serverType = MutableStateFlow<String?>(null)
 
-    private val _crossfadeEnabled = MutableStateFlow(false)
-    private val _crossfadeDuration = MutableStateFlow(3)
     private val _cacheSizeBytes = MutableStateFlow(0L)
 
     init {
@@ -166,8 +162,6 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.lastSyncTime,
         settingsRepository.wifiBitrate,
         settingsRepository.cellularBitrate,
-        _crossfadeEnabled,
-        _crossfadeDuration,
         settingsRepository.lastFmSessionKey,
         settingsRepository.scrobblingEnabled,
         libraryStats,
@@ -185,17 +179,15 @@ class SettingsViewModel @Inject constructor(
         val lastSync = values[4] as Long
         val wifiBr = values[5] as Int
         val cellBr = values[6] as Int
-        val crossfade = values[7] as Boolean
-        val crossfadeDur = values[8] as Int
-        val lastFmKey = values[9] as String?
-        val scrobbling = values[10] as Boolean
-        val stats = values[11] as LibraryStats
-        val serverVer = values[12] as String
-        val serverTp = values[13] as String?
-        val cacheBytes = values[14] as Long
-        val maxCache = values[15] as Int
-        val readAhead = values[16] as Int
-        val screenOn = values[17] as Boolean
+        val lastFmKey = values[7] as String?
+        val scrobbling = values[8] as Boolean
+        val stats = values[9] as LibraryStats
+        val serverVer = values[10] as String
+        val serverTp = values[11] as String?
+        val cacheBytes = values[12] as Long
+        val maxCache = values[13] as Int
+        val readAhead = values[14] as Int
+        val screenOn = values[15] as Boolean
 
         SettingsUiState(
             serverUrl = serverConfig?.url ?: "",
@@ -206,8 +198,6 @@ class SettingsViewModel @Inject constructor(
             lastSyncTime = lastSync,
             wifiBitrate = wifiBr,
             cellularBitrate = cellBr,
-            crossfadeEnabled = crossfade,
-            crossfadeDuration = crossfadeDur,
             lastFmConnected = lastFmKey != null,
             scrobblingEnabled = scrobbling,
             libraryStats = stats,
@@ -232,24 +222,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { syncManager.fullSync() }
     }
 
-    fun fullResync() {
-        viewModelScope.launch { syncManager.fullSync() }
-    }
-
     fun setWifiBitrate(bitrate: Int) {
         viewModelScope.launch { settingsRepository.setWifiBitrate(bitrate) }
     }
 
     fun setCellularBitrate(bitrate: Int) {
         viewModelScope.launch { settingsRepository.setCellularBitrate(bitrate) }
-    }
-
-    fun setCrossfadeEnabled(enabled: Boolean) {
-        _crossfadeEnabled.value = enabled
-    }
-
-    fun setCrossfadeDuration(seconds: Int) {
-        _crossfadeDuration.value = seconds
     }
 
     fun toggleLastFm() {

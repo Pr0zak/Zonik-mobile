@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
-import java.security.MessageDigest
+import com.zonik.app.util.md5
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -49,9 +49,4 @@ class SubsonicAuthInterceptor @Inject constructor(
         return (1..16).map { chars.random() }.joinToString("")
     }
 
-    private fun md5(input: String): String {
-        val digest = MessageDigest.getInstance("MD5")
-        val bytes = digest.digest(input.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
 }

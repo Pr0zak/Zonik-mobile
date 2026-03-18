@@ -13,8 +13,8 @@ object DebugLog {
     private const val MAX_FILE_SIZE = 512 * 1024L // 512 KB
     private const val LOG_FILE = "debug_log.txt"
     private const val PREV_LOG_FILE = "debug_log_prev.txt"
-    private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
-    private val dateTimeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+    private val timeFormat = ThreadLocal.withInitial { SimpleDateFormat("HH:mm:ss.SSS", Locale.US) }
+    private val dateTimeFormat = ThreadLocal.withInitial { SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US) }
     private var logFile: File? = null
     private var initialized = false
 
@@ -42,7 +42,7 @@ object DebugLog {
         loadFromFile()
 
         // Mark session start
-        val sessionLine = "--- Session start ${dateTimeFormat.format(Date())} ---"
+        val sessionLine = "--- Session start ${dateTimeFormat.get()!!.format(Date())} ---"
         appendToFile(sessionLine)
         entries.addLast(sessionLine)
 
@@ -61,7 +61,7 @@ object DebugLog {
                         cause = cause.cause
                     }
                 }
-                val time = timeFormat.format(Date())
+                val time = timeFormat.get()!!.format(Date())
                 val line = "$time E/CRASH: $crash"
                 appendToFile(line)
             } catch (_: Exception) {
@@ -88,7 +88,7 @@ object DebugLog {
     }
 
     private fun add(level: String, tag: String, message: String) {
-        val time = timeFormat.format(Date())
+        val time = timeFormat.get()!!.format(Date())
         val line = "$time $level/$tag: $message"
         entries.addLast(line)
         while (entries.size > MAX_ENTRIES) {

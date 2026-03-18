@@ -165,6 +165,7 @@ class NowPlayingViewModel @Inject constructor(
         val currentIndex = speeds.indexOf(_playbackSpeed.value)
         val nextIndex = if (currentIndex == -1 || currentIndex == speeds.lastIndex) 0 else currentIndex + 1
         _playbackSpeed.value = speeds[nextIndex]
+        playbackManager.setPlaybackSpeed(speeds[nextIndex])
     }
 }
 

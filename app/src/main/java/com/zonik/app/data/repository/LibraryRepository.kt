@@ -302,6 +302,7 @@ class LibraryRepository @Inject constructor(
             entity
         }
         database.trackDao().upsertAll(entities)
+        database.trackDao().deleteNotIn(entities.map { it.id })
         return entities.size
     }
 
@@ -318,7 +319,7 @@ class LibraryRepository @Inject constructor(
 
     fun buildStreamUrl(baseUrl: String, trackId: String, maxBitRate: Int = 0): String {
         return "${baseUrl.trimEnd('/')}/rest/stream.view?id=$trackId" +
-            if (maxBitRate > 0) "&maxBitRate=$maxBitRate" else "" +
+            (if (maxBitRate > 0) "&maxBitRate=$maxBitRate" else "") +
             "&estimateContentLength=true"
     }
 
