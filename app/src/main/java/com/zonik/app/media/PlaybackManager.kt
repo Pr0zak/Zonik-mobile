@@ -248,10 +248,14 @@ class PlaybackManager @Inject constructor(
 
         // Restore equalizer settings
         scope.launch {
-            val enabled = settingsRepository.eqEnabled.first()
-            val preset = settingsRepository.eqPreset.first()
-            val bandLevels = settingsRepository.eqBandLevels.first()
-            applyEqualizerSettings(enabled, preset, bandLevels)
+            try {
+                val enabled = settingsRepository.eqEnabled.first()
+                val preset = settingsRepository.eqPreset.first()
+                val bandLevels = settingsRepository.eqBandLevels.first()
+                applyEqualizerSettings(enabled, preset, bandLevels)
+            } catch (e: Exception) {
+                DebugLog.w("Playback", "EQ restore failed: ${e.message}")
+            }
         }
     }
 
