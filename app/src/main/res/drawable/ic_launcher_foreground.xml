@@ -4,12 +4,11 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Z letterform - large, spanning the icon -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#EF9F27"
-        android:strokeWidth="6.3"
+        android:strokeColor="#AFA9EC"
+        android:strokeWidth="9.9"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M34.2,31.5 L73.8,31.5 L34.2,76.5 L73.8,76.5"/>
+        android:pathData="M35.1,35.1 L72.9,35.1 L35.1,72.9 L72.9,72.9"/>
 </vector>

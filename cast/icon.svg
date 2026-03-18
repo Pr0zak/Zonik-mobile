@@ -1,18 +1,17 @@
 <svg width="512" height="512" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <clipPath id="c1"><rect x="0" y="0" width="240" height="240" rx="44"/></clipPath>
+    <clipPath id="c1"><rect width="240" height="240" rx="44"/></clipPath>
   </defs>
-
-  <rect x="0" y="0" width="240" height="240" rx="44" fill="#090700"/>
+  <rect width="240" height="240" rx="44" fill="#07060f"/>
   <g clip-path="url(#c1)">
-    <circle cx="120" cy="120" r="108" fill="#100d02"/>
-    <circle cx="120" cy="120" r="100" fill="none" stroke="#6e5820" stroke-width="4"/>
-    <circle cx="120" cy="120" r="78"  fill="none" stroke="#6e5820" stroke-width="4"/>
-    <circle cx="120" cy="120" r="56"  fill="none" stroke="#6e5820" stroke-width="4"/>
-    <circle cx="120" cy="120" r="38" fill="#0e0b00"/>
-    <circle cx="120" cy="120" r="38" fill="none" stroke="#BA7517" stroke-width="2"/>
-    <path d="M 76,70 L 164,70 L 76,170 L 164,170"
-          fill="none" stroke="#EF9F27" stroke-width="14"
+    <circle cx="120" cy="120" r="108" fill="#0d0b18"/>
+    <circle cx="120" cy="120" r="100" fill="none" stroke="#1c1836" stroke-width="4"/>
+    <circle cx="120" cy="120" r="78"  fill="none" stroke="#1c1836" stroke-width="4"/>
+    <circle cx="120" cy="120" r="56"  fill="none" stroke="#1c1836" stroke-width="4"/>
+    <circle cx="120" cy="120" r="38" fill="#08060e"/>
+    <circle cx="120" cy="120" r="38" fill="none" stroke="#534AB7" stroke-width="2"/>
+    <path d="M 78,78 L 162,78 L 78,162 L 162,162"
+          fill="none" stroke="#AFA9EC" stroke-width="22"
           stroke-linecap="square" stroke-linejoin="miter"/>
   </g>
 </svg>

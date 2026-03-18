@@ -1,5 +1,5 @@
 .background {
-  background-color: #090700;
+  background-color: #07060f;
 }
 
 .logo {
@@ -14,7 +14,7 @@
   background-size: 384px 384px;
   background-repeat: no-repeat;
   background-position: center;
-  background-color: #090700;
+  background-color: #07060f;
 }
 
 .watermark {
@@ -25,5 +25,5 @@
 }
 
 .progressBar {
-  background-color: #EF9F27;
+  background-color: #AFA9EC;
 }
