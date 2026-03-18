@@ -256,8 +256,8 @@ fun SettingsScreen(
                 }
             }
 
-            // Storage section
-            SettingsSectionHeader(title = "Storage")
+            // Cache & Buffering section
+            SettingsSectionHeader(title = "Cache & Buffering")
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -266,6 +266,7 @@ fun SettingsScreen(
                 Column {
                     ListItem(
                         headlineContent = { Text("Audio cache") },
+                        overlineContent = { Text("Caches tracks for offline playback and slow connections") },
                         supportingContent = {
                             val maxLabel = if (uiState.maxCacheSizeMb >= 1024) "${uiState.maxCacheSizeMb / 1024} GB" else "${uiState.maxCacheSizeMb} MB"
                             Text("${formatLargeFileSize(uiState.cacheSizeBytes)} / $maxLabel")
@@ -283,6 +284,20 @@ fun SettingsScreen(
                     ReadAheadDropdown(
                         currentCount = uiState.cacheReadAhead,
                         onCountSelected = viewModel::setCacheReadAhead
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ListItem(
+                        headlineContent = { Text("Adaptive bitrate") },
+                        supportingContent = { Text("Auto-reduce quality on slow connections") },
+                        leadingContent = {
+                            Icon(Icons.Default.Speed, contentDescription = null)
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = uiState.adaptiveBitrate,
+                                onCheckedChange = viewModel::setAdaptiveBitrate
+                            )
+                        }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
@@ -729,13 +744,14 @@ private fun BitrateDropdown(
     onBitrateSelected: (Int) -> Unit
 ) {
     val options = listOf(
-        0 to "Original",
+        0 to "Original (no limit)",
         320 to "320 kbps",
         256 to "256 kbps",
         192 to "192 kbps",
-        128 to "128 kbps"
+        128 to "128 kbps",
+        64 to "64 kbps (low data)"
     )
-    val currentLabel = options.find { it.first == currentBitrate }?.second ?: "Original"
+    val currentLabel = options.find { it.first == currentBitrate }?.second ?: "Original (no limit)"
     var expanded by remember { mutableStateOf(false) }
 
     ListItem(

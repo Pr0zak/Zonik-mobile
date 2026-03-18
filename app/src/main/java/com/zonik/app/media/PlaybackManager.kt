@@ -62,6 +62,12 @@ class PlaybackManager @Inject constructor(
                 cachedCellularBitrate = bitrate
             }
         }
+        scope.launch {
+            settingsRepository.adaptiveBitrate.collect { enabled ->
+                adaptiveBitrateEnabled = enabled
+                if (!enabled) resetBitrate()
+            }
+        }
     }
 
     private var _pendingStartIndex: Int = -1  // Legacy, kept for log compatibility
@@ -91,6 +97,7 @@ class PlaybackManager @Inject constructor(
     @Volatile private var bitrateOverride: Int? = null
     @Volatile private var consecutiveBuffers = 0
     @Volatile private var stableTrackCount = 0
+    @Volatile private var adaptiveBitrateEnabled = true
 
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
@@ -234,7 +241,7 @@ class PlaybackManager @Inject constructor(
                 }
                 if (playbackState == Player.STATE_BUFFERING) {
                     consecutiveBuffers++
-                    if (consecutiveBuffers >= 3) {
+                    if (consecutiveBuffers >= 3 && adaptiveBitrateEnabled) {
                         degradeBitrate()
                     }
                 }

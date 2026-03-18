@@ -123,6 +123,14 @@ class SettingsRepository @Inject constructor(
         dataStore.edit { prefs -> prefs[KEEP_SCREEN_ON] = enabled }
     }
 
+    val adaptiveBitrate: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[ADAPTIVE_BITRATE] ?: true
+    }
+
+    suspend fun setAdaptiveBitrate(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[ADAPTIVE_BITRATE] = enabled }
+    }
+
     val cacheReadAhead: Flow<Int> = dataStore.data.map { prefs ->
         prefs[CACHE_READ_AHEAD] ?: 5
     }
@@ -157,6 +165,7 @@ class SettingsRepository @Inject constructor(
         private val LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
         private val GITHUB_TOKEN = stringPreferencesKey("github_token")
         private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        private val ADAPTIVE_BITRATE = booleanPreferencesKey("adaptive_bitrate")
         private val AUDIO_CACHE_SIZE_MB = intPreferencesKey("audio_cache_size_mb")
         private val CACHE_READ_AHEAD = intPreferencesKey("cache_read_ahead")
         private val AUTO_TAB_ORDER = stringPreferencesKey("auto_tab_order")

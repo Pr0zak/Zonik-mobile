@@ -1,9 +1,12 @@
 package com.zonik.app.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -522,13 +525,14 @@ private fun TracksTab(
 
     // Build letter index for alpha scroll (only when sorted by title or artist)
     val letterIndex = remember(sortedTracks, trackSort) {
-        if (trackSort == TrackSort.TITLE || trackSort == TrackSort.ARTIST) {
+        if (trackSort != TrackSort.RECENT && trackSort != TrackSort.DURATION) {
             val map = mutableMapOf<Char, Int>()
             val headerOffset = 3 // Play All row + sort chips + track count
             sortedTracks.forEachIndexed { index, track ->
                 val letter = when (trackSort) {
                     TrackSort.TITLE -> track.title.firstOrNull()?.uppercaseChar() ?: '#'
                     TrackSort.ARTIST -> track.artist.firstOrNull()?.uppercaseChar() ?: '#'
+                    TrackSort.ALBUM -> track.album.firstOrNull()?.uppercaseChar() ?: '#'
                     else -> '#'
                 }
                 val ch = if (letter.isLetter()) letter else '#'
@@ -721,29 +725,96 @@ private fun TracksTab(
         }
     }
 
-    // Alpha scroll sidebar
+    // Alpha scroll sidebar — draggable
     if (letterIndex.isNotEmpty()) {
         val letters = letterIndex.keys.sorted()
+        var isDragging by remember { mutableStateOf(false) }
+        var activeLetter by remember { mutableStateOf<Char?>(null) }
+
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = 2.dp),
+                .padding(end = 4.dp)
+                .pointerInput(letters) {
+                    detectVerticalDragGestures(
+                        onDragStart = { offset ->
+                            isDragging = true
+                            val letterHeight = size.height.toFloat() / letters.size
+                            val index = (offset.y / letterHeight).toInt().coerceIn(0, letters.lastIndex)
+                            val letter = letters[index]
+                            activeLetter = letter
+                            letterIndex[letter]?.let { idx ->
+                                coroutineScope.launch { listState.scrollToItem(idx) }
+                            }
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            activeLetter = null
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            activeLetter = null
+                        },
+                        onVerticalDrag = { _, _ ->
+                            // handled via pointer position in onDragStart-like logic below
+                        }
+                    )
+                }
+                .pointerInput(letters) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (isDragging && event.changes.isNotEmpty()) {
+                                val y = event.changes.first().position.y
+                                val letterHeight = size.height.toFloat() / letters.size
+                                val index = (y / letterHeight).toInt().coerceIn(0, letters.lastIndex)
+                                val letter = letters[index]
+                                if (letter != activeLetter) {
+                                    activeLetter = letter
+                                    letterIndex[letter]?.let { idx ->
+                                        coroutineScope.launch { listState.scrollToItem(idx) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             letters.forEach { letter ->
                 Text(
                     text = letter.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (letter == activeLetter) androidx.compose.ui.text.font.FontWeight.Bold else null,
+                    color = if (letter == activeLetter) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .clickable {
                             letterIndex[letter]?.let { index ->
-                                coroutineScope.launch {
-                                    listState.animateScrollToItem(index)
-                                }
+                                coroutineScope.launch { listState.scrollToItem(index) }
                             }
                         }
-                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                        .padding(horizontal = 10.dp, vertical = 2.dp)
+                )
+            }
+        }
+
+        // Show active letter indicator while dragging
+        if (isDragging && activeLetter != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(64.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f),
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = activeLetter.toString(),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }

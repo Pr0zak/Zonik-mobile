@@ -41,6 +41,7 @@ data class SettingsUiState(
     val maxCacheSizeMb: Int = 500,
     val cacheReadAhead: Int = 3,
     val keepScreenOn: Boolean = false,
+    val adaptiveBitrate: Boolean = true,
     val libraryStats: LibraryStats = LibraryStats(),
     val serverVersion: String = "",
     val serverType: String? = null
@@ -170,7 +171,8 @@ class SettingsViewModel @Inject constructor(
         _cacheSizeBytes,
         settingsRepository.audioCacheSizeMb,
         settingsRepository.cacheReadAhead,
-        settingsRepository.keepScreenOn
+        settingsRepository.keepScreenOn,
+        settingsRepository.adaptiveBitrate
     ) { values ->
         val serverConfig = values[0] as com.zonik.app.model.ServerConfig?
         val isLoggedIn = values[1] as Boolean
@@ -188,6 +190,7 @@ class SettingsViewModel @Inject constructor(
         val maxCache = values[13] as Int
         val readAhead = values[14] as Int
         val screenOn = values[15] as Boolean
+        val adaptive = values[16] as Boolean
 
         SettingsUiState(
             serverUrl = serverConfig?.url ?: "",
@@ -206,7 +209,8 @@ class SettingsViewModel @Inject constructor(
             cacheSizeBytes = cacheBytes,
             maxCacheSizeMb = maxCache,
             cacheReadAhead = readAhead,
-            keepScreenOn = screenOn
+            keepScreenOn = screenOn,
+            adaptiveBitrate = adaptive
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -264,6 +268,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setKeepScreenOn(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setKeepScreenOn(enabled) }
+    }
+
+    fun setAdaptiveBitrate(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setAdaptiveBitrate(enabled) }
     }
 
     val autoTabOrder = settingsRepository.autoTabOrder
