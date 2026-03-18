@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.repository.LibraryRepository
@@ -499,35 +500,47 @@ private fun TracksTab(
 ) {
     val trackSort by viewModel.trackSort.collectAsState()
     val trackSortAsc by viewModel.trackSortAsc.collectAsState()
-    val formatFilter by viewModel.trackFormatFilter.collectAsState()
-
     if (tracks.isEmpty()) {
         EmptyState(message = "No tracks found")
         return
     }
 
-    // Get available formats for filter chips
-    val formats = remember(tracks) {
-        tracks.mapNotNull { it.suffix?.uppercase() }.distinct().sorted()
-    }
-
-    // Apply filter and sort
-    val sortedTracks = remember(tracks, trackSort, trackSortAsc, formatFilter) {
-        val filtered = if (formatFilter != null) {
-            tracks.filter { it.suffix?.uppercase() == formatFilter }
-        } else tracks
-
+    // Apply sort
+    val sortedTracks = remember(tracks, trackSort, trackSortAsc) {
         val sorted = when (trackSort) {
-            TrackSort.TITLE -> filtered.sortedBy { it.title.lowercase() }
-            TrackSort.ARTIST -> filtered.sortedBy { it.artist.lowercase() }
-            TrackSort.ALBUM -> filtered.sortedWith(compareBy({ it.album.lowercase() }, { it.track ?: 0 }))
-            TrackSort.DURATION -> filtered.sortedBy { it.duration }
-            TrackSort.RECENT -> filtered // Already in recent order from DB
+            TrackSort.TITLE -> tracks.sortedBy { it.title.lowercase() }
+            TrackSort.ARTIST -> tracks.sortedBy { it.artist.lowercase() }
+            TrackSort.ALBUM -> tracks.sortedWith(compareBy({ it.album.lowercase() }, { it.track ?: 0 }))
+            TrackSort.DURATION -> tracks.sortedBy { it.duration }
+            TrackSort.RECENT -> tracks // Already in recent order from DB
         }
         if (trackSortAsc || trackSort == TrackSort.RECENT && trackSortAsc) sorted else sorted.reversed()
     }
 
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
+    // Build letter index for alpha scroll (only when sorted by title or artist)
+    val letterIndex = remember(sortedTracks, trackSort) {
+        if (trackSort == TrackSort.TITLE || trackSort == TrackSort.ARTIST) {
+            val map = mutableMapOf<Char, Int>()
+            val headerOffset = 3 // Play All row + sort chips + track count
+            sortedTracks.forEachIndexed { index, track ->
+                val letter = when (trackSort) {
+                    TrackSort.TITLE -> track.title.firstOrNull()?.uppercaseChar() ?: '#'
+                    TrackSort.ARTIST -> track.artist.firstOrNull()?.uppercaseChar() ?: '#'
+                    else -> '#'
+                }
+                val ch = if (letter.isLetter()) letter else '#'
+                if (ch !in map) map[ch] = index + headerOffset
+            }
+            map
+        } else emptyMap()
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 4.dp)
     ) {
@@ -581,32 +594,6 @@ private fun TracksTab(
                             }
                         } else null
                     )
-                }
-            }
-        }
-
-        // Format filter chips
-        if (formats.size > 1) {
-            item {
-                FlowRow(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    FilterChip(
-                        selected = formatFilter == null,
-                        onClick = { viewModel.setTrackFormatFilter(null) },
-                        label = { Text("All", style = MaterialTheme.typography.labelSmall) }
-                    )
-                    formats.forEach { fmt ->
-                        FilterChip(
-                            selected = formatFilter == fmt,
-                            onClick = {
-                                viewModel.setTrackFormatFilter(if (formatFilter == fmt) null else fmt)
-                            },
-                            label = { Text(fmt, style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
                 }
             }
         }
@@ -733,6 +720,35 @@ private fun TracksTab(
             Spacer(modifier = Modifier.height(80.dp))
         }
     }
+
+    // Alpha scroll sidebar
+    if (letterIndex.isNotEmpty()) {
+        val letters = letterIndex.keys.sorted()
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            letters.forEach { letter ->
+                Text(
+                    text = letter.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable {
+                            letterIndex[letter]?.let { index ->
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(index)
+                                }
+                            }
+                        }
+                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                )
+            }
+        }
+    }
+    } // close Box
 }
 
 @Composable

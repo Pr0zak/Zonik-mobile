@@ -53,6 +53,44 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Library Stats section (at top)
+            SettingsSectionHeader(title = "Library Stats")
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                val stats = uiState.libraryStats
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(label = "Tracks", value = "%,d".format(stats.trackCount))
+                        StatItem(label = "Albums", value = "%,d".format(stats.albumCount))
+                        StatItem(label = "Artists", value = "%,d".format(stats.artistCount))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(label = "Genres", value = "%,d".format(stats.genreCount))
+                        StatItem(label = "Duration", value = formatLargeDuration(stats.totalDurationSeconds))
+                        StatItem(label = "Size", value = formatLargeFileSize(stats.totalSizeBytes))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = onNavigateToStats,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View Full Stats")
+                    }
+                }
+            }
+
             // Server section
             SettingsSectionHeader(title = "Server")
             Card(
@@ -124,44 +162,6 @@ fun SettingsScreen(
                             }
                         }
                     )
-                }
-            }
-
-            // Library Stats section
-            SettingsSectionHeader(title = "Library Stats")
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                val stats = uiState.libraryStats
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatItem(label = "Tracks", value = "%,d".format(stats.trackCount))
-                        StatItem(label = "Albums", value = "%,d".format(stats.albumCount))
-                        StatItem(label = "Artists", value = "%,d".format(stats.artistCount))
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatItem(label = "Genres", value = "%,d".format(stats.genreCount))
-                        StatItem(label = "Duration", value = formatLargeDuration(stats.totalDurationSeconds))
-                        StatItem(label = "Size", value = formatLargeFileSize(stats.totalSizeBytes))
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = onNavigateToStats,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("View Full Stats")
-                    }
                 }
             }
 
@@ -253,61 +253,6 @@ fun SettingsScreen(
                             }
                         }
                     )
-                }
-            }
-
-            // Last.fm section
-            SettingsSectionHeader(title = "Last.fm")
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                Column {
-                    ListItem(
-                        headlineContent = {
-                            if (uiState.lastFmConnected) {
-                                OutlinedButton(onClick = viewModel::toggleLastFm) {
-                                    Text("Disconnect Last.fm")
-                                }
-                            } else {
-                                OutlinedButton(onClick = viewModel::toggleLastFm) {
-                                    Text("Connect Last.fm")
-                                }
-                            }
-                        },
-                        leadingContent = {
-                            Icon(
-                                imageVector = if (uiState.lastFmConnected) Icons.Default.Link else Icons.Default.LinkOff,
-                                contentDescription = null
-                            )
-                        }
-                    )
-                    if (uiState.lastFmConnected) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        ListItem(
-                            headlineContent = { Text("Scrobbling") },
-                            leadingContent = {
-                                Icon(Icons.Default.MusicNote, contentDescription = null)
-                            },
-                            trailingContent = {
-                                Switch(
-                                    checked = uiState.scrobblingEnabled,
-                                    onCheckedChange = viewModel::setScrobblingEnabled
-                                )
-                            }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        ListItem(
-                            headlineContent = { Text("Pending scrobbles") },
-                            supportingContent = {
-                                Text("${uiState.pendingScrobbleCount}")
-                            },
-                            leadingContent = {
-                                Icon(Icons.Default.Pending, contentDescription = null)
-                            }
-                        )
-                    }
                 }
             }
 
