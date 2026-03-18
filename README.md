@@ -12,14 +12,15 @@
 ## Features
 
 - **Streaming playback** with smart bitrate (Wi-Fi/cellular), adaptive degradation on slow connections
+- **5-band equalizer** with 10 presets, custom band levels, and system EQ launch
 - **Android Auto** with configurable browse tabs (Mix, Recent, Library, Playlists), star/delete buttons, voice search
 - **Chromecast** support via Google Cast SDK (Styled Media Receiver)
 - **Audio caching** with configurable size and read-ahead pre-caching for offline-like playback
 - **Connection resilience** — automatic retry with exponential backoff, network reconnect recovery, larger buffers
 - **Library sync** via OpenSubsonic `search3` API with starred track sync via `getStarred2`
-- **Now Playing** with album art, Palette colors, blurred background, queue, star/delete actions, keep-screen-on
+- **Now Playing** with album art, Palette colors, queue with alpha scroll, star/delete actions, keep-screen-on
 - **Stats page** — format/bitrate/genre/decade distributions, most played albums, top artists
-- **Last.fm** scrobbling
+- **Scrobbling** via Subsonic API (server forwards to Last.fm)
 - **Self-update** from GitHub releases
 - **Debug logging** with upload to private GitHub Gists
 

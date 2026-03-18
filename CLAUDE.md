@@ -113,6 +113,7 @@ app/src/main/java/com/zonik/app/
 - **Audio caching**: `SimpleCache` (Hilt singleton) with `LeastRecentlyUsedCacheEvictor`, custom `CacheKeyFactory` uses track ID (not full URL with auth salt). Configurable size (off/250MB–10GB, default 500MB).
 - **Read-ahead pre-caching**: on track transition (AUTO/SEEK) and on queue load (`PLAY_TRACKS`), next N tracks are pre-cached via `CacheWriter` on IO thread. Configurable count (0–10, default 5).
 - **Buffering UI**: Now Playing shows spinner on play button when buffering, error banner for connection issues. Android Auto gets buffering state automatically via MediaSession.
+- **Equalizer**: 5-band EQ (60Hz/230Hz/910Hz/3.6kHz/14kHz) via `android.media.audiofx.Equalizer` bound to ExoPlayer's audio session ID. 10 presets + custom band levels. Settings persisted in DataStore, restored on service startup. System EQ launch button for OEM equalizers. EQ commands sent via `SET_EQ` SessionCommand (must be on main thread).
 - **Keep screen on**: optional setting prevents display sleep while Now Playing is visible and playing (uses `FLAG_KEEP_SCREEN_ON`)
 - Now Playing auto-shows instantly on tap via `playbackRequested` SharedFlow (emits before buffering)
 - `currentTrack` set immediately in `playTracks()` for instant UI update
@@ -126,7 +127,7 @@ app/src/main/java/com/zonik/app/
 - `markedForDeletion` flag stored in Room DB, preserved across library syncs
 - Available on: HomeScreen, LibraryScreen, AlbumDetailScreen, SearchScreen, TrackListItem component, Android Auto
 - **Star/Unstar**: calls Subsonic `star`/`unstar` API then updates local Room DB; available in Now Playing, Android Auto, AlbumDetailScreen
-- Starred status synced bidirectionally: `getStarred2` API fetched during sync merges server-side stars with local DB
+- Starred status synced from server: `getStarred2` API is authoritative — during sync, server starred list replaces local starred state
 - Now Playing reads starred status directly from Room DB (not stale in-memory Track object)
 
 ## Android Auto
@@ -182,8 +183,8 @@ app/src/main/java/com/zonik/app/
 - ExoPlayer uses `CacheDataSource` wrapping `OkHttpDataSource` with a clean client (no auth interceptor) — auth must be baked into stream URLs
 - Cache key factory must extract track ID from URL (not use full URL) because auth params include random salt
 - Play All / Shuffle must cap tracks at 500 to avoid `TransactionTooLargeException` (Binder 1MB IPC limit)
-- `starred` flag must be preserved during sync — `syncAllTracks` fetches `getStarred2` and merges server + local starred IDs before upserting
-- `search3` response may NOT include `starred` field reliably — always use `getStarred2` as authoritative source
+- `starred` sync uses `getStarred2` as authoritative source — server starred replaces local state during sync
+- `search3` response may NOT include `starred` field reliably — always use `getStarred2`
 - Now Playing starred status must read from Room DB directly, not from in-memory Track objects (which may be stale)
 - Network callback must be registered/unregistered in `onCreate`/`onDestroy` and must post to main thread (ExoPlayer threading requirement)
 - `SimpleCache.isCached()` with `Long.MAX_VALUE` always returns false — use `getCachedBytes() > 0` instead
@@ -196,7 +197,10 @@ app/src/main/java/com/zonik/app/
 - Coil ImageLoader must use the auth-aware OkHttpClient for cover art (configured in ZonikApplication)
 - Android Auto requires Developer Mode + Unknown Sources for sideloaded APKs
 - DataStore emits on any field change — don't use `collect` on `isLoggedIn` to trigger sync (causes infinite loop); use `first()` instead
-- Room DB uses `fallbackToDestructiveMigration()` — bump version number when changing entities (no manual migration needed)
+- Room DB uses `fallbackToDestructiveMigration()` — DO NOT remove entities or change DB version without testing on device (caused startup crash on Android 16)
+- `MediaController.sendCustomCommand` must be called on main thread — use `Dispatchers.Main` not `Dispatchers.IO`
+- `Equalizer` must be created in the same process as ExoPlayer (ZonikMediaService) — communicate via SessionCommand
+- SQLite `NOT IN` clause has 999 variable limit — use chunked `deleteByIds` instead of `deleteNotIn` for large lists
 - `markedForDeletion` flag must be preserved during sync — `syncAllTracks` and `getAlbumDetail` read existing marked IDs before upserting
 - Cast `MediaRouteButton` crashes without `AppCompatActivity` context — `MainActivity` extends `AppCompatActivity` (not `ComponentActivity`)
 - Cast initialization wrapped in try-catch — graceful fallback on devices without Google Play Services
