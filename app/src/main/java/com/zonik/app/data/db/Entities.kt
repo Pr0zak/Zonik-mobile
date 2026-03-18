@@ -104,3 +104,10 @@ data class TrackEntity(
         )
     }
 }
+
+@androidx.room.Entity(tableName = "pending_scrobbles")
+data class PendingScrobbleEntity(
+    @androidx.room.PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val trackId: String,
+    val timestamp: Long
+)

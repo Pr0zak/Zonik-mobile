@@ -158,3 +158,21 @@ interface TrackDao {
 }
 
 data class StatCount(val label: String, val count: Int)
+
+@Dao
+interface PendingScrobbleDao {
+    @Query("SELECT * FROM pending_scrobbles ORDER BY timestamp")
+    suspend fun getAll(): List<PendingScrobbleEntity>
+
+    @Insert
+    suspend fun insert(scrobble: PendingScrobbleEntity)
+
+    @Delete
+    suspend fun delete(scrobble: PendingScrobbleEntity)
+
+    @Query("SELECT COUNT(*) FROM pending_scrobbles")
+    fun count(): Flow<Int>
+
+    @Query("DELETE FROM pending_scrobbles")
+    suspend fun deleteAll()
+}
