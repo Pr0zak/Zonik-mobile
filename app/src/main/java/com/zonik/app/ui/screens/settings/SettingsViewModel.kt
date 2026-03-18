@@ -9,6 +9,7 @@ import com.zonik.app.data.api.UpdateChecker
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SettingsRepository
 import com.zonik.app.data.repository.SyncManager
+import com.zonik.app.media.PlaybackManager
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.cache.SimpleCache
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,7 +44,10 @@ data class SettingsUiState(
     val adaptiveBitrate: Boolean = true,
     val libraryStats: LibraryStats = LibraryStats(),
     val serverVersion: String = "",
-    val serverType: String? = null
+    val serverType: String? = null,
+    val eqEnabled: Boolean = false,
+    val eqPreset: Int = 0,
+    val eqBandLevels: String? = null
 )
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -54,7 +58,8 @@ class SettingsViewModel @Inject constructor(
     private val updateChecker: UpdateChecker,
     private val syncManager: SyncManager,
     private val logUploader: LogUploader,
-    private val simpleCache: SimpleCache
+    private val simpleCache: SimpleCache,
+    private val playbackManager: PlaybackManager
 ) : ViewModel() {
 
     val githubToken = settingsRepository.githubToken
@@ -170,7 +175,10 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.coverArtCacheSizeMb,
         settingsRepository.cacheReadAhead,
         settingsRepository.keepScreenOn,
-        settingsRepository.adaptiveBitrate
+        settingsRepository.adaptiveBitrate,
+        settingsRepository.eqEnabled,
+        settingsRepository.eqPreset,
+        settingsRepository.eqBandLevels
     ) { values ->
         val serverConfig = values[0] as com.zonik.app.model.ServerConfig?
         val isLoggedIn = values[1] as Boolean
@@ -188,6 +196,9 @@ class SettingsViewModel @Inject constructor(
         val readAhead = values[13] as Int
         val screenOn = values[14] as Boolean
         val adaptive = values[15] as Boolean
+        val eqOn = values[16] as Boolean
+        val eqPr = values[17] as Int
+        val eqBands = values[18] as String?
 
         SettingsUiState(
             serverUrl = serverConfig?.url ?: "",
@@ -206,7 +217,10 @@ class SettingsViewModel @Inject constructor(
             coverArtCacheSizeMb = coverArtCache,
             cacheReadAhead = readAhead,
             keepScreenOn = screenOn,
-            adaptiveBitrate = adaptive
+            adaptiveBitrate = adaptive,
+            eqEnabled = eqOn,
+            eqPreset = eqPr,
+            eqBandLevels = eqBands
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -286,5 +300,34 @@ class SettingsViewModel @Inject constructor(
 
     fun disconnect() {
         viewModelScope.launch { settingsRepository.clearAll() }
+    }
+
+    fun setEqEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setEqEnabled(enabled)
+            playbackManager.applyEqualizerSettings(enabled, uiState.value.eqPreset, uiState.value.eqBandLevels)
+        }
+    }
+
+    fun setEqPreset(preset: Int) {
+        viewModelScope.launch {
+            settingsRepository.setEqPreset(preset)
+            settingsRepository.setEqBandLevels(null) // Clear custom when selecting preset
+            playbackManager.applyEqualizerSettings(uiState.value.eqEnabled, preset, null)
+        }
+    }
+
+    fun setEqBandLevel(band: Int, level: Short) {
+        viewModelScope.launch {
+            val current = uiState.value.eqBandLevels?.split(",")?.mapNotNull { it.toShortOrNull() }?.toMutableList()
+                ?: MutableList(5) { 0.toShort() }
+            if (band in current.indices) {
+                current[band] = level
+            }
+            val levelsStr = current.joinToString(",")
+            settingsRepository.setEqBandLevels(levelsStr)
+            settingsRepository.setEqPreset(-1) // Custom
+            playbackManager.applyEqualizerSettings(uiState.value.eqEnabled, -1, levelsStr)
+        }
     }
 }

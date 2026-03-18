@@ -197,6 +197,10 @@ fun SettingsScreen(
                 }
             }
 
+            // Equalizer section
+            SettingsSectionHeader(title = "Equalizer")
+            EqualizerSection(viewModel = viewModel, uiState = uiState)
+
             // Sync section
             SettingsSectionHeader(title = "Sync")
             Card(
@@ -676,6 +680,114 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
                 if (index < tabOrder.size - 1) {
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiState) {
+    val context = LocalContext.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Column {
+            ListItem(
+                headlineContent = { Text("Equalizer") },
+                leadingContent = { Icon(Icons.Default.Tune, contentDescription = null) },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.eqEnabled,
+                        onCheckedChange = viewModel::setEqEnabled
+                    )
+                }
+            )
+
+            if (uiState.eqEnabled) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                // Preset dropdown
+                val presets = listOf("Normal", "Classical", "Dance", "Flat", "Folk", "Heavy Metal", "Hip Hop", "Jazz", "Pop", "Rock")
+                val presetLabel = if (uiState.eqPreset < 0) "Custom" else presets.getOrElse(uiState.eqPreset) { "Preset ${uiState.eqPreset}" }
+                var expanded by remember { mutableStateOf(false) }
+
+                ListItem(
+                    headlineContent = { Text("Preset") },
+                    supportingContent = { Text(presetLabel) },
+                    leadingContent = { Icon(Icons.Default.MusicNote, contentDescription = null) },
+                    trailingContent = {
+                        Box {
+                            TextButton(onClick = { expanded = true }) {
+                                Text(presetLabel)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                presets.forEachIndexed { index, name ->
+                                    DropdownMenuItem(
+                                        text = { Text(name) },
+                                        onClick = { viewModel.setEqPreset(index); expanded = false },
+                                        trailingIcon = if (index == uiState.eqPreset) {
+                                            { Icon(Icons.Default.Check, contentDescription = null) }
+                                        } else null
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+
+                // Custom band sliders (show when preset is Custom)
+                if (uiState.eqPreset < 0) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    val bands = listOf("60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz")
+                    val levels = uiState.eqBandLevels?.split(",")?.mapNotNull { it.toShortOrNull() }
+                        ?: List(5) { 0.toShort() }
+
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Custom EQ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        bands.forEachIndexed { index, label ->
+                            val level = levels.getOrElse(index) { 0 }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(56.dp))
+                                Slider(
+                                    value = level.toFloat(),
+                                    onValueChange = { viewModel.setEqBandLevel(index, it.toInt().toShort()) },
+                                    valueRange = -1500f..1500f,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text("${level / 100}dB", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                            }
+                        }
+                    }
+                }
+
+                // System EQ button
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ListItem(
+                    headlineContent = {
+                        OutlinedButton(onClick = {
+                            try {
+                                val intent = android.content.Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+                                intent.putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+                                intent.putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
+                                if (intent.resolveActivity(context.packageManager) != null) {
+                                    context.startActivity(intent)
+                                }
+                            } catch (_: Exception) {}
+                        }) {
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("System Equalizer")
+                        }
+                    }
+                )
             }
         }
     }

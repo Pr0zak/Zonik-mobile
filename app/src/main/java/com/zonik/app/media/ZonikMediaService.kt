@@ -57,6 +57,7 @@ class ZonikMediaService : MediaLibraryService() {
     @Inject lateinit var simpleCache: SimpleCache
 
     private var mediaLibrarySession: MediaLibrarySession? = null
+    private var equalizer: android.media.audiofx.Equalizer? = null
     private val preCacheScope = CoroutineScope(Dispatchers.IO)
     private var preCacheJob: Job? = null
     private var cacheDataSourceFactory: CacheDataSource.Factory? = null
@@ -67,6 +68,7 @@ class ZonikMediaService : MediaLibraryService() {
     private val toggleStarCommand = SessionCommand(ACTION_TOGGLE_STAR, Bundle.EMPTY)
     private val toggleDeleteCommand = SessionCommand(ACTION_TOGGLE_DELETE, Bundle.EMPTY)
     private val playTracksCommand = SessionCommand(ACTION_PLAY_TRACKS, Bundle.EMPTY)
+    private val setEqCommand = SessionCommand(ACTION_SET_EQ, Bundle.EMPTY)
 
     companion object {
         // Browse tree node IDs
@@ -87,8 +89,12 @@ class ZonikMediaService : MediaLibraryService() {
         private const val ACTION_TOGGLE_STAR = "com.zonik.app.TOGGLE_STAR"
         private const val ACTION_TOGGLE_DELETE = "com.zonik.app.TOGGLE_DELETE"
         private const val ACTION_PLAY_TRACKS = "com.zonik.app.PLAY_TRACKS"
+        private const val ACTION_SET_EQ = "com.zonik.app.SET_EQ"
         private const val EXTRA_TRACK_IDS = "track_ids"
         private const val EXTRA_START_INDEX = "start_index"
+        private const val EXTRA_EQ_ENABLED = "eq_enabled"
+        private const val EXTRA_EQ_PRESET = "eq_preset"
+        private const val EXTRA_EQ_BAND_LEVELS = "eq_band_levels"
 
         // Prefixes for dynamic node IDs
         private const val ARTIST_PREFIX = "artist:"
@@ -263,6 +269,16 @@ class ZonikMediaService : MediaLibraryService() {
         }
         com.zonik.app.data.DebugLog.d("MediaService", "Loaded ${starredTrackIds.size} starred, ${markedForDeletionIds.size} marked for deletion")
 
+        // Restore equalizer settings
+        try {
+            val eqEnabled = runBlocking { settingsRepository.eqEnabled.first() }
+            val eqPreset = runBlocking { settingsRepository.eqPreset.first() }
+            val eqBandLevels = runBlocking { settingsRepository.eqBandLevels.first() }
+            applyEqualizer(player.audioSessionId, eqEnabled, eqPreset, eqBandLevels)
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("MediaService", "EQ init failed: ${e.message}")
+        }
+
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, callback)
             .setSessionActivity(pendingIntent)
             .build()
@@ -286,6 +302,8 @@ class ZonikMediaService : MediaLibraryService() {
         }
         networkCallback = null
         preCacheJob?.cancel()
+        equalizer?.release()
+        equalizer = null
         mediaLibrarySession?.run {
             player.release()
             release()
@@ -334,6 +352,34 @@ class ZonikMediaService : MediaLibraryService() {
         val token = md5("${config.apiKey}$salt")
         val separator = if (baseUrl.contains('?')) '&' else '?'
         return "${baseUrl}${separator}u=${config.username}&t=$token&s=$salt&v=1.16.1&c=ZonikApp"
+    }
+
+    private fun applyEqualizer(audioSessionId: Int, enabled: Boolean, preset: Int, bandLevelsStr: String?) {
+        try {
+            if (equalizer == null) {
+                equalizer = android.media.audiofx.Equalizer(0, audioSessionId)
+            }
+            val eq = equalizer ?: return
+            if (!enabled) {
+                eq.enabled = false
+                return
+            }
+            if (bandLevelsStr != null) {
+                // Custom band levels
+                val levels = bandLevelsStr.split(",").mapNotNull { it.toShortOrNull() }
+                for (i in levels.indices) {
+                    if (i < eq.numberOfBands) {
+                        eq.setBandLevel(i.toShort(), levels[i])
+                    }
+                }
+            } else if (preset >= 0 && preset < eq.numberOfPresets) {
+                eq.usePreset(preset.toShort())
+            }
+            eq.enabled = true
+            com.zonik.app.data.DebugLog.d("MediaService", "EQ applied: enabled=$enabled preset=$preset custom=${bandLevelsStr != null}")
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("MediaService", "EQ failed: ${e.message}")
+        }
     }
 
     private fun gridExtras(): Bundle = Bundle().apply {
@@ -709,6 +755,7 @@ class ZonikMediaService : MediaLibraryService() {
                 .add(toggleStarCommand)
                 .add(toggleDeleteCommand)
                 .add(playTracksCommand)
+                .add(setEqCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
@@ -722,6 +769,15 @@ class ZonikMediaService : MediaLibraryService() {
             customCommand: SessionCommand,
             args: Bundle
         ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == ACTION_SET_EQ) {
+                val enabled = args.getBoolean(EXTRA_EQ_ENABLED, false)
+                val preset = args.getInt(EXTRA_EQ_PRESET, 0)
+                val bandLevels = args.getString(EXTRA_EQ_BAND_LEVELS)
+                val audioSessionId = (session.player as? ExoPlayer)?.audioSessionId ?: 0
+                applyEqualizer(audioSessionId, enabled, preset, bandLevels)
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+
             if (customCommand.customAction == ACTION_PLAY_TRACKS) {
                 val trackIds = args.getStringArrayList(EXTRA_TRACK_IDS)
                 val startIndex = args.getInt(EXTRA_START_INDEX, 0)

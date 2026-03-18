@@ -178,5 +178,22 @@ class SettingsRepository @Inject constructor(
         private val COVER_ART_CACHE_SIZE_MB = intPreferencesKey("cover_art_cache_size_mb")
         private val CACHE_READ_AHEAD = intPreferencesKey("cache_read_ahead")
         private val AUTO_TAB_ORDER = stringPreferencesKey("auto_tab_order")
+        private val EQ_ENABLED = booleanPreferencesKey("eq_enabled")
+        private val EQ_PRESET = intPreferencesKey("eq_preset")
+        private val EQ_BAND_LEVELS = stringPreferencesKey("eq_band_levels")
+    }
+
+    val eqEnabled: Flow<Boolean> = dataStore.data.map { prefs -> prefs[EQ_ENABLED] ?: false }
+    suspend fun setEqEnabled(enabled: Boolean) { dataStore.edit { it[EQ_ENABLED] = enabled } }
+
+    val eqPreset: Flow<Int> = dataStore.data.map { prefs -> prefs[EQ_PRESET] ?: 0 }
+    suspend fun setEqPreset(preset: Int) { dataStore.edit { it[EQ_PRESET] = preset } }
+
+    val eqBandLevels: Flow<String?> = dataStore.data.map { prefs -> prefs[EQ_BAND_LEVELS] }
+    suspend fun setEqBandLevels(levels: String?) {
+        dataStore.edit { prefs ->
+            if (levels != null) prefs[EQ_BAND_LEVELS] = levels
+            else prefs.remove(EQ_BAND_LEVELS)
+        }
     }
 }

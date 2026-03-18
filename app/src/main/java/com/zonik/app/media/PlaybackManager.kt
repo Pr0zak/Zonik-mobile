@@ -245,6 +245,14 @@ class PlaybackManager @Inject constructor(
                 }
             }
         })
+
+        // Restore equalizer settings
+        scope.launch {
+            val enabled = settingsRepository.eqEnabled.first()
+            val preset = settingsRepository.eqPreset.first()
+            val bandLevels = settingsRepository.eqBandLevels.first()
+            applyEqualizerSettings(enabled, preset, bandLevels)
+        }
     }
 
     fun playTracks(tracks: List<Track>, startIndex: Int = 0) {
@@ -552,6 +560,18 @@ class PlaybackManager @Inject constructor(
             DebugLog.d("Playback", "Degraded bitrate to ${newBitrate}kbps due to slow connection")
             _playbackError.value = "Slow connection — reduced to ${newBitrate}kbps"
         }
+    }
+
+    fun applyEqualizerSettings(enabled: Boolean, preset: Int, bandLevels: String?) {
+        val args = android.os.Bundle().apply {
+            putBoolean("eq_enabled", enabled)
+            putInt("eq_preset", preset)
+            if (bandLevels != null) putString("eq_band_levels", bandLevels)
+        }
+        controller?.sendCustomCommand(
+            androidx.media3.session.SessionCommand("com.zonik.app.SET_EQ", android.os.Bundle.EMPTY),
+            args
+        )
     }
 
     fun resetBitrate() {
