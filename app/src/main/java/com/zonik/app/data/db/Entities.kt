@@ -104,13 +104,3 @@ data class TrackEntity(
         )
     }
 }
-
-@Entity(tableName = "pending_scrobbles")
-data class PendingScrobbleEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val trackTitle: String,
-    val trackArtist: String,
-    val trackAlbum: String,
-    val timestamp: Long,
-    val duration: Int
-)

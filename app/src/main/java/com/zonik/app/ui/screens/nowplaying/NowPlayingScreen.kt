@@ -175,7 +175,6 @@ class NowPlayingViewModel @Inject constructor(
 @Composable
 fun NowPlayingScreen(
     onBack: () -> Unit,
-    onOpenQueue: () -> Unit = {},
     viewModel: NowPlayingViewModel = hiltViewModel()
 ) {
     val currentTrack by viewModel.currentTrack.collectAsState()
@@ -705,25 +704,6 @@ fun NowPlayingScreen(
                                     .fillMaxWidth()
                                     .clickable { viewModel.skipToIndex(index) }
                             ) {
-                                // Blurred cover art background
-                                if (queueTrack.coverArt != null) {
-                                    Box(modifier = Modifier.matchParentSize()) {
-                                        CoverArt(
-                                            coverArtId = queueTrack.coverArt,
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .blur(40.dp),
-                                            size = 64
-                                        )
-                                        // Dark overlay for readability
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(Color.Black.copy(alpha = 0.75f))
-                                        )
-                                    }
-                                }
                                 ListItem(
                                     headlineContent = {
                                         Text(

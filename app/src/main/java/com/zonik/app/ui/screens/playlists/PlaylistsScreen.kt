@@ -24,7 +24,7 @@ import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Playlist
 import com.zonik.app.model.Track
-import com.zonik.app.ui.screens.search.formatDuration
+import com.zonik.app.ui.util.formatDuration
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

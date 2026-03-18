@@ -23,17 +23,12 @@ import com.zonik.app.model.Album
 import com.zonik.app.model.Artist
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
+import com.zonik.app.ui.util.formatDuration
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-fun formatDuration(seconds: Int): String {
-    val min = seconds / 60
-    val sec = seconds % 60
-    return "%d:%02d".format(min, sec)
-}
 
 data class SearchUiState(
     val query: String = "",
@@ -129,6 +124,14 @@ class SearchViewModel @Inject constructor(
                 libraryRepository.unmarkForDeletion(track.id)
             } else {
                 libraryRepository.markForDeletion(track.id)
+            }
+            // Update UI state to reflect the change
+            _uiState.update { state ->
+                state.copy(
+                    tracks = state.tracks.map {
+                        if (it.id == track.id) it.copy(markedForDeletion = !track.markedForDeletion) else it
+                    }
+                )
             }
         }
     }

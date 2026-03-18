@@ -23,6 +23,7 @@ import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Album
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
+import com.zonik.app.ui.util.formatDuration
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -129,12 +130,6 @@ class AlbumDetailViewModel @Inject constructor(
             }
         }
     }
-}
-
-fun formatDuration(seconds: Int): String {
-    val minutes = seconds / 60
-    val secs = seconds % 60
-    return "%d:%02d".format(minutes, secs)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)

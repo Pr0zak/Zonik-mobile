@@ -233,7 +233,12 @@ class LibraryRepository @Inject constructor(
 
         val entities = allArtists.map { ArtistEntity.fromDomain(it.toDomain()) }
         database.artistDao().upsertAll(entities)
-        database.artistDao().deleteNotIn(entities.map { it.id })
+        val newIds = entities.map { it.id }.toSet()
+        val existingIds = database.artistDao().getAllIds()
+        val toDelete = existingIds.filter { it !in newIds }
+        toDelete.chunked(900).forEach { chunk ->
+            database.artistDao().deleteByIds(chunk)
+        }
         return entities.size
     }
 
@@ -256,7 +261,12 @@ class LibraryRepository @Inject constructor(
 
         val entities = allAlbums.map { AlbumEntity.fromDomain(it.toDomain()) }
         database.albumDao().upsertAll(entities)
-        database.albumDao().deleteNotIn(entities.map { it.id })
+        val newIds = entities.map { it.id }.toSet()
+        val existingIds = database.albumDao().getAllIds()
+        val toDelete = existingIds.filter { it !in newIds }
+        toDelete.chunked(900).forEach { chunk ->
+            database.albumDao().deleteByIds(chunk)
+        }
         return entities.size
     }
 
@@ -289,20 +299,22 @@ class LibraryRepository @Inject constructor(
             emptySet()
         }
 
-        // Preserve local flags (markedForDeletion, starred) from existing tracks
-        val existingMarked = database.trackDao().getMarkedForDeletionIds()
-        val existingStarredIds = database.trackDao().getStarred().map { it.id }.toSet()
-        // Merge: starred if server OR local DB says so
-        val allStarredIds = serverStarredIds + existingStarredIds
-        com.zonik.app.data.DebugLog.d("Sync", "Preserving ${allStarredIds.size} starred (${serverStarredIds.size} server + ${existingStarredIds.size} local), ${existingMarked.size} marked for deletion")
+        // Preserve markedForDeletion from existing tracks; starred is server-authoritative
+        val existingMarked = database.trackDao().getMarkedForDeletionIds().toSet()
+        com.zonik.app.data.DebugLog.d("Sync", "Server has ${serverStarredIds.size} starred, preserving ${existingMarked.size} marked for deletion")
         val entities = allTracks.map { subsonicTrack ->
             var entity = TrackEntity.fromDomain(subsonicTrack.toDomain())
             if (entity.id in existingMarked) entity = entity.copy(markedForDeletion = true)
-            if (entity.id in allStarredIds) entity = entity.copy(starred = true)
+            if (entity.id in serverStarredIds) entity = entity.copy(starred = true)
             entity
         }
         database.trackDao().upsertAll(entities)
-        database.trackDao().deleteNotIn(entities.map { it.id })
+        val newIds = entities.map { it.id }.toSet()
+        val existingIds = database.trackDao().getAllIds()
+        val toDelete = existingIds.filter { it !in newIds }
+        toDelete.chunked(900).forEach { chunk ->
+            database.trackDao().deleteByIds(chunk)
+        }
         return entities.size
     }
 
@@ -315,15 +327,5 @@ class LibraryRepository @Inject constructor(
         syncArtists()
         syncAlbums()
         syncAllTracks()
-    }
-
-    fun buildStreamUrl(baseUrl: String, trackId: String, maxBitRate: Int = 0): String {
-        return "${baseUrl.trimEnd('/')}/rest/stream.view?id=$trackId" +
-            (if (maxBitRate > 0) "&maxBitRate=$maxBitRate" else "") +
-            "&estimateContentLength=true"
-    }
-
-    fun buildCoverArtUrl(baseUrl: String, coverArtId: String, size: Int = 300): String {
-        return "${baseUrl.trimEnd('/')}/rest/getCoverArt.view?id=$coverArtId&size=$size"
     }
 }

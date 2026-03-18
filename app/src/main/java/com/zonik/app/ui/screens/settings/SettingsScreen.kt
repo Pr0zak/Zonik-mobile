@@ -32,12 +32,6 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(uiState.isLoggedIn) {
-        if (!uiState.isLoggedIn && uiState.serverUrl.isEmpty()) {
-            // Only navigate if we were previously logged in and state cleared
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -303,7 +297,21 @@ fun SettingsScreen(
                     ListItem(
                         headlineContent = {
                             OutlinedButton(onClick = viewModel::clearCache) {
-                                Text("Clear Cache")
+                                Text("Clear Audio Cache")
+                            }
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    CoverArtCacheSizeDropdown(
+                        currentSizeMb = uiState.coverArtCacheSizeMb,
+                        onSizeSelected = viewModel::setCoverArtCacheSizeMb
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    val coverArtContext = LocalContext.current
+                    ListItem(
+                        headlineContent = {
+                            OutlinedButton(onClick = { viewModel.clearCoverArtCache(coverArtContext) }) {
+                                Text("Clear Cover Art Cache")
                             }
                         }
                     )
@@ -873,6 +881,58 @@ private fun CacheSizeDropdown(
         },
         leadingContent = {
             Icon(Icons.Default.Sd, contentDescription = null)
+        },
+        trailingContent = {
+            Box {
+                TextButton(onClick = { expanded = true }) {
+                    Text(currentLabel)
+                    Icon(
+                        Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    options.forEach { (sizeMb, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                onSizeSelected(sizeMb)
+                                expanded = false
+                            },
+                            trailingIcon = if (sizeMb == currentSizeMb) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null
+                        )
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun CoverArtCacheSizeDropdown(
+    currentSizeMb: Int,
+    onSizeSelected: (Int) -> Unit
+) {
+    val options = listOf(
+        100 to "100 MB",
+        250 to "250 MB",
+        500 to "500 MB",
+        1024 to "1 GB"
+    )
+    val currentLabel = options.find { it.first == currentSizeMb }?.second ?: "${currentSizeMb} MB"
+    var expanded by remember { mutableStateOf(false) }
+
+    ListItem(
+        headlineContent = { Text("Cover art cache size") },
+        supportingContent = { Text("$currentLabel (restart app to apply)") },
+        leadingContent = {
+            Icon(Icons.Default.Image, contentDescription = null)
         },
         trailingContent = {
             Box {

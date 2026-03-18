@@ -9,8 +9,11 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.zonik.app.data.repository.SettingsRepository
 import com.zonik.app.media.CastManager
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 
@@ -25,6 +28,9 @@ class ZonikApplication : Application(), Configuration.Provider, ImageLoaderFacto
 
     @Inject
     lateinit var castManager: CastManager
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -74,6 +80,7 @@ class ZonikApplication : Application(), Configuration.Provider, ImageLoaderFacto
     }
 
     override fun newImageLoader(): ImageLoader {
+        val coverArtCacheSizeMb = runBlocking { settingsRepository.coverArtCacheSizeMb.first() }
         return ImageLoader.Builder(this)
             .okHttpClient(okHttpClient)
             .memoryCache {
@@ -84,7 +91,7 @@ class ZonikApplication : Application(), Configuration.Provider, ImageLoaderFacto
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("coil_cache"))
-                    .maxSizeBytes(250L * 1024 * 1024)
+                    .maxSizeBytes(coverArtCacheSizeMb.toLong() * 1024 * 1024)
                     .build()
             }
             .build()

@@ -70,8 +70,6 @@ class PlaybackManager @Inject constructor(
         }
     }
 
-    private var _pendingStartIndex: Int = -1  // Legacy, kept for log compatibility
-
     // Set by skipToIndex to prevent onMediaItemTransition from overriding
     // the correct track when manually seeking within the queue.
     private var _manualSeekIndex: Int = -1
@@ -178,7 +176,7 @@ class PlaybackManager @Inject constructor(
                 val index = controller?.currentMediaItemIndex ?: -1
                 val metaTitle = mediaItem?.mediaMetadata?.title?.toString()
                 val metaArtist = mediaItem?.mediaMetadata?.artist?.toString()
-                DebugLog.d("Playback", "Track transition: title='$metaTitle' artist='$metaArtist' index=$index reason=$reason pendingStart=$_pendingStartIndex manualSeek=$_manualSeekIndex")
+                DebugLog.d("Playback", "Track transition: title='$metaTitle' artist='$metaArtist' index=$index reason=$reason manualSeek=$_manualSeekIndex")
 
                 // After a manual seek, ignore the follow-up AUTO transition
                 if (_ignoreNextAutoTransition && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
@@ -366,7 +364,6 @@ class PlaybackManager @Inject constructor(
             DebugLog.d("Playback", "skipToIndex: queue index $index maps to ExoPlayer index $exoIndex")
         }
 
-        _pendingStartIndex = -1  // Clear any pending correction
         _manualSeekIndex = index  // Tell onMediaItemTransition to use our queue index
         _ignoreNextAutoTransition = false
         setCurrentTrack(track)  // Update UI immediately

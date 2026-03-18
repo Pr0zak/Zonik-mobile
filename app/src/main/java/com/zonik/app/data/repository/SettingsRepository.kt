@@ -115,6 +115,14 @@ class SettingsRepository @Inject constructor(
         dataStore.edit { prefs -> prefs[AUDIO_CACHE_SIZE_MB] = sizeMb }
     }
 
+    val coverArtCacheSizeMb: Flow<Int> = dataStore.data.map { prefs ->
+        prefs[COVER_ART_CACHE_SIZE_MB] ?: 250
+    }
+
+    suspend fun setCoverArtCacheSizeMb(sizeMb: Int) {
+        dataStore.edit { prefs -> prefs[COVER_ART_CACHE_SIZE_MB] = sizeMb }
+    }
+
     val keepScreenOn: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[KEEP_SCREEN_ON] ?: false
     }
@@ -167,6 +175,7 @@ class SettingsRepository @Inject constructor(
         private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         private val ADAPTIVE_BITRATE = booleanPreferencesKey("adaptive_bitrate")
         private val AUDIO_CACHE_SIZE_MB = intPreferencesKey("audio_cache_size_mb")
+        private val COVER_ART_CACHE_SIZE_MB = intPreferencesKey("cover_art_cache_size_mb")
         private val CACHE_READ_AHEAD = intPreferencesKey("cache_read_ahead")
         private val AUTO_TAB_ORDER = stringPreferencesKey("auto_tab_order")
     }

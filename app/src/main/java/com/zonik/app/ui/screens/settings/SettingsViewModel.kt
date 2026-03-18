@@ -1,5 +1,6 @@
 package com.zonik.app.ui.screens.settings
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.api.AppUpdate
@@ -34,11 +35,9 @@ data class SettingsUiState(
     val lastSyncTime: Long = 0L,
     val wifiBitrate: Int = 0,
     val cellularBitrate: Int = 192,
-    val lastFmConnected: Boolean = false,
-    val scrobblingEnabled: Boolean = false,
-    val pendingScrobbleCount: Int = 0,
     val cacheSizeBytes: Long = 0L,
     val maxCacheSizeMb: Int = 500,
+    val coverArtCacheSizeMb: Int = 250,
     val cacheReadAhead: Int = 3,
     val keepScreenOn: Boolean = false,
     val adaptiveBitrate: Boolean = true,
@@ -163,13 +162,12 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.lastSyncTime,
         settingsRepository.wifiBitrate,
         settingsRepository.cellularBitrate,
-        settingsRepository.lastFmSessionKey,
-        settingsRepository.scrobblingEnabled,
         libraryStats,
         _serverVersion,
         _serverType,
         _cacheSizeBytes,
         settingsRepository.audioCacheSizeMb,
+        settingsRepository.coverArtCacheSizeMb,
         settingsRepository.cacheReadAhead,
         settingsRepository.keepScreenOn,
         settingsRepository.adaptiveBitrate
@@ -181,16 +179,15 @@ class SettingsViewModel @Inject constructor(
         val lastSync = values[4] as Long
         val wifiBr = values[5] as Int
         val cellBr = values[6] as Int
-        val lastFmKey = values[7] as String?
-        val scrobbling = values[8] as Boolean
-        val stats = values[9] as LibraryStats
-        val serverVer = values[10] as String
-        val serverTp = values[11] as String?
-        val cacheBytes = values[12] as Long
-        val maxCache = values[13] as Int
-        val readAhead = values[14] as Int
-        val screenOn = values[15] as Boolean
-        val adaptive = values[16] as Boolean
+        val stats = values[7] as LibraryStats
+        val serverVer = values[8] as String
+        val serverTp = values[9] as String?
+        val cacheBytes = values[10] as Long
+        val maxCache = values[11] as Int
+        val coverArtCache = values[12] as Int
+        val readAhead = values[13] as Int
+        val screenOn = values[14] as Boolean
+        val adaptive = values[15] as Boolean
 
         SettingsUiState(
             serverUrl = serverConfig?.url ?: "",
@@ -201,13 +198,12 @@ class SettingsViewModel @Inject constructor(
             lastSyncTime = lastSync,
             wifiBitrate = wifiBr,
             cellularBitrate = cellBr,
-            lastFmConnected = lastFmKey != null,
-            scrobblingEnabled = scrobbling,
             libraryStats = stats,
             serverVersion = serverVer,
             serverType = serverTp,
             cacheSizeBytes = cacheBytes,
             maxCacheSizeMb = maxCache,
+            coverArtCacheSizeMb = coverArtCache,
             cacheReadAhead = readAhead,
             keepScreenOn = screenOn,
             adaptiveBitrate = adaptive
@@ -234,21 +230,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setCellularBitrate(bitrate) }
     }
 
-    fun toggleLastFm() {
-        viewModelScope.launch {
-            if (uiState.value.lastFmConnected) {
-                settingsRepository.setLastFmSessionKey(null)
-                settingsRepository.setScrobblingEnabled(false)
-            } else {
-                settingsRepository.setLastFmSessionKey("stub_session_key")
-            }
-        }
-    }
-
-    fun setScrobblingEnabled(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setScrobblingEnabled(enabled) }
-    }
-
     fun clearCache() {
         viewModelScope.launch(Dispatchers.IO) {
             simpleCache.keys.toList().forEach { key ->
@@ -260,6 +241,19 @@ class SettingsViewModel @Inject constructor(
 
     fun setAudioCacheSizeMb(sizeMb: Int) {
         viewModelScope.launch { settingsRepository.setAudioCacheSizeMb(sizeMb) }
+    }
+
+    fun setCoverArtCacheSizeMb(sizeMb: Int) {
+        viewModelScope.launch { settingsRepository.setCoverArtCacheSizeMb(sizeMb) }
+    }
+
+    fun clearCoverArtCache(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val cacheDir = context.cacheDir.resolve("coil_cache")
+            if (cacheDir.exists()) {
+                cacheDir.deleteRecursively()
+            }
+        }
     }
 
     fun setCacheReadAhead(count: Int) {

@@ -17,6 +17,12 @@ interface ArtistDao {
     @Query("DELETE FROM artists WHERE id NOT IN (:ids)")
     suspend fun deleteNotIn(ids: List<String>)
 
+    @Query("SELECT id FROM artists")
+    suspend fun getAllIds(): List<String>
+
+    @Query("DELETE FROM artists WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<String>)
+
     @Query("SELECT COUNT(*) FROM artists")
     fun count(): Flow<Int>
 
@@ -49,6 +55,12 @@ interface AlbumDao {
 
     @Query("DELETE FROM albums WHERE id NOT IN (:ids)")
     suspend fun deleteNotIn(ids: List<String>)
+
+    @Query("SELECT id FROM albums")
+    suspend fun getAllIds(): List<String>
+
+    @Query("DELETE FROM albums WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<String>)
 
     @Query("DELETE FROM albums")
     suspend fun deleteAll()
@@ -137,24 +149,12 @@ interface TrackDao {
 
     @Query("DELETE FROM tracks WHERE id NOT IN (:ids)")
     suspend fun deleteNotIn(ids: List<String>)
+
+    @Query("SELECT id FROM tracks")
+    suspend fun getAllIds(): List<String>
+
+    @Query("DELETE FROM tracks WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<String>)
 }
 
 data class StatCount(val label: String, val count: Int)
-
-@Dao
-interface PendingScrobbleDao {
-    @Query("SELECT * FROM pending_scrobbles ORDER BY timestamp")
-    suspend fun getAll(): List<PendingScrobbleEntity>
-
-    @Insert
-    suspend fun insert(scrobble: PendingScrobbleEntity)
-
-    @Delete
-    suspend fun delete(scrobble: PendingScrobbleEntity)
-
-    @Query("SELECT COUNT(*) FROM pending_scrobbles")
-    fun count(): Flow<Int>
-
-    @Query("DELETE FROM pending_scrobbles")
-    suspend fun deleteAll()
-}

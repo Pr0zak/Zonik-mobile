@@ -9,10 +9,9 @@ import androidx.room.RoomDatabase
     entities = [
         ArtistEntity::class,
         AlbumEntity::class,
-        TrackEntity::class,
-        PendingScrobbleEntity::class
+        TrackEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class ZonikDatabase : RoomDatabase() {
@@ -20,7 +19,6 @@ abstract class ZonikDatabase : RoomDatabase() {
     abstract fun artistDao(): ArtistDao
     abstract fun albumDao(): AlbumDao
     abstract fun trackDao(): TrackDao
-    abstract fun scrobbleDao(): PendingScrobbleDao
 
     companion object {
         fun create(context: Context): ZonikDatabase {
