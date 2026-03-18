@@ -1,6 +1,13 @@
-# Zonik Mobile
+<p align="center">
+  <img src="cast/icon.png" width="128" height="128" alt="Zonik Logo">
+</p>
 
-A native Android music player for [Zonik](https://github.com/Pr0zak/Zonik) self-hosted music servers. Streams your library over OpenSubsonic with Android Auto and Chromecast support.
+<h1 align="center">Zonik Mobile</h1>
+
+<p align="center">
+  A native Android music player for <a href="https://github.com/Pr0zak/Zonik">Zonik</a> self-hosted music servers.<br>
+  Streams your library over OpenSubsonic with Android Auto and Chromecast support.
+</p>
 
 ## Features
 
