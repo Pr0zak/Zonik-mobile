@@ -15,6 +15,7 @@
 - **5-band equalizer** with 10 presets, custom band levels, and system EQ launch
 - **Android Auto** with configurable browse tabs (Mix, Recent, Library, Playlists), star/delete buttons, voice search
 - **Chromecast** support via Google Cast SDK (Styled Media Receiver)
+- **Wear OS** companion app — remote control from your Pixel Watch (Now Playing, browse, queue, tile, complication)
 - **Audio caching** with configurable size and read-ahead pre-caching for offline-like playback
 - **Connection resilience** — automatic retry with exponential backoff, network reconnect recovery, larger buffers
 - **Library sync** via OpenSubsonic `search3` API with starred track sync via `getStarred2` and flagged-for-deletion sync via `userRating`
@@ -36,9 +37,29 @@
 
 ## Install
 
-Download the latest APK from [Releases](https://github.com/Pr0zak/Zonik-mobile/releases) and sideload it.
+### Phone
+
+Download the latest `zonik-v*-debug.apk` from [Releases](https://github.com/Pr0zak/Zonik-mobile/releases) and sideload it.
 
 For **Android Auto**: enable Developer Mode (tap version 10x in Android Auto settings), then enable "Unknown sources" in developer settings.
+
+### Wear OS (Pixel Watch)
+
+The companion app runs on your watch and acts as a remote control for the phone app — no server connection needed on the watch.
+
+1. Download `wear-debug.apk` from [Releases](https://github.com/Pr0zak/Zonik-mobile/releases)
+2. Enable **ADB debugging** on the watch: Settings > Developer options > ADB debugging
+3. Connect to the watch over Wi-Fi:
+   ```bash
+   adb connect <watch-ip>:5555
+   ```
+4. Install the APK:
+   ```bash
+   adb -s <watch-ip>:5555 install wear-debug.apk
+   ```
+5. Open **Zonik** on the watch — it connects to the phone's playback service automatically
+
+The watch app provides Now Playing controls (play/pause, skip, seek via crown, star), library browsing, queue management, a Now Playing tile, and a watch face complication.
 
 ## Build
 
@@ -48,7 +69,9 @@ export ANDROID_HOME=$HOME/tools/android-sdk
 ./gradlew assembleDebug
 ```
 
-APK output: `app/build/outputs/apk/debug/app-debug.apk`
+APK outputs:
+- Phone: `app/build/outputs/apk/debug/app-debug.apk`
+- Wear: `wear/build/outputs/apk/debug/wear-debug.apk`
 
 ## Tech Stack
 
