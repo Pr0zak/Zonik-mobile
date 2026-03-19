@@ -108,7 +108,8 @@ For Android Auto to recognize the app, the user must enable **Developer Mode** i
 ### 3.8 User Interactions
 - Star/unstar tracks, albums, artists (Subsonic `star`/`unstar`)
 - Scrobble currently playing track (Subsonic `scrobble`)
-- Rate tracks (Subsonic `setRating`)
+- Rate tracks (Subsonic `setRating`) — rating=1 is used as "flagged for deletion" (synced with Zonik server's Flagged view)
+- **Mark for Deletion** — sets `rating=1` on server via `setRating` API; server-authoritative during sync (`userRating == 1` → flagged)
 - Save/restore play queue (Subsonic `savePlayQueue`/`getPlayQueue`)
 - **Sleep timer** — presets: 15 / 30 / 45 / 60 min, custom duration, "end of current track"; gradual volume fade over last 30 seconds before stopping; timer visible in Now Playing and notification
 

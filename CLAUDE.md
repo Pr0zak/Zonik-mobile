@@ -124,7 +124,9 @@ app/src/main/java/com/zonik/app/
 ## Track Management
 - **Mark for Deletion**: tracks can be marked/unmarked via long-press context menu on any track list, Now Playing screen, and Android Auto now playing button
 - Marked tracks show red title text as visual indicator
-- `markedForDeletion` flag stored in Room DB, preserved across library syncs
+- Synced with Zonik server via Subsonic `setRating` API: marking sets `rating=1`, unmarking sets `rating=0`
+- Server is authoritative during sync: `userRating == 1` in `search3` response → `markedForDeletion = true`
+- Zonik server treats `rating=1` as "flagged for deletion" — tracks appear in server web UI's "Flagged" filter
 - Available on: HomeScreen, LibraryScreen, AlbumDetailScreen, SearchScreen, TrackListItem component, Android Auto
 - **Star/Unstar**: calls Subsonic `star`/`unstar` API then updates local Room DB; available in Now Playing, Android Auto, AlbumDetailScreen
 - Starred status synced from server: `getStarred2` API is authoritative — during sync, server starred list replaces local starred state
@@ -159,7 +161,7 @@ app/src/main/java/com/zonik/app/
 - Auth params: `u`, `t` (md5(apiKey+salt)), `s` (random salt), `v=1.16.1`, `c=ZonikApp`, `f=json`
 - Streaming: `GET /rest/stream.view?id={trackId}&estimateContentLength=true` (NO `f=json` — returns binary)
 - Cover art: `GET /rest/getCoverArt.view?id={coverId}&size={pixels}` (NO `f=json`)
-- Library sync: `search3` with empty query, 500 items per page (Symfonium approach) + `getStarred2` for starred status
+- Library sync: `search3` with empty query, 500 items per page (Symfonium approach) + `getStarred2` for starred status + `userRating` for flagged-for-deletion status
 - Zonik native API: `POST /api/download/search`, `/api/download/trigger`, `GET /api/jobs` (`Accept: application/json` header required, response wrapped in `{"items": [...]}`)
 
 ## Debugging
@@ -201,7 +203,7 @@ app/src/main/java/com/zonik/app/
 - `MediaController.sendCustomCommand` must be called on main thread — use `Dispatchers.Main` not `Dispatchers.IO`
 - `Equalizer` must be created in the same process as ExoPlayer (ZonikMediaService) — communicate via SessionCommand
 - SQLite `NOT IN` clause has 999 variable limit — use chunked `deleteByIds` instead of `deleteNotIn` for large lists
-- `markedForDeletion` flag must be preserved during sync — `syncAllTracks` and `getAlbumDetail` read existing marked IDs before upserting
+- `markedForDeletion` is server-authoritative via `userRating == 1` — synced from `search3` response, not preserved locally
 - Cast `MediaRouteButton` crashes without `AppCompatActivity` context — `MainActivity` extends `AppCompatActivity` (not `ComponentActivity`)
 - Cast initialization wrapped in try-catch — graceful fallback on devices without Google Play Services
 - Cast receiver CSS/images must use jsdelivr CDN URLs (raw GitHub returns wrong MIME types)

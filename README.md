@@ -17,7 +17,8 @@
 - **Chromecast** support via Google Cast SDK (Styled Media Receiver)
 - **Audio caching** with configurable size and read-ahead pre-caching for offline-like playback
 - **Connection resilience** — automatic retry with exponential backoff, network reconnect recovery, larger buffers
-- **Library sync** via OpenSubsonic `search3` API with starred track sync via `getStarred2`
+- **Library sync** via OpenSubsonic `search3` API with starred track sync via `getStarred2` and flagged-for-deletion sync via `userRating`
+- **Mark for deletion** synced with Zonik server (rating=1 = flagged) — tracks appear in server's "Flagged" view for review/bulk delete
 - **Now Playing** with album art, Palette colors, queue with alpha scroll, star/delete actions, keep-screen-on
 - **Stats page** — format/bitrate/genre/decade distributions, most played albums, top artists
 - **Scrobbling** via Subsonic API (server forwards to Last.fm)
