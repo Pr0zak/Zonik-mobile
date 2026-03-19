@@ -181,6 +181,32 @@ class SettingsRepository @Inject constructor(
         private val EQ_ENABLED = booleanPreferencesKey("eq_enabled")
         private val EQ_PRESET = intPreferencesKey("eq_preset")
         private val EQ_BAND_LEVELS = stringPreferencesKey("eq_band_levels")
+        private val LAST_QUEUE_TRACK_IDS = stringPreferencesKey("last_queue_track_ids")
+        private val LAST_QUEUE_INDEX = intPreferencesKey("last_queue_index")
+        private val LAST_QUEUE_POSITION_MS = longPreferencesKey("last_queue_position_ms")
+    }
+
+    // -- Playback resume state --
+
+    val lastQueueTrackIds: Flow<List<String>> = dataStore.data.map { prefs ->
+        val raw = prefs[LAST_QUEUE_TRACK_IDS]
+        if (raw.isNullOrEmpty()) emptyList() else raw.split(",")
+    }
+
+    val lastQueueIndex: Flow<Int> = dataStore.data.map { prefs ->
+        prefs[LAST_QUEUE_INDEX] ?: 0
+    }
+
+    val lastQueuePositionMs: Flow<Long> = dataStore.data.map { prefs ->
+        prefs[LAST_QUEUE_POSITION_MS] ?: 0L
+    }
+
+    suspend fun savePlaybackState(trackIds: List<String>, index: Int, positionMs: Long) {
+        dataStore.edit { prefs ->
+            prefs[LAST_QUEUE_TRACK_IDS] = trackIds.joinToString(",")
+            prefs[LAST_QUEUE_INDEX] = index
+            prefs[LAST_QUEUE_POSITION_MS] = positionMs
+        }
     }
 
     val eqEnabled: Flow<Boolean> = dataStore.data.map { prefs -> prefs[EQ_ENABLED] ?: false }

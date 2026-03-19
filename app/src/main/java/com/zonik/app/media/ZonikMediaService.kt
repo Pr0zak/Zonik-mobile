@@ -292,12 +292,14 @@ class ZonikMediaService : MediaLibraryService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = mediaLibrarySession?.player
+        savePlaybackState(player)
         if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
             stopSelf()
         }
     }
 
     override fun onDestroy() {
+        savePlaybackState(mediaLibrarySession?.player)
         // Unregister network callback
         networkCallback?.let { cb ->
             try { connectivityManager?.unregisterNetworkCallback(cb) } catch (_: Exception) {}
@@ -312,6 +314,23 @@ class ZonikMediaService : MediaLibraryService() {
         }
         mediaLibrarySession = null
         super.onDestroy()
+    }
+
+    private fun savePlaybackState(player: androidx.media3.common.Player?) {
+        if (player == null || player.mediaItemCount == 0) return
+        try {
+            val trackIds = (0 until player.mediaItemCount).map { i ->
+                player.getMediaItemAt(i).mediaId.removePrefix(TRACK_PREFIX)
+            }
+            val index = player.currentMediaItemIndex
+            val position = player.currentPosition.coerceAtLeast(0L)
+            runBlocking {
+                settingsRepository.savePlaybackState(trackIds, index, position)
+            }
+            com.zonik.app.data.DebugLog.d("MediaService", "Saved playback state: ${trackIds.size} tracks, index=$index, pos=${position}ms")
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("MediaService", "Failed to save playback state: ${e.message}")
+        }
     }
 
     // -- Helpers --
@@ -555,7 +574,7 @@ class ZonikMediaService : MediaLibraryService() {
 
         /**
          * Playback resumption: when Android Auto starts and wants to resume music.
-         * Returns a shuffle mix so the user gets instant music without interaction.
+         * Restores the last queue, track, and position. Falls back to shuffle if no saved state.
          */
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
@@ -563,6 +582,30 @@ class ZonikMediaService : MediaLibraryService() {
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             com.zonik.app.data.DebugLog.d("MediaService", "Playback resumption requested")
             return try {
+                // Try to restore saved queue
+                val savedTrackIds = runBlocking { settingsRepository.lastQueueTrackIds.first() }
+                val savedIndex = runBlocking { settingsRepository.lastQueueIndex.first() }
+                val savedPosition = runBlocking { settingsRepository.lastQueuePositionMs.first() }
+
+                if (savedTrackIds.isNotEmpty()) {
+                    // Batch lookup, then reorder to match saved queue order
+                    val tracks = runBlocking {
+                        val entities = database.trackDao().getByIds(savedTrackIds)
+                        val entityMap = entities.associateBy { it.id }
+                        savedTrackIds.mapNotNull { id -> entityMap[id]?.toDomain() }
+                    }
+                    if (tracks.isNotEmpty()) {
+                        val startIndex = savedIndex.coerceIn(0, tracks.size - 1)
+                        com.zonik.app.data.DebugLog.d("MediaService", "Resuming: ${tracks.size} tracks, index=$startIndex, position=${savedPosition}ms")
+                        val mediaItems = tracks.map { buildFullMediaItem(it) }
+                        return Futures.immediateFuture(
+                            MediaSession.MediaItemsWithStartPosition(mediaItems, startIndex, savedPosition)
+                        )
+                    }
+                }
+
+                // Fallback: shuffle mix
+                com.zonik.app.data.DebugLog.d("MediaService", "No saved queue — falling back to shuffle")
                 val tracks = runBlocking { libraryRepository.getRandomSongs(count = 100) }
                 if (tracks.isNotEmpty()) {
                     val mediaItems = tracks.map { buildFullMediaItem(it) }

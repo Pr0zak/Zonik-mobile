@@ -80,6 +80,9 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE id = :id")
     suspend fun getById(id: String): TrackEntity?
 
+    @Query("SELECT * FROM tracks WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<String>): List<TrackEntity>
+
     @Query("SELECT * FROM tracks ORDER BY rowid DESC LIMIT :limit")
     fun getRecent(limit: Int = 20): Flow<List<TrackEntity>>
 

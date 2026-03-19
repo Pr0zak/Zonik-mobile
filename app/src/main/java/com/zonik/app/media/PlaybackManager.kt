@@ -108,6 +108,8 @@ class PlaybackManager @Inject constructor(
 
     // Scrobble tracking — scrobble once when track plays >50%
     private var scrobbledTrackId: String? = null
+    // Throttle position saves to every 10 seconds
+    @Volatile private var lastPositionSaveTime = 0L
 
     suspend fun connect() {
         if (controller != null) return
@@ -440,6 +442,12 @@ class PlaybackManager @Inject constructor(
 
     private fun checkScrobble(positionMs: Long) {
         val track = _currentTrack.value ?: return
+        // Periodically save position for resume (every 10s)
+        val now = System.currentTimeMillis()
+        if (now - lastPositionSaveTime > 10_000) {
+            lastPositionSaveTime = now
+            savePositionNow()
+        }
         if (track.id == scrobbledTrackId) return
         val duration = getDuration()
         if (duration <= 0) return
@@ -457,8 +465,22 @@ class PlaybackManager @Inject constructor(
     }
 
     fun release() {
+        // Save position before disconnecting so resume picks up here
+        savePositionNow()
         controller?.release()
         controller = null
+    }
+
+    /** Save current position immediately (called on release and periodically) */
+    private fun savePositionNow() {
+        val queue = _queue.value
+        if (queue.isEmpty()) return
+        val track = _currentTrack.value ?: return
+        val index = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+        val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+        scope.launch {
+            settingsRepository.savePlaybackState(queue.map { it.id }, index, position)
+        }
     }
 
     private fun buildStreamUrl(track: Track, serverUrl: String, config: ServerConfig): String {
@@ -518,6 +540,18 @@ class PlaybackManager @Inject constructor(
         _currentTrack.value = track
         scrobbledTrackId = null
         addToRecentlyPlayed(track)
+        persistPlaybackState()
+    }
+
+    private fun persistPlaybackState() {
+        scope.launch {
+            val queue = _queue.value
+            if (queue.isEmpty()) return@launch
+            val trackIds = queue.map { it.id }
+            val index = queue.indexOfFirst { it.id == _currentTrack.value?.id }.coerceAtLeast(0)
+            val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            settingsRepository.savePlaybackState(trackIds, index, position)
+        }
     }
 
     private fun updateCurrentTrackByIndex(index: Int) {
