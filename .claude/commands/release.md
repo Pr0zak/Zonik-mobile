@@ -29,37 +29,44 @@ Perform a full release of the Zonik Android app. The argument specifies the vers
    - Update `versionCode`
    - Update `versionName`
 
-5. **Build the debug APK**:
+5. **Build both APKs** (phone + wear):
    ```bash
    export JAVA_HOME=$HOME/tools/jdk-17.0.12
    export PATH="$JAVA_HOME/bin:$PATH"
    export ANDROID_HOME=$HOME/tools/android-sdk
    ./gradlew assembleDebug
    ```
+   This builds both `app:assembleDebug` and `wear:assembleDebug`.
    If the build fails, stop and report the error. Do NOT continue.
 
-6. **Copy APK to release directory**:
+6. **Copy APKs to release directory**:
    ```bash
    mkdir -p release
    cp app/build/outputs/apk/debug/app-debug.apk release/zonik-v{NEW_VERSION}-debug.apk
+   cp wear/build/outputs/apk/debug/wear-debug.apk release/zonik-wear-v{NEW_VERSION}-debug.apk
    ```
 
 7. **Git commit and push**:
-   - Stage: `app/build.gradle.kts` and `release/zonik-v{NEW_VERSION}-debug.apk`
-   - Remove old APK from release/ if version changed
+   - Stage: `app/build.gradle.kts`, `release/zonik-v{NEW_VERSION}-debug.apk`, and `release/zonik-wear-v{NEW_VERSION}-debug.apk`
+   - Remove old APKs from release/ if version changed
    - Commit message: `Release v{NEW_VERSION}`
    - Push to origin
 
 8. **Create or update GitHub release**:
    - First try to create a new release:
      ```bash
-     gh release create v{NEW_VERSION} release/zonik-v{NEW_VERSION}-debug.apk \
+     gh release create v{NEW_VERSION} \
+       release/zonik-v{NEW_VERSION}-debug.apk \
+       release/zonik-wear-v{NEW_VERSION}-debug.apk \
        --title "v{NEW_VERSION}" \
        --generate-notes
      ```
-   - If the release tag already exists, update the existing release APK instead:
+   - If the release tag already exists, update the existing release APKs instead:
      ```bash
-     gh release upload v{NEW_VERSION} release/zonik-v{NEW_VERSION}-debug.apk --clobber
+     gh release upload v{NEW_VERSION} \
+       release/zonik-v{NEW_VERSION}-debug.apk \
+       release/zonik-wear-v{NEW_VERSION}-debug.apk \
+       --clobber
      ```
 
 9. **Report**: Print the release URL and new version number.

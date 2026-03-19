@@ -24,9 +24,11 @@ Build the Zonik Android APK.
    ```
 
 3. **Report result**:
-   - If successful: print APK path and file size
+   - If successful: print APK paths and file sizes
    - If failed: print the error output
 
-The APK will be at:
-- Debug: `app/build/outputs/apk/debug/app-debug.apk`
-- Release: `app/build/outputs/apk/release/app-release.apk`
+APK outputs:
+- Phone debug: `app/build/outputs/apk/debug/app-debug.apk`
+- Phone release: `app/build/outputs/apk/release/app-release.apk`
+- Wear debug: `wear/build/outputs/apk/debug/wear-debug.apk`
+- Wear release: `wear/build/outputs/apk/release/wear-release.apk`
