@@ -24,6 +24,10 @@ mediarouter = "1.7.0"
 core-ktx = "1.15.0"
 core-splashscreen = "1.0.1"
 appcompat = "1.7.0"
+wear-compose = "1.4.0"
+horologist = "0.6.20"
+wear-tiles = "1.4.1"
+wear-watchface-complications = "1.2.1"
 
 [libraries]
 # AndroidX Core
@@ -103,6 +107,20 @@ androidx-browser = { group = "androidx.browser", name = "browser", version.ref =
 
 # Security
 security-crypto = { group = "androidx.security", name = "security-crypto", version = "1.1.0-alpha06" }
+
+# Wear OS
+wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wear-compose" }
+wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wear-compose" }
+wear-compose-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wear-compose" }
+horologist-compose-layout = { group = "com.google.android.horologist", name = "horologist-compose-layout", version.ref = "horologist" }
+horologist-compose-material = { group = "com.google.android.horologist", name = "horologist-compose-material", version.ref = "horologist" }
+horologist-media-ui = { group = "com.google.android.horologist", name = "horologist-media-ui", version.ref = "horologist" }
+horologist-media-data = { group = "com.google.android.horologist", name = "horologist-media-data", version.ref = "horologist" }
+horologist-tiles = { group = "com.google.android.horologist", name = "horologist-tiles", version.ref = "horologist" }
+wear-tiles = { group = "androidx.wear.tiles", name = "tiles", version.ref = "wear-tiles" }
+wear-tiles-material = { group = "androidx.wear.tiles", name = "tiles-material", version.ref = "wear-tiles" }
+wear-watchface-complications = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "wear-watchface-complications" }
+wear-input = { group = "androidx.wear", name = "wear-input", version = "1.2.0-alpha02" }
 
 # Testing
 junit = { group = "junit", name = "junit", version = "4.13.2" }

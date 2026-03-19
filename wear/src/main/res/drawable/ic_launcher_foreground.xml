@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Z letterform with padding for adaptive icon safe zone -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#AFA9EC"
+        android:strokeWidth="8.1"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter"
+        android:pathData="M37.8,37.8 L70.2,37.8 L37.8,70.2 L70.2,70.2"/>
+</vector>
