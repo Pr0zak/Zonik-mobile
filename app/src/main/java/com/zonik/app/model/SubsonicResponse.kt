@@ -186,7 +186,8 @@ data class SubsonicTrack(
     val suffix: String? = null,
     val contentType: String? = null,
     val path: String? = null,
-    val starred: String? = null
+    val starred: String? = null,
+    val userRating: Int? = null
 ) {
     fun toDomain() = Track(
         id = id,
@@ -205,7 +206,8 @@ data class SubsonicTrack(
         suffix = suffix,
         contentType = contentType,
         path = path,
-        starred = starred != null
+        starred = starred != null,
+        markedForDeletion = userRating == 1
     )
 }
 

@@ -1020,7 +1020,11 @@ class ZonikMediaService : MediaLibraryService() {
                 val isMarked = trackId in markedForDeletionIds
                 try {
                     runBlocking {
-                        database.trackDao().setMarkedForDeletion(trackId, !isMarked)
+                        if (isMarked) {
+                            libraryRepository.unmarkForDeletion(trackId)
+                        } else {
+                            libraryRepository.markForDeletion(trackId)
+                        }
                     }
                     if (isMarked) markedForDeletionIds.remove(trackId) else markedForDeletionIds.add(trackId)
                     com.zonik.app.data.DebugLog.d("MediaService", "Delete mark toggled for $trackId: ${!isMarked}")

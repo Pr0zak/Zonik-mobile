@@ -84,12 +84,8 @@ class LibraryRepository @Inject constructor(
             duration = albumDetail.duration,
             genre = albumDetail.genre
         )
-        // Preserve markedForDeletion flags when caching
-        val existingMarked = database.trackDao().getMarkedForDeletionIds().toSet()
-        val tracks = albumDetail.song.map { song ->
-            val track = song.toDomain()
-            if (track.id in existingMarked) track.copy(markedForDeletion = true) else track
-        }
+        // markedForDeletion is derived from userRating == 1 in toDomain()
+        val tracks = albumDetail.song.map { song -> song.toDomain() }
 
         database.trackDao().upsertAll(tracks.map { TrackEntity.fromDomain(it) })
 
@@ -141,10 +137,20 @@ class LibraryRepository @Inject constructor(
 
     suspend fun markForDeletion(id: String) {
         database.trackDao().setMarkedForDeletion(id, true)
+        try {
+            api.setRating(id, 1)
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("Library", "Failed to set rating=1 for $id: ${e.message}")
+        }
     }
 
     suspend fun unmarkForDeletion(id: String) {
         database.trackDao().setMarkedForDeletion(id, false)
+        try {
+            api.setRating(id, 0)
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("Library", "Failed to clear rating for $id: ${e.message}")
+        }
     }
 
     fun getTracksMarkedForDeletion(): Flow<List<Track>> =
@@ -299,12 +305,11 @@ class LibraryRepository @Inject constructor(
             emptySet()
         }
 
-        // Preserve markedForDeletion from existing tracks; starred is server-authoritative
-        val existingMarked = database.trackDao().getMarkedForDeletionIds().toSet()
-        com.zonik.app.data.DebugLog.d("Sync", "Server has ${serverStarredIds.size} starred, preserving ${existingMarked.size} marked for deletion")
+        // markedForDeletion is now server-authoritative (userRating == 1); starred via getStarred2
+        val serverMarkedCount = allTracks.count { it.userRating == 1 }
+        com.zonik.app.data.DebugLog.d("Sync", "Server has ${serverStarredIds.size} starred, ${serverMarkedCount} flagged for deletion")
         val entities = allTracks.map { subsonicTrack ->
             var entity = TrackEntity.fromDomain(subsonicTrack.toDomain())
-            if (entity.id in existingMarked) entity = entity.copy(markedForDeletion = true)
             if (entity.id in serverStarredIds) entity = entity.copy(starred = true)
             entity
         }

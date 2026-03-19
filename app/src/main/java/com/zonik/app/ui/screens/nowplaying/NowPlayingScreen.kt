@@ -155,7 +155,11 @@ class NowPlayingViewModel @Inject constructor(
         val track = currentTrack.value ?: return
         viewModelScope.launch {
             val newValue = !_isMarkedForDeletion.value
-            database.trackDao().setMarkedForDeletion(track.id, newValue)
+            if (newValue) {
+                libraryRepository.markForDeletion(track.id)
+            } else {
+                libraryRepository.unmarkForDeletion(track.id)
+            }
             _isMarkedForDeletion.value = newValue
         }
     }
