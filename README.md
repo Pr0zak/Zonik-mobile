@@ -48,12 +48,14 @@ For **Android Auto**: enable Developer Mode (tap version 10x in Android Auto set
 The companion app runs on your watch and acts as a remote control for the phone app — no server connection needed on the watch.
 
 1. Download `wear-debug.apk` from [Releases](https://github.com/Pr0zak/Zonik-mobile/releases)
-2. Enable **ADB debugging** on the watch: Settings > Developer options > ADB debugging
-3. Connect to the watch over Wi-Fi:
+2. Enable **Developer options** on the watch: Settings > System > About > tap **Build number** 7 times
+3. Enable **ADB debugging**: Settings > Developer options > ADB debugging
+4. Find the watch IP: Settings > Connectivity > Wi-Fi > connected network > tap to see IP
+5. Connect to the watch over Wi-Fi:
    ```bash
    adb connect <watch-ip>:5555
    ```
-4. Install the APK:
+6. Install the APK:
    ```bash
    adb -s <watch-ip>:5555 install wear-debug.apk
    ```
