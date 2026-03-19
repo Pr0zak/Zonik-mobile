@@ -186,7 +186,11 @@ class LibraryRepository @Inject constructor(
     }
 
     suspend fun star(id: String) {
-        api.star(id = id)
+        try {
+            api.star(id = id)
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("Library", "Star API failed for $id: ${e.message}")
+        }
         val track = database.trackDao().getById(id)
         if (track != null) {
             database.trackDao().upsertAll(listOf(track.copy(starred = true)))
@@ -200,7 +204,11 @@ class LibraryRepository @Inject constructor(
     }
 
     suspend fun unstar(id: String) {
-        api.unstar(id = id)
+        try {
+            api.unstar(id = id)
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("Library", "Unstar API failed for $id: ${e.message}")
+        }
         database.trackDao().getById(id)?.let {
             database.trackDao().upsertAll(listOf(it.copy(starred = false)))
         }

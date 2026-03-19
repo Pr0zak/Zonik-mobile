@@ -140,27 +140,27 @@ class NowPlayingViewModel @Inject constructor(
 
     fun toggleStar() {
         val track = currentTrack.value ?: return
+        val newValue = !_isStarred.value
+        _isStarred.value = newValue
         viewModelScope.launch {
-            if (_isStarred.value) {
-                libraryRepository.unstar(track.id)
-                _isStarred.value = false
-            } else {
+            if (newValue) {
                 libraryRepository.star(track.id)
-                _isStarred.value = true
+            } else {
+                libraryRepository.unstar(track.id)
             }
         }
     }
 
     fun toggleMarkForDeletion() {
         val track = currentTrack.value ?: return
+        val newValue = !_isMarkedForDeletion.value
+        _isMarkedForDeletion.value = newValue
         viewModelScope.launch {
-            val newValue = !_isMarkedForDeletion.value
             if (newValue) {
                 libraryRepository.markForDeletion(track.id)
             } else {
                 libraryRepository.unmarkForDeletion(track.id)
             }
-            _isMarkedForDeletion.value = newValue
         }
     }
 

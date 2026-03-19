@@ -572,10 +572,13 @@ class PlaybackManager @Inject constructor(
             putInt("eq_preset", preset)
             if (bandLevels != null) putString("eq_band_levels", bandLevels)
         }
-        controller?.sendCustomCommand(
-            androidx.media3.session.SessionCommand("com.zonik.app.SET_EQ", android.os.Bundle.EMPTY),
-            args
-        )
+        // sendCustomCommand must be called on main thread
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            controller?.sendCustomCommand(
+                androidx.media3.session.SessionCommand("com.zonik.app.SET_EQ", android.os.Bundle.EMPTY),
+                args
+            )
+        }
     }
 
     fun resetBitrate() {
