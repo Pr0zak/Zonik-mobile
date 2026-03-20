@@ -10,9 +10,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.Color
+import com.zonik.app.ui.theme.ZonikColors
+import com.zonik.app.ui.theme.ZonikShapes
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,8 +41,17 @@ fun TrackListItem(
     val isCurrentlyPlaying = track.id == currentlyPlayingId
     var showMenu by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
+    val primaryColor = MaterialTheme.colorScheme.primary
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier.then(
+        if (isCurrentlyPlaying) Modifier.drawBehind {
+            drawRect(
+                color = primaryColor,
+                topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
+                size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)
+            )
+        } else Modifier
+    )) {
         ListItem(
             headlineContent = {
                 Text(
@@ -68,14 +80,14 @@ fun TrackListItem(
             },
             leadingContent = {
                 val artModifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .then(
                         if (isCurrentlyPlaying) {
                             Modifier.border(
                                 width = 2.dp,
                                 color = MaterialTheme.colorScheme.primary,
-                                shape = RoundedCornerShape(4.dp)
+                                shape = RoundedCornerShape(10.dp)
                             )
                         } else {
                             Modifier
@@ -327,19 +339,19 @@ private fun DetailRow(label: String, value: String) {
 @Composable
 private fun FormatBadge(suffix: String) {
     val backgroundColor = when (suffix.lowercase()) {
-        "flac", "alac" -> Color(0xFF2E7D32).copy(alpha = 0.15f)
-        "mp3", "aac", "ogg", "opus" -> Color(0xFF1565C0).copy(alpha = 0.15f)
+        "flac", "alac" -> ZonikColors.gold.copy(alpha = 0.15f)
+        "mp3", "aac", "ogg", "opus" -> Color(0xFF9E9E9E).copy(alpha = 0.12f)
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
     val textColor = when (suffix.lowercase()) {
-        "flac", "alac" -> Color(0xFF2E7D32)
-        "mp3", "aac", "ogg", "opus" -> Color(0xFF1565C0)
+        "flac", "alac" -> ZonikColors.gold
+        "mp3", "aac", "ogg", "opus" -> Color(0xFF9E9E9E)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Surface(
         color = backgroundColor,
-        shape = RoundedCornerShape(4.dp)
+        shape = ZonikShapes.badgeShape
     ) {
         Text(
             text = suffix.uppercase(),

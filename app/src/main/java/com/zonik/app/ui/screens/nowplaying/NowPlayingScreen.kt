@@ -548,6 +548,17 @@ fun NowPlayingScreen(
                         )
                     }
                 },
+                track = { sliderState ->
+                    SliderDefaults.Track(
+                        sliderState = sliderState,
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = animatedAccent,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.12f)
+                        ),
+                        thumbTrackGapSize = 0.dp,
+                        drawStopIndicator = null
+                    )
+                },
                 colors = SliderDefaults.colors(
                     activeTrackColor = animatedAccent,
                     inactiveTrackColor = Color.White.copy(alpha = 0.12f)

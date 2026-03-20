@@ -99,7 +99,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF252331))
             ) {
                 Column {
                     ListItem(
@@ -283,7 +283,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF252331))
             ) {
                 Column {
                     ListItem(
@@ -541,7 +541,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF252331))
     ) {
         Column {
             ListItem(
@@ -808,7 +808,7 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF252331))
     ) {
         Column {
             ListItem(

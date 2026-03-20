@@ -5,12 +5,15 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,6 +49,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import com.zonik.app.ui.theme.ZonikColors
+import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.ui.theme.ZonikTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -237,48 +242,19 @@ fun MainScreen(
     val navBackStackEntry by tabNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    Scaffold(
-        bottomBar = {
-            Column {
-                MiniPlayer(onClick = onExpandNowPlaying)
-                NavigationBar {
-                    tabs.forEach { tabItem ->
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    imageVector = tabItem.icon,
-                                    contentDescription = tabItem.label
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = tabItem.label,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            selected = currentDestination?.hierarchy?.any {
-                                it.route == tabItem.tab.route
-                            } == true,
-                            onClick = {
-                                tabNavController.navigate(tabItem.tab.route) {
-                                    popUpTo(tabNavController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
+    // Measure nav bar + mini player height for bottom padding
+    val navBarHeight = 80.dp
+    val miniPlayerHeight = 72.dp
+    val miniPlayerBottomPadding = 8.dp
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Content area with bottom padding for floating elements
         NavHost(
             navController = tabNavController,
             startDestination = MainTab.Home.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = navBarHeight + miniPlayerHeight + miniPlayerBottomPadding)
         ) {
             composable(MainTab.Home.route) {
                 HomeScreen(
@@ -330,6 +306,69 @@ fun MainScreen(
                         rootNavController.navigate(Screen.Stats.route)
                     }
                 )
+            }
+        }
+
+        // Floating MiniPlayer + Glass Nav Bar at bottom
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            // Floating MiniPlayer
+            MiniPlayer(
+                onClick = onExpandNowPlaying,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = miniPlayerBottomPadding)
+            )
+
+            // Glass Navigation Bar
+            Surface(
+                color = ZonikColors.navBarBg,
+                shape = ZonikShapes.navBarShape,
+                tonalElevation = 0.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                NavigationBar(
+                    containerColor = Color.Transparent,
+                    tonalElevation = 0.dp
+                ) {
+                    tabs.forEach { tabItem ->
+                        val selected = currentDestination?.hierarchy?.any {
+                            it.route == tabItem.tab.route
+                        } == true
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    imageVector = tabItem.icon,
+                                    contentDescription = tabItem.label
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = tabItem.label,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            selected = selected,
+                            onClick = {
+                                tabNavController.navigate(tabItem.tab.route) {
+                                    popUpTo(tabNavController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = Color.White.copy(alpha = 0.4f),
+                                unselectedTextColor = Color.White.copy(alpha = 0.4f),
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            )
+                        )
+                    }
+                }
             }
         }
     }
