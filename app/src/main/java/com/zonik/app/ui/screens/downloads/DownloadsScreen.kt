@@ -184,18 +184,26 @@ class DownloadsViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                DebugLog.d(TAG, "Bulk downloading ${selected.size} tracks")
-                val tracks = selected.map { result ->
-                    BulkDownloadTrack(
-                        artist = state.searchArtist.trim(),
-                        track = result.displayName,
-                        username = result.username,
-                        filename = result.filename
-                    )
+                val artist = state.searchArtist.trim()
+                DebugLog.d(TAG, "Downloading ${selected.size} selected tracks")
+                var succeeded = 0
+                for (result in selected) {
+                    try {
+                        val response = zonikApi.triggerDownload(
+                            DownloadTriggerRequest(
+                                artist = artist,
+                                track = result.displayName,
+                                username = result.username,
+                                filename = result.filename
+                            )
+                        )
+                        DebugLog.d(TAG, "Trigger ${result.displayName}: jobId=${response.jobId}")
+                        succeeded++
+                    } catch (e: Exception) {
+                        DebugLog.e(TAG, "Trigger failed for ${result.displayName}", e)
+                    }
                 }
-                val response = zonikApi.bulkDownload(BulkDownloadRequest(tracks = tracks))
-                DebugLog.d(TAG, "Bulk trigger response: jobId=${response.jobId} message=${response.message}")
-                _uiState.update { it.copy(selectedResults = emptySet(), successMessage = "Downloading ${selected.size} tracks") }
+                _uiState.update { it.copy(selectedResults = emptySet(), successMessage = "Started $succeeded of ${selected.size} downloads") }
                 refreshStatus()
             } catch (e: Exception) {
                 DebugLog.e(TAG, "Bulk download failed", e)
