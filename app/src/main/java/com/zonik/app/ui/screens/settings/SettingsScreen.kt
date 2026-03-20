@@ -103,6 +103,7 @@ fun SettingsScreen(
             ) {
                 Column {
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Server URL") },
                         supportingContent = {
                             Text(
@@ -124,6 +125,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Username") },
                         supportingContent = {
                             Text(
@@ -137,6 +139,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Server version") },
                         supportingContent = {
                             Text(
@@ -153,6 +156,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = {
                             TextButton(
                                 onClick = {
@@ -202,6 +206,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Keep screen on") },
                         supportingContent = { Text("Prevent sleep while Now Playing is visible") },
                         leadingContent = {
@@ -237,6 +242,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Wi-Fi only") },
                         supportingContent = { Text("Only sync over Wi-Fi") },
                         leadingContent = {
@@ -251,6 +257,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Last synced") },
                         supportingContent = {
                             Text(
@@ -267,6 +274,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = {
                             OutlinedButton(onClick = viewModel::syncNow) {
                                 Text("Sync Now")
@@ -287,6 +295,7 @@ fun SettingsScreen(
             ) {
                 Column {
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Audio cache") },
                         overlineContent = { Text("Caches tracks for offline playback and slow connections") },
                         supportingContent = {
@@ -331,6 +340,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Adaptive bitrate") },
                         supportingContent = { Text("Auto-reduce quality on slow connections") },
                         leadingContent = {
@@ -345,6 +355,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = {
                             OutlinedButton(onClick = viewModel::clearCache) {
                                 Text("Clear Audio Cache")
@@ -359,6 +370,7 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     val coverArtContext = LocalContext.current
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = {
                             OutlinedButton(onClick = { viewModel.clearCoverArtCache(coverArtContext) }) {
                                 Text("Clear Cover Art Cache")
@@ -392,6 +404,7 @@ fun SettingsScreen(
                     } catch (_: Exception) { "unknown" }
                 }
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = { Text("App version") },
                     supportingContent = { Text("Zonik v$versionName") },
                     leadingContent = {
@@ -452,6 +465,7 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
             val update = availableUpdate
             if (update != null) {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = { Text("Update available: v${update.version}") },
                     supportingContent = {
                         if (update.releaseNotes.isNotBlank()) {
@@ -481,6 +495,7 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
                     )
                 } else {
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = {
                             Button(onClick = viewModel::downloadUpdate) {
                                 Icon(
@@ -496,6 +511,7 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
                 }
             } else {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = {
                         if (isChecking) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -545,6 +561,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
     ) {
         Column {
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text("Debug Logs") },
                 supportingContent = { Text("Upload or copy logs for troubleshooting") },
                 leadingContent = {
@@ -563,6 +580,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
 
             // Upload to Zonik server (no extra config needed)
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = {
                     Button(
                         onClick = viewModel::uploadLogsToServer,
@@ -587,6 +605,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 val isSuccess = serverUploadResult!!.startsWith("Uploaded")
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = { Text(if (isSuccess) "Logs uploaded" else "Upload failed") },
                     supportingContent = { Text(serverUploadResult!!) },
                     leadingContent = {
@@ -603,6 +622,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
 
             if (githubToken == null) {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = {
                         OutlinedButton(onClick = { showTokenDialog = true }) {
                             Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -616,6 +636,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
                 )
             } else {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -647,6 +668,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
                 if (uploadUrl != null) {
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Logs uploaded") },
                         supportingContent = {
                             Text(
@@ -676,6 +698,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(onClick = {
@@ -757,6 +780,7 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
     ) {
         Column {
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text("Tab order") },
                 supportingContent = { Text("Reorder tabs shown in Android Auto") },
                 leadingContent = {
@@ -766,6 +790,7 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             tabOrder.forEachIndexed { index, tabId ->
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = { Text(tabLabels[tabId] ?: tabId) },
                     leadingContent = {
                         Text(
@@ -812,6 +837,7 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
     ) {
         Column {
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text("Equalizer") },
                 leadingContent = { Icon(Icons.Default.Tune, contentDescription = null) },
                 trailingContent = {
@@ -831,6 +857,7 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
                 var expanded by remember { mutableStateOf(false) }
 
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = { Text("Preset") },
                     supportingContent = { Text(presetLabel) },
                     leadingContent = { Icon(Icons.Default.MusicNote, contentDescription = null) },
@@ -887,6 +914,7 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
                 // System EQ button
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = {
                         OutlinedButton(onClick = {
                             try {
@@ -938,6 +966,7 @@ private fun SyncIntervalDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text("Sync interval") },
         supportingContent = { Text(currentLabel) },
         leadingContent = {
@@ -1003,6 +1032,7 @@ private fun BitrateDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(label) },
         supportingContent = { Text(currentLabel) },
         leadingContent = {
@@ -1069,6 +1099,7 @@ private fun ReadAheadDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text("Read-ahead") },
         supportingContent = { Text("Pre-cache upcoming tracks") },
         leadingContent = {
@@ -1124,6 +1155,7 @@ private fun CacheSizeDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text("Max cache size") },
         supportingContent = {
             Text(
@@ -1181,6 +1213,7 @@ private fun CoverArtCacheSizeDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text("Cover art cache size") },
         supportingContent = { Text("$currentLabel (restart app to apply)") },
         leadingContent = {
