@@ -477,9 +477,21 @@ class PlaybackManager @Inject constructor(
         if (queue.isEmpty()) return
         val track = _currentTrack.value ?: return
         val index = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-        val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
-        scope.launch {
-            settingsRepository.savePlaybackState(queue.map { it.id }, index, position)
+        // controller.currentPosition must be on main thread — if we're already there, read directly
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            scope.launch {
+                settingsRepository.savePlaybackState(queue.map { it.id }, index, position)
+            }
+        } else {
+            // Post to main to read position, then save
+            val trackIds = queue.map { it.id }
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+                scope.launch {
+                    settingsRepository.savePlaybackState(trackIds, index, position)
+                }
+            }
         }
     }
 
@@ -544,12 +556,15 @@ class PlaybackManager @Inject constructor(
     }
 
     private fun persistPlaybackState() {
+        // Read queue/track from StateFlows (thread-safe) and position on main thread
+        val queue = _queue.value
+        if (queue.isEmpty()) return
+        val trackIds = queue.map { it.id }
+        val index = queue.indexOfFirst { it.id == _currentTrack.value?.id }.coerceAtLeast(0)
+        // controller.currentPosition must be called on main thread — read it here
+        // (setCurrentTrack is called from Player.Listener which runs on main)
+        val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
         scope.launch {
-            val queue = _queue.value
-            if (queue.isEmpty()) return@launch
-            val trackIds = queue.map { it.id }
-            val index = queue.indexOfFirst { it.id == _currentTrack.value?.id }.coerceAtLeast(0)
-            val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
             settingsRepository.savePlaybackState(trackIds, index, position)
         }
     }
