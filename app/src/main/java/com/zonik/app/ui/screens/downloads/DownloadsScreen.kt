@@ -14,12 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.DebugLog
 import com.zonik.app.data.api.*
+import com.zonik.app.data.db.ZonikDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +40,7 @@ data class DownloadsUiState(
     val searchArtist: String = "",
     val searchResults: List<DownloadResult> = emptyList(),
     val isSearching: Boolean = false,
+    val searchStartTime: Long = 0L,
     val activeTransfers: List<TransferInfo> = emptyList(),
     val activeJobs: List<JobInfo> = emptyList(),
     val jobHistory: List<JobInfo> = emptyList(),
@@ -46,7 +49,8 @@ data class DownloadsUiState(
     val selectedResults: Set<Int> = emptySet(),
     val expandedJobId: String? = null,
     val jobDetail: JobDetailResponse? = null,
-    val isLoadingDetail: Boolean = false
+    val isLoadingDetail: Boolean = false,
+    val libraryTitleArtistPairs: Set<String> = emptySet()
 )
 
 // endregion
@@ -55,7 +59,8 @@ data class DownloadsUiState(
 
 @HiltViewModel
 class DownloadsViewModel @Inject constructor(
-    private val zonikApi: ZonikApi
+    private val zonikApi: ZonikApi,
+    private val database: ZonikDatabase
 ) : ViewModel() {
 
     companion object {
@@ -69,6 +74,16 @@ class DownloadsViewModel @Inject constructor(
         refreshStatus()
         loadHistory()
         startAutoRefresh()
+        loadLibraryPairs()
+    }
+
+    private fun loadLibraryPairs() {
+        viewModelScope.launch {
+            try {
+                val pairs = database.trackDao().getAllTitleArtistPairs()
+                _uiState.update { it.copy(libraryTitleArtistPairs = pairs.toSet()) }
+            } catch (_: Exception) {}
+        }
     }
 
     private fun startAutoRefresh() {
@@ -103,7 +118,7 @@ class DownloadsViewModel @Inject constructor(
         val state = _uiState.value
         if (state.searchQuery.isBlank() && state.searchArtist.isBlank()) return
 
-        _uiState.update { it.copy(isSearching = true, error = null, selectedResults = emptySet()) }
+        _uiState.update { it.copy(isSearching = true, searchStartTime = System.currentTimeMillis(), error = null, selectedResults = emptySet()) }
 
         viewModelScope.launch {
             try {
@@ -355,9 +370,11 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     onSearch = viewModel::search,
                     results = uiState.searchResults,
                     isSearching = uiState.isSearching,
+                    searchStartTime = uiState.searchStartTime,
                     selectedIndices = uiState.selectedResults,
                     onToggleSelection = viewModel::toggleSelection,
-                    onDownloadSingle = { result -> viewModel.triggerDownload(result) }
+                    onDownloadSingle = { result -> viewModel.triggerDownload(result) },
+                    libraryPairs = uiState.libraryTitleArtistPairs
                 )
 
                 DownloadsTab.ACTIVE -> ActiveTab(
@@ -392,9 +409,11 @@ private fun SearchTab(
     onSearch: () -> Unit,
     results: List<DownloadResult>,
     isSearching: Boolean,
+    searchStartTime: Long,
     selectedIndices: Set<Int>,
     onToggleSelection: (Int) -> Unit,
-    onDownloadSingle: (DownloadResult) -> Unit
+    onDownloadSingle: (DownloadResult) -> Unit,
+    libraryPairs: Set<String>
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -456,7 +475,35 @@ private fun SearchTab(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator()
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Searching Soulseek network...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "This may take up to a minute",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (searchStartTime > 0L) {
+                            var elapsed by remember { mutableIntStateOf(0) }
+                            LaunchedEffect(searchStartTime) {
+                                while (true) {
+                                    elapsed = ((System.currentTimeMillis() - searchStartTime) / 1000).toInt()
+                                    delay(1000L)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${elapsed}s elapsed",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
 
@@ -488,13 +535,36 @@ private fun SearchTab(
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
                     itemsIndexed(results) { index, result ->
+                        val inLibrary = remember(result.displayName, libraryPairs) {
+                            val key = result.displayName.lowercase().trim() + "|||" + artist.lowercase().trim()
+                            key in libraryPairs
+                        }
                         ListItem(
                             headlineContent = {
-                                Text(
-                                    text = result.displayName,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = result.displayName,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (inLibrary) {
+                                        Surface(
+                                            color = Color(0xFF2E7D32).copy(alpha = 0.15f),
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "IN LIBRARY",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF2E7D32),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             },
                             supportingContent = {
                                 Text(

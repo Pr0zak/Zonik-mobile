@@ -135,6 +135,17 @@ class SearchViewModel @Inject constructor(
             }
         }
     }
+
+    fun startRadio(track: Track) {
+        viewModelScope.launch {
+            try {
+                val radioTracks = libraryRepository.startRadio(track.id, track.genre, track.artistId)
+                if (radioTracks.isNotEmpty()) {
+                    playbackManager.playTracks(radioTracks)
+                }
+            } catch (_: Exception) {}
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -250,7 +261,8 @@ fun SearchScreen(
                         onTrackClick = { viewModel.playTrack(it) },
                         onPlayNext = { viewModel.playNext(it) },
                         onAddToQueue = { viewModel.addToQueue(it) },
-                        onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(it) }
+                        onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(it) },
+                        onStartRadio = { viewModel.startRadio(it) }
                     )
                 }
             }
@@ -268,7 +280,8 @@ private fun SearchResults(
     onTrackClick: (Track) -> Unit,
     onPlayNext: (Track) -> Unit,
     onAddToQueue: (Track) -> Unit,
-    onToggleMarkForDeletion: (Track) -> Unit
+    onToggleMarkForDeletion: (Track) -> Unit,
+    onStartRadio: (Track) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -305,7 +318,8 @@ private fun SearchResults(
                     onClick = { onTrackClick(track) },
                     onPlayNext = { onPlayNext(track) },
                     onAddToQueue = { onAddToQueue(track) },
-                    onToggleMarkForDeletion = { onToggleMarkForDeletion(track) }
+                    onToggleMarkForDeletion = { onToggleMarkForDeletion(track) },
+                    onStartRadio = { onStartRadio(track) }
                 )
             }
         }
@@ -369,7 +383,8 @@ private fun TrackRow(
     onClick: () -> Unit,
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
-    onToggleMarkForDeletion: () -> Unit
+    onToggleMarkForDeletion: () -> Unit,
+    onStartRadio: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -426,6 +441,11 @@ private fun TrackRow(
                 text = { Text("Add to Queue") },
                 onClick = { showMenu = false; onAddToQueue() },
                 leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("Start Radio") },
+                onClick = { showMenu = false; onStartRadio() },
+                leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) }
             )
             DropdownMenuItem(
                 text = {

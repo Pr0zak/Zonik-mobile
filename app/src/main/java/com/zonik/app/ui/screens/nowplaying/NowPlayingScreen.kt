@@ -171,6 +171,27 @@ class NowPlayingViewModel @Inject constructor(
         _playbackSpeed.value = speeds[nextIndex]
         playbackManager.setPlaybackSpeed(speeds[nextIndex])
     }
+
+    private val _isLoadingRadio = MutableStateFlow(false)
+    val isLoadingRadio: StateFlow<Boolean> = _isLoadingRadio.asStateFlow()
+
+    fun startRadio() {
+        val track = currentTrack.value ?: return
+        if (_isLoadingRadio.value) return
+        _isLoadingRadio.value = true
+        viewModelScope.launch {
+            try {
+                val radioTracks = libraryRepository.startRadio(track.id, track.genre, track.artistId)
+                if (radioTracks.isNotEmpty()) {
+                    playbackManager.playTracks(radioTracks)
+                }
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.e("NowPlaying", "Start radio failed", e)
+            } finally {
+                _isLoadingRadio.value = false
+            }
+        }
+    }
 }
 
 // --- Screen ---
@@ -194,6 +215,7 @@ fun NowPlayingScreen(
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val isBuffering by viewModel.isBuffering.collectAsState()
     val playbackError by viewModel.playbackError.collectAsState()
+    val isLoadingRadio by viewModel.isLoadingRadio.collectAsState()
 
     // Keep screen on while Now Playing is visible (if enabled in settings)
     val activity = LocalContext.current as? android.app.Activity
@@ -542,6 +564,26 @@ fun NowPlayingScreen(
                         contentDescription = "Mark for Deletion",
                         tint = if (isMarkedForDeletion) MaterialTheme.colorScheme.error else Color.White.copy(alpha = 0.5f)
                     )
+                }
+
+                // Start Radio button
+                IconButton(
+                    onClick = { viewModel.startRadio() },
+                    enabled = !isLoadingRadio && track != null
+                ) {
+                    if (isLoadingRadio) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Sensors,
+                            contentDescription = "Start Radio",
+                            tint = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
                 }
 
                 // Format badge

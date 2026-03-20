@@ -70,6 +70,7 @@ class ZonikMediaService : MediaLibraryService() {
     private val playTracksCommand = SessionCommand(ACTION_PLAY_TRACKS, Bundle.EMPTY)
     private val setEqCommand = SessionCommand(ACTION_SET_EQ, Bundle.EMPTY)
     private val toggleShuffleCommand = SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY)
+    private val startRadioCommand = SessionCommand(ACTION_START_RADIO, Bundle.EMPTY)
 
     companion object {
         // Browse tree node IDs
@@ -92,6 +93,7 @@ class ZonikMediaService : MediaLibraryService() {
         private const val ACTION_PLAY_TRACKS = "com.zonik.app.PLAY_TRACKS"
         private const val ACTION_SET_EQ = "com.zonik.app.SET_EQ"
         private const val ACTION_TOGGLE_SHUFFLE = "com.zonik.app.TOGGLE_SHUFFLE"
+        private const val ACTION_START_RADIO = "com.zonik.app.START_RADIO"
         private const val EXTRA_TRACK_IDS = "track_ids"
         private const val EXTRA_START_INDEX = "start_index"
         private const val EXTRA_EQ_ENABLED = "eq_enabled"
@@ -489,11 +491,19 @@ class ZonikMediaService : MediaLibraryService() {
             .build()
     }
 
+    private fun buildRadioButton(): CommandButton {
+        return CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setDisplayName("Start Radio")
+            .setIconResId(R.drawable.ic_radio)
+            .setSessionCommand(startRadioCommand)
+            .setEnabled(true)
+            .build()
+    }
+
     private fun buildCustomLayout(trackId: String): List<CommandButton> {
         val isStarred = trackId.isNotBlank() && trackId in starredTrackIds
-        val isMarked = trackId.isNotBlank() && trackId in markedForDeletionIds
         val isShuffled = mediaLibrarySession?.player?.shuffleModeEnabled ?: false
-        return listOf(buildStarButton(isStarred), buildShuffleButton(isShuffled), buildDeleteButton(isMarked))
+        return listOf(buildStarButton(isStarred), buildShuffleButton(isShuffled), buildRadioButton())
     }
 
     /**
@@ -947,6 +957,7 @@ class ZonikMediaService : MediaLibraryService() {
                 .add(playTracksCommand)
                 .add(setEqCommand)
                 .add(toggleShuffleCommand)
+                .add(startRadioCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
@@ -975,6 +986,33 @@ class ZonikMediaService : MediaLibraryService() {
                 val bandLevels = args.getString(EXTRA_EQ_BAND_LEVELS)
                 val audioSessionId = (session.player as? ExoPlayer)?.audioSessionId ?: 0
                 applyEqualizer(audioSessionId, enabled, preset, bandLevels)
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+
+            if (customCommand.customAction == ACTION_START_RADIO) {
+                val trackId = resolveCurrentTrackId(session) ?: return Futures.immediateFuture(
+                    SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE)
+                )
+                com.zonik.app.data.DebugLog.d("MediaService", "START_RADIO for track $trackId")
+                try {
+                    val track = runBlocking { database.trackDao().getById(trackId)?.toDomain() }
+                        ?: return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                    val radioTracks = runBlocking {
+                        libraryRepository.startRadio(track.id, track.genre, track.artistId)
+                    }
+                    if (radioTracks.isEmpty()) {
+                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                    }
+                    val mediaItems = radioTracks.map { buildFullMediaItem(it) }
+                    val player = session.player
+                    player.setMediaItems(mediaItems, 0, 0)
+                    player.prepare()
+                    player.play()
+                    com.zonik.app.data.DebugLog.d("MediaService", "START_RADIO: playing ${mediaItems.size} radio tracks")
+                } catch (e: Exception) {
+                    com.zonik.app.data.DebugLog.e("MediaService", "START_RADIO failed", e)
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_IO))
+                }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
 

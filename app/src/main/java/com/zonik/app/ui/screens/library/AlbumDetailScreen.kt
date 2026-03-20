@@ -115,6 +115,17 @@ class AlbumDetailViewModel @Inject constructor(
         }
     }
 
+    fun startRadio(track: Track) {
+        viewModelScope.launch {
+            try {
+                val radioTracks = libraryRepository.startRadio(track.id, track.genre, track.artistId)
+                if (radioTracks.isNotEmpty()) {
+                    playbackManager.playTracks(radioTracks)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun star() {
         viewModelScope.launch {
             val currentAlbum = _album.value ?: return@launch
@@ -196,6 +207,7 @@ fun AlbumDetailScreen(
                     onAddToQueue = viewModel::addToQueue,
                     onGoToArtist = onNavigateToArtist,
                     onToggleMarkForDeletion = viewModel::toggleMarkForDeletion,
+                    onStartRadio = viewModel::startRadio,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -216,6 +228,7 @@ private fun AlbumDetailContent(
     onAddToQueue: (Track) -> Unit,
     onGoToArtist: (String) -> Unit,
     onToggleMarkForDeletion: (Track) -> Unit,
+    onStartRadio: (Track) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -246,7 +259,8 @@ private fun AlbumDetailContent(
                 onGoToArtist = {
                     track.artistId?.let { artistId -> onGoToArtist(artistId) }
                 },
-                onToggleMarkForDeletion = { onToggleMarkForDeletion(track) }
+                onToggleMarkForDeletion = { onToggleMarkForDeletion(track) },
+                onStartRadio = { onStartRadio(track) }
             )
         }
 
@@ -362,7 +376,8 @@ private fun TrackItem(
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
     onGoToArtist: () -> Unit,
-    onToggleMarkForDeletion: () -> Unit
+    onToggleMarkForDeletion: () -> Unit,
+    onStartRadio: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -447,6 +462,16 @@ private fun TrackItem(
                 },
                 leadingIcon = {
                     Icon(Icons.Default.Person, contentDescription = null)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Start Radio") },
+                onClick = {
+                    showMenu = false
+                    onStartRadio()
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Sensors, contentDescription = null)
                 }
             )
             DropdownMenuItem(

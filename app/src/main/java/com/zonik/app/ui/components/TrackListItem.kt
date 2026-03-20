@@ -30,6 +30,7 @@ fun TrackListItem(
     onGoToAlbum: (() -> Unit)? = null,
     onGoToArtist: (() -> Unit)? = null,
     onToggleMarkForDeletion: (() -> Unit)? = null,
+    onStartRadio: (() -> Unit)? = null,
     currentlyPlayingId: String? = null,
     showAlbum: Boolean = true,
     modifier: Modifier = Modifier
@@ -155,6 +156,18 @@ fun TrackListItem(
                     onClick = {
                         showMenu = false
                         onGoToArtist()
+                    }
+                )
+            }
+            if (onStartRadio != null) {
+                DropdownMenuItem(
+                    text = { Text("Start Radio") },
+                    onClick = {
+                        showMenu = false
+                        onStartRadio()
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.Sensors, contentDescription = null)
                     }
                 )
             }

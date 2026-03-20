@@ -144,6 +144,15 @@ interface TrackDao {
     @Query("SELECT COUNT(*) FROM tracks WHERE markedForDeletion = 1")
     suspend fun markedCount(): Int
 
+    @Query("SELECT LOWER(title) || '|||' || LOWER(artist) FROM tracks")
+    suspend fun getAllTitleArtistPairs(): List<String>
+
+    @Query("SELECT * FROM tracks WHERE artistId = :artistId ORDER BY title COLLATE NOCASE LIMIT :limit")
+    suspend fun getByArtistId(artistId: String, limit: Int = 50): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE genre = :genre COLLATE NOCASE ORDER BY RANDOM() LIMIT :limit")
+    suspend fun getByGenre(genre: String, limit: Int = 50): List<TrackEntity>
+
     @Query("SELECT * FROM tracks WHERE title = :title AND artist = :artist LIMIT 1")
     suspend fun findByTitleAndArtist(title: String, artist: String): TrackEntity?
 

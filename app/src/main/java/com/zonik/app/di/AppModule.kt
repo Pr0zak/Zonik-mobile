@@ -26,7 +26,12 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.database.StandaloneDatabaseProvider
 import java.io.File
 import java.util.concurrent.TimeUnit
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class ZonikApiClient
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -85,6 +90,49 @@ object AppModule {
 
     @Provides
     @Singleton
+    @ZonikApiClient
+    fun provideZonikApiClient(
+        authInterceptor: SubsonicAuthInterceptor,
+        settingsRepository: SettingsRepository
+    ): OkHttpClient {
+        val dynamicBaseUrlInterceptor = Interceptor { chain ->
+            val serverUrl = runBlocking {
+                settingsRepository.serverConfig.first()?.url
+            }
+
+            if (serverUrl == null) {
+                chain.proceed(chain.request())
+            } else {
+                val originalUrl = chain.request().url
+                val newBaseUrl = serverUrl.trimEnd('/').toHttpUrl()
+
+                val newUrl = originalUrl.newBuilder()
+                    .scheme(newBaseUrl.scheme)
+                    .host(newBaseUrl.host)
+                    .port(newBaseUrl.port)
+                    .build()
+
+                val newRequest = chain.request().newBuilder()
+                    .url(newUrl)
+                    .build()
+
+                chain.proceed(newRequest)
+            }
+        }
+
+        return OkHttpClient.Builder()
+            .addInterceptor(dynamicBaseUrlInterceptor)
+            .addInterceptor(authInterceptor)
+            .addInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            })
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
     fun provideSubsonicApi(
         client: OkHttpClient,
         json: Json
@@ -101,7 +149,7 @@ object AppModule {
     @Provides
     @Singleton
     fun provideZonikApi(
-        client: OkHttpClient,
+        @ZonikApiClient client: OkHttpClient,
         json: Json
     ): ZonikApi {
         return Retrofit.Builder()

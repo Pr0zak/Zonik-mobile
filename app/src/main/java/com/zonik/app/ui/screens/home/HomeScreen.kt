@@ -98,6 +98,19 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+
+    fun startRadio(track: Track) {
+        viewModelScope.launch {
+            try {
+                val radioTracks = libraryRepository.startRadio(track.id, track.genre, track.artistId)
+                if (radioTracks.isNotEmpty()) {
+                    playbackManager.playTracks(radioTracks)
+                }
+            } catch (e: Exception) {
+                DebugLog.e("HomeViewModel", "Start radio failed", e)
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -205,7 +218,8 @@ fun HomeScreen(
                         onPlay = { viewModel.playTrack(track) },
                         onPlayNext = { viewModel.playNext(track) },
                         onAddToQueue = { viewModel.addToQueue(track) },
-                        onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(track) }
+                        onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(track) },
+                        onStartRadio = { viewModel.startRadio(track) }
                     )
                 }
             } else if (!syncState.isSyncing) {
@@ -386,7 +400,8 @@ private fun TrackListItemWithMenu(
     onPlay: () -> Unit,
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
-    onToggleMarkForDeletion: () -> Unit
+    onToggleMarkForDeletion: () -> Unit,
+    onStartRadio: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -448,6 +463,11 @@ private fun TrackListItemWithMenu(
                 text = { Text("Add to Queue") },
                 onClick = { showMenu = false; onAddToQueue() },
                 leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("Start Radio") },
+                onClick = { showMenu = false; onStartRadio() },
+                leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) }
             )
             DropdownMenuItem(
                 text = {

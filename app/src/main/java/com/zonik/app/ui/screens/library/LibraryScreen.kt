@@ -162,6 +162,17 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    fun startRadio(track: Track) {
+        viewModelScope.launch {
+            try {
+                val radioTracks = libraryRepository.startRadio(track.id, track.genre, track.artistId)
+                if (radioTracks.isNotEmpty()) {
+                    playbackManager.playTracks(radioTracks)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun playGenre(genre: String) {
         viewModelScope.launch {
             try {
@@ -690,6 +701,11 @@ private fun TracksTab(
                         text = { Text("Add to Queue") },
                         onClick = { showMenu = false; viewModel.addToQueue(track) },
                         leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Start Radio") },
+                        onClick = { showMenu = false; viewModel.startRadio(track) },
+                        leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) }
                     )
                     DropdownMenuItem(
                         text = { Text("Track Details") },

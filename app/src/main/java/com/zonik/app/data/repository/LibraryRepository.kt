@@ -225,6 +225,67 @@ class LibraryRepository @Inject constructor(
     }
 
     /**
+     * Start radio from a track: server-first similar songs with local fallbacks.
+     * 1. getSimilarSongs2 (server Last.fm data)
+     * 2. Same-genre tracks from server
+     * 3. Same-artist tracks from local DB
+     * 4. Random songs fallback
+     */
+    suspend fun startRadio(trackId: String, genre: String?, artistId: String?): List<Track> {
+        val seen = mutableSetOf(trackId)
+        val result = mutableListOf<Track>()
+
+        // 1. Try getSimilarSongs2
+        try {
+            val similar = getSimilarSongs(trackId, 75)
+            for (t in similar) {
+                if (t.id !in seen) { seen.add(t.id); result.add(t) }
+            }
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("Library", "getSimilarSongs2 failed: ${e.message}")
+        }
+
+        // 2. If <10 results, add same-genre tracks from server
+        if (result.size < 10 && !genre.isNullOrBlank()) {
+            try {
+                val genreTracks = api.getSongsByGenre(genre, 50).response.randomSongs?.song?.map { it.toDomain() } ?: emptyList()
+                for (t in genreTracks) {
+                    if (t.id !in seen) { seen.add(t.id); result.add(t) }
+                }
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.w("Library", "getSongsByGenre fallback failed: ${e.message}")
+            }
+        }
+
+        // 3. If still <10, add same-artist tracks from local DB
+        if (result.size < 10 && !artistId.isNullOrBlank()) {
+            try {
+                val artistTracks = database.trackDao().getByArtistId(artistId, 50).map { it.toDomain() }
+                for (t in artistTracks) {
+                    if (t.id !in seen) { seen.add(t.id); result.add(t) }
+                }
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.w("Library", "Artist DB fallback failed: ${e.message}")
+            }
+        }
+
+        // 4. Final fallback: random songs
+        if (result.size < 10) {
+            try {
+                val random = getRandomSongs(50)
+                for (t in random) {
+                    if (t.id !in seen) { seen.add(t.id); result.add(t) }
+                }
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.w("Library", "Random fallback failed: ${e.message}")
+            }
+        }
+
+        com.zonik.app.data.DebugLog.d("Library", "startRadio: ${result.size} tracks (from track $trackId)")
+        return result.shuffled()
+    }
+
+    /**
      * Fast sync using search3 with empty query (Symfonium approach).
      * Fetches all artists, albums, and tracks in bulk via paginated search3 calls.
      */
