@@ -265,6 +265,7 @@ private fun AlbumDetailContent(
 
         // Track list
         itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+            val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
             TrackItem(
                 track = track,
                 onClick = { onTrackClick(index) },
@@ -274,7 +275,8 @@ private fun AlbumDetailContent(
                     track.artistId?.let { artistId -> onGoToArtist(artistId) }
                 },
                 onToggleMarkForDeletion = { onToggleMarkForDeletion(track) },
-                onStartRadio = { onStartRadio(track) }
+                onStartRadio = { onStartRadio(track) },
+                backgroundColor = rowBg
             )
         }
 
@@ -444,12 +446,14 @@ private fun TrackItem(
     onAddToQueue: () -> Unit,
     onGoToArtist: () -> Unit,
     onToggleMarkForDeletion: () -> Unit,
-    onStartRadio: () -> Unit
+    onStartRadio: () -> Unit,
+    backgroundColor: Color = Color.Transparent
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Box {
         ListItem(
+            colors = ListItemDefaults.colors(containerColor = backgroundColor),
             headlineContent = {
                 Text(
                     text = track.title,

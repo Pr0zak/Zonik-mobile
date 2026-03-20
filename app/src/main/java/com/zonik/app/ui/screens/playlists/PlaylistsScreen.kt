@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -340,10 +341,12 @@ private fun PlaylistDetailScreen(
 
                     // Track list
                     itemsIndexed(tracks, key = { index, track -> "track-$index-${track.id}" }) { index, track ->
+                        val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
                         PlaylistTrackRow(
                             track = track,
                             trackNumber = index + 1,
-                            onClick = { onTrackClick(index) }
+                            onClick = { onTrackClick(index) },
+                            backgroundColor = rowBg
                         )
                     }
                 }
@@ -353,8 +356,9 @@ private fun PlaylistDetailScreen(
 }
 
 @Composable
-private fun PlaylistTrackRow(track: Track, trackNumber: Int, onClick: () -> Unit) {
+private fun PlaylistTrackRow(track: Track, trackNumber: Int, onClick: () -> Unit, backgroundColor: Color = Color.Transparent) {
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = backgroundColor),
         headlineContent = {
             Text(text = track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },

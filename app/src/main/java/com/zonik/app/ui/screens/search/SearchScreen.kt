@@ -6,12 +6,14 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -312,14 +314,16 @@ private fun SearchResults(
             item {
                 SectionHeader(title = "Tracks")
             }
-            items(tracks, key = { "track-${it.id}" }) { track ->
+            itemsIndexed(tracks, key = { _, track -> "track-${track.id}" }) { index, track ->
+                val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
                 TrackRow(
                     track = track,
                     onClick = { onTrackClick(track) },
                     onPlayNext = { onPlayNext(track) },
                     onAddToQueue = { onAddToQueue(track) },
                     onToggleMarkForDeletion = { onToggleMarkForDeletion(track) },
-                    onStartRadio = { onStartRadio(track) }
+                    onStartRadio = { onStartRadio(track) },
+                    backgroundColor = rowBg
                 )
             }
         }
@@ -384,12 +388,14 @@ private fun TrackRow(
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
     onToggleMarkForDeletion: () -> Unit,
-    onStartRadio: () -> Unit
+    onStartRadio: () -> Unit,
+    backgroundColor: Color = Color.Transparent
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Box {
         ListItem(
+            colors = ListItemDefaults.colors(containerColor = backgroundColor),
             headlineContent = {
                 Text(
                     text = track.title,

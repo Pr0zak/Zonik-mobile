@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -692,12 +693,14 @@ private fun TracksTab(
             )
         }
 
-        items(sortedTracks, key = { it.id }) { track ->
+        itemsIndexed(sortedTracks, key = { _, track -> track.id }) { index, track ->
             var showMenu by remember { mutableStateOf(false) }
             var showDetails by remember { mutableStateOf(false) }
+            val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
 
             Box {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = rowBg),
                     headlineContent = {
                         Text(
                             text = track.title,
@@ -997,11 +1000,13 @@ private fun FavoritesTab(
             )
         }
 
-        items(favorites, key = { it.id }) { track ->
+        itemsIndexed(favorites, key = { _, track -> track.id }) { index, track ->
             var showMenu by remember { mutableStateOf(false) }
+            val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
 
             Box {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = rowBg),
                     headlineContent = {
                         Text(
                             text = track.title,

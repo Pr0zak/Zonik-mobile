@@ -231,14 +231,16 @@ fun HomeScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            recentTracks.forEach { track ->
+            recentTracks.forEachIndexed { index, track ->
+                val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
                 TrackListItemWithMenu(
                     track = track,
                     onPlay = { viewModel.playTrack(track) },
                     onPlayNext = { viewModel.playNext(track) },
                     onAddToQueue = { viewModel.addToQueue(track) },
                     onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(track) },
-                    onStartRadio = { viewModel.startRadio(track) }
+                    onStartRadio = { viewModel.startRadio(track) },
+                    backgroundColor = rowBg
                 )
             }
         } else if (!syncState.isSyncing) {
@@ -424,12 +426,14 @@ private fun TrackListItemWithMenu(
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
     onToggleMarkForDeletion: () -> Unit,
-    onStartRadio: () -> Unit
+    onStartRadio: () -> Unit,
+    backgroundColor: Color = Color.Transparent
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Box {
         ListItem(
+            colors = ListItemDefaults.colors(containerColor = backgroundColor),
             headlineContent = {
                 Text(
                     text = track.title,
