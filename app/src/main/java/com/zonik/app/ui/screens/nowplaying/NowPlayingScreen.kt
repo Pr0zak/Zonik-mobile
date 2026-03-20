@@ -537,13 +537,16 @@ fun NowPlayingScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 thumb = {
-                    SliderDefaults.Thumb(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White
-                        ),
-                        thumbSize = androidx.compose.ui.unit.DpSize(14.dp, 14.dp)
-                    )
+                    Box(
+                        modifier = Modifier.size(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .background(Color.White, CircleShape)
+                        )
+                    }
                 },
                 colors = SliderDefaults.colors(
                     activeTrackColor = animatedAccent,

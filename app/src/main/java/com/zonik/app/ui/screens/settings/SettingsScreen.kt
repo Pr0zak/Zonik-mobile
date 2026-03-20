@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,7 +59,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
             ) {
                 val stats = uiState.libraryStats
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -98,7 +99,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
             ) {
                 Column {
                     ListItem(
@@ -182,7 +183,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
             ) {
                 Column {
                     BitrateDropdown(
@@ -227,7 +228,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
             ) {
                 Column {
                     SyncIntervalDropdown(
@@ -282,7 +283,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
             ) {
                 Column {
                     ListItem(
@@ -382,7 +383,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
             ) {
                 val context = LocalContext.current
                 val versionName = remember {
@@ -445,7 +446,7 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
     ) {
         Column {
             val update = availableUpdate
@@ -540,7 +541,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
     ) {
         Column {
             ListItem(
@@ -752,7 +753,7 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
     ) {
         Column {
             ListItem(
@@ -807,7 +808,7 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
     ) {
         Column {
             ListItem(
