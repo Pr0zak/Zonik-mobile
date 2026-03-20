@@ -325,7 +325,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
         topBar = {
             TopAppBar(
                 title = { Text("Downloads") },
-                windowInsets = WindowInsets(0),
+                windowInsets = WindowInsets.statusBars,
                 actions = {
                     if (selectedTab == 1) {
                         IconButton(onClick = { viewModel.refreshStatus() }) {

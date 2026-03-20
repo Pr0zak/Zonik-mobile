@@ -2,6 +2,7 @@ package com.zonik.app.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,14 +10,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import com.zonik.app.data.DebugLog
+import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.ui.util.formatLargeDuration
 import com.zonik.app.ui.util.formatLargeFileSize
 import java.text.SimpleDateFormat
@@ -36,7 +40,7 @@ fun SettingsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
-                windowInsets = WindowInsets(0)
+                windowInsets = WindowInsets.statusBars
             )
         }
     ) { padding ->
@@ -52,7 +56,8 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 20.dp),
+                shape = ZonikShapes.cardShape
             ) {
                 val stats = uiState.libraryStats
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -90,7 +95,8 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 20.dp),
+                shape = ZonikShapes.cardShape
             ) {
                 Column {
                     ListItem(
@@ -102,7 +108,15 @@ fun SettingsScreen(
                             )
                         },
                         leadingContent = {
-                            Icon(Icons.Default.Dns, contentDescription = null)
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(20.dp))
+                                }
+                            }
                         }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -164,14 +178,16 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 20.dp),
+                shape = ZonikShapes.cardShape
             ) {
                 Column {
                     BitrateDropdown(
                         label = "Wi-Fi max bitrate",
                         icon = Icons.Default.Wifi,
                         currentBitrate = uiState.wifiBitrate,
-                        onBitrateSelected = viewModel::setWifiBitrate
+                        onBitrateSelected = viewModel::setWifiBitrate,
+                        wrapIcon = true
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     BitrateDropdown(
@@ -206,7 +222,8 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 20.dp),
+                shape = ZonikShapes.cardShape
             ) {
                 Column {
                     SyncIntervalDropdown(
@@ -259,18 +276,41 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 20.dp),
+                shape = ZonikShapes.cardShape
             ) {
                 Column {
                     ListItem(
                         headlineContent = { Text("Audio cache") },
                         overlineContent = { Text("Caches tracks for offline playback and slow connections") },
                         supportingContent = {
-                            val maxLabel = if (uiState.maxCacheSizeMb >= 1024) "${uiState.maxCacheSizeMb / 1024} GB" else "${uiState.maxCacheSizeMb} MB"
-                            Text("${formatLargeFileSize(uiState.cacheSizeBytes)} / $maxLabel")
+                            Column {
+                                val maxLabel = if (uiState.maxCacheSizeMb >= 1024) "${uiState.maxCacheSizeMb / 1024} GB" else "${uiState.maxCacheSizeMb} MB"
+                                Text("${formatLargeFileSize(uiState.cacheSizeBytes)} / $maxLabel")
+                                if (uiState.maxCacheSizeMb > 0) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LinearProgressIndicator(
+                                        progress = { (uiState.cacheSizeBytes.toFloat() / (uiState.maxCacheSizeMb * 1024L * 1024L).toFloat()).coerceIn(0f, 1f) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(4.dp)
+                                            .clip(RoundedCornerShape(2.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                }
+                            }
                         },
                         leadingContent = {
-                            Icon(Icons.Default.Storage, contentDescription = null)
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Icon(Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(20.dp))
+                                }
+                            }
                         }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -335,7 +375,8 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 20.dp),
+                shape = ZonikShapes.cardShape
             ) {
                 val context = LocalContext.current
                 val versionName = remember {
@@ -347,7 +388,15 @@ fun SettingsScreen(
                     headlineContent = { Text("App version") },
                     supportingContent = { Text("Zonik v$versionName") },
                     leadingContent = {
-                        Icon(Icons.Default.Info, contentDescription = null)
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp))
+                            }
+                        }
                     }
                 )
             }
@@ -365,13 +414,15 @@ private fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(
+                letterSpacing = 1.sp
+            ),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -386,7 +437,8 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp),
+        shape = ZonikShapes.cardShape
     ) {
         Column {
             val update = availableUpdate
@@ -479,14 +531,23 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp),
+        shape = ZonikShapes.cardShape
     ) {
         Column {
             ListItem(
                 headlineContent = { Text("Debug Logs") },
                 supportingContent = { Text("Upload or copy logs for troubleshooting") },
                 leadingContent = {
-                    Icon(Icons.Default.BugReport, contentDescription = null)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+                    }
                 }
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -681,7 +742,8 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp),
+        shape = ZonikShapes.cardShape
     ) {
         Column {
             ListItem(
@@ -734,7 +796,8 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp),
+        shape = ZonikShapes.cardShape
     ) {
         Column {
             ListItem(
@@ -838,10 +901,13 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
 @Composable
 private fun SettingsSectionHeader(title: String) {
     Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
+        text = title.uppercase(),
+        style = MaterialTheme.typography.titleSmall.copy(
+            letterSpacing = 1.5.sp,
+            fontWeight = FontWeight.Bold
+        ),
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
+        modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 6.dp)
     )
 }
 
@@ -864,7 +930,15 @@ private fun SyncIntervalDropdown(
         headlineContent = { Text("Sync interval") },
         supportingContent = { Text(currentLabel) },
         leadingContent = {
-            Icon(Icons.Default.Sync, contentDescription = null)
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+            }
         },
         trailingContent = {
             Box {
@@ -903,7 +977,8 @@ private fun BitrateDropdown(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.Speed,
     currentBitrate: Int,
-    onBitrateSelected: (Int) -> Unit
+    onBitrateSelected: (Int) -> Unit,
+    wrapIcon: Boolean = false
 ) {
     val options = listOf(
         0 to "Original (no limit)",
@@ -920,7 +995,19 @@ private fun BitrateDropdown(
         headlineContent = { Text(label) },
         supportingContent = { Text(currentLabel) },
         leadingContent = {
-            Icon(icon, contentDescription = null)
+            if (wrapIcon) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                    }
+                }
+            } else {
+                Icon(icon, contentDescription = null)
+            }
         },
         trailingContent = {
             Box {

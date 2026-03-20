@@ -1,10 +1,13 @@
 package com.zonik.app.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -12,6 +15,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -23,6 +32,8 @@ import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Album
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
+import com.zonik.app.ui.theme.ZonikColors
+import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.ui.util.formatDuration
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -158,7 +169,7 @@ fun AlbumDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(album?.name ?: "") },
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -167,7 +178,10 @@ fun AlbumDetailScreen(
                         )
                     }
                 },
-                windowInsets = WindowInsets(0)
+                windowInsets = WindowInsets.statusBars,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
         }
     ) { padding ->
@@ -279,19 +293,41 @@ private fun AlbumHeader(album: Album?, onStar: () -> Unit) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Album art
-        CoverArt(
-            coverArtId = album?.coverArt,
-            contentDescription = album?.name,
-            modifier = Modifier.size(240.dp),
-            size = 600
-        )
+        // Album art with glow effect
+        Box(
+            contentAlignment = Alignment.Center
+        ) {
+            // Glow layer (blurred, semi-transparent copy behind)
+            CoverArt(
+                coverArtId = album?.coverArt,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .aspectRatio(1f)
+                    .blur(40.dp)
+                    .graphicsLayer(alpha = 0.4f),
+                size = 600
+            )
+            // Main album art
+            CoverArt(
+                coverArtId = album?.coverArt,
+                contentDescription = album?.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .aspectRatio(1f)
+                    .clip(ZonikShapes.coverArtLargeShape),
+                size = 600
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
             text = album?.name ?: "",
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -301,7 +337,7 @@ private fun AlbumHeader(album: Album?, onStar: () -> Unit) {
         Text(
             text = album?.artist ?: "",
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -337,17 +373,39 @@ private fun ActionButtons(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        FilledTonalButton(onClick = onPlayAll) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Play All")
+        // Play All with gradient background
+        Button(
+            onClick = onPlayAll,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+            contentPadding = PaddingValues(0.dp),
+            shape = ZonikShapes.buttonShape
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)
+                        ),
+                        shape = ZonikShapes.buttonShape
+                    )
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Play All")
+                }
+            }
         }
+        // Shuffle
         FilledTonalButton(onClick = onShuffle) {
             Icon(
                 imageVector = Icons.Default.Shuffle,
@@ -357,13 +415,22 @@ private fun ActionButtons(
             Spacer(modifier = Modifier.width(6.dp))
             Text("Shuffle")
         }
-        IconButton(onClick = onStar) {
-            Icon(
-                imageVector = if (isStarred) Icons.Default.Star else Icons.Default.StarBorder,
-                contentDescription = if (isStarred) "Unstar" else "Star",
-                tint = if (isStarred) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        // Star in circular surface
+        Surface(
+            onClick = onStar,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = if (isStarred) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = if (isStarred) "Unstar" else "Star",
+                    tint = if (isStarred) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
@@ -408,11 +475,34 @@ private fun TrackItem(
                 )
             },
             trailingContent = {
-                Text(
-                    text = formatDuration(track.duration),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = formatDuration(track.duration),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    track.suffix?.let { suffix ->
+                        val isLossless = suffix.lowercase() in listOf("flac", "alac", "wav", "aiff")
+                        val badgeBg = if (isLossless) ZonikColors.gold.copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        val badgeText = if (isLossless) ZonikColors.gold
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        Surface(
+                            color = badgeBg,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = suffix.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = badgeText,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
             },
             modifier = Modifier.combinedClickable(
                 onClick = onClick,

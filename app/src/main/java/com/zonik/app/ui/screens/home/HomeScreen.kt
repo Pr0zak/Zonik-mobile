@@ -15,8 +15,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import com.zonik.app.ui.theme.ZonikColors
+import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.R
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -124,152 +128,167 @@ fun HomeScreen(
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF1A1A2E)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(R.drawable.ic_launcher_foreground),
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("Zonik")
-                    }
-                },
-                windowInsets = WindowInsets(0),
-                actions = {
-                    if (syncState.isSyncing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .padding(end = 4.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-                    IconButton(
-                        onClick = viewModel::syncNow,
-                        enabled = !syncState.isSyncing
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Sync")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Custom top bar
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Sync status banner
-            SyncBanner(
-                syncState = syncState,
-                onDismiss = {}
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1A1A2E)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_launcher_foreground),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                "Zonik",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
+            Spacer(modifier = Modifier.weight(1f))
+            if (syncState.isSyncing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            IconButton(
+                onClick = viewModel::syncNow,
+                enabled = !syncState.isSyncing
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = "Sync")
+            }
+        }
 
-            // Quick actions
-            FilledTonalButton(
-                onClick = viewModel::shuffleMix,
+        // Sync status banner
+        SyncBanner(syncState = syncState, onDismiss = {})
+
+        // Shuffle Mix button
+        Button(
+            onClick = viewModel::shuffleMix,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+            contentPadding = PaddingValues(0.dp),
+            shape = ZonikShapes.buttonShape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)
+                        ),
+                        shape = ZonikShapes.buttonShape
+                    )
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Shuffle, contentDescription = "Shuffle Mix")
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Shuffle Mix")
-            }
-
-            // All Tracks button
-            if (onNavigateToLibraryTracks != null) {
-                OutlinedButton(
-                    onClick = onNavigateToLibraryTracks,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                ) {
-                    Icon(Icons.Default.MusicNote, contentDescription = null)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("All Tracks")
+                    Text("Shuffle Mix", color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
+        }
 
-            // Recent Tracks
-            if (recentTracks.isNotEmpty()) {
-                Text(
-                    text = "Recent Tracks",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        // All Tracks text button
+        if (onNavigateToLibraryTracks != null) {
+            TextButton(
+                onClick = onNavigateToLibraryTracks,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+            ) {
+                Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("All Tracks")
+            }
+        }
+
+        // Recent Tracks
+        if (recentTracks.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Recent Tracks",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            recentTracks.forEach { track ->
+                TrackListItemWithMenu(
+                    track = track,
+                    onPlay = { viewModel.playTrack(track) },
+                    onPlayNext = { viewModel.playNext(track) },
+                    onAddToQueue = { viewModel.addToQueue(track) },
+                    onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(track) },
+                    onStartRadio = { viewModel.startRadio(track) }
                 )
+            }
+        } else if (!syncState.isSyncing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "No tracks yet",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(onClick = viewModel::syncNow) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sync Library")
+                    }
+                }
+            }
+        }
 
-                recentTracks.forEach { track ->
-                    TrackListItemWithMenu(
+        // Recently Played
+        if (recentlyPlayed.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Recently Played",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(recentlyPlayed, key = { it.id }) { track ->
+                    RecentlyPlayedCard(
                         track = track,
-                        onPlay = { viewModel.playTrack(track) },
-                        onPlayNext = { viewModel.playNext(track) },
-                        onAddToQueue = { viewModel.addToQueue(track) },
-                        onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(track) },
-                        onStartRadio = { viewModel.startRadio(track) }
+                        onClick = { viewModel.playTrack(track) }
                     )
                 }
-            } else if (!syncState.isSyncing) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "No tracks yet",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedButton(onClick = viewModel::syncNow) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Sync Library")
-                        }
-                    }
-                }
             }
-
-            // Recently Played
-            if (recentlyPlayed.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Recently Played",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(recentlyPlayed, key = { it.id }) { track ->
-                        RecentlyPlayedCard(
-                            track = track,
-                            onClick = { viewModel.playTrack(track) }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -360,25 +379,29 @@ private fun SyncBanner(syncState: SyncState, onDismiss: () -> Unit) {
 
 @Composable
 private fun RecentlyPlayedCard(track: Track, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(
+    Surface(
         modifier = modifier
-            .width(150.dp)
-            .clickable(onClick = onClick)
+            .width(176.dp)
+            .clickable(onClick = onClick),
+        shape = ZonikShapes.cardShape,
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             CoverArt(
                 coverArtId = track.coverArt,
                 contentDescription = track.title,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
+                    .clip(ZonikShapes.coverArtShape)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 text = track.title,
                 style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -427,7 +450,9 @@ private fun TrackListItemWithMenu(
                 CoverArt(
                     coverArtId = track.coverArt,
                     contentDescription = track.title,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(10.dp))
                 )
             },
             trailingContent = {

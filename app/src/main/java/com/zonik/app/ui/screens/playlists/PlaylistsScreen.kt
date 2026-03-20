@@ -153,7 +153,7 @@ private fun PlaylistListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Playlists") },
-                windowInsets = WindowInsets(0)
+                windowInsets = WindowInsets.statusBars
             )
         }
     ) { padding ->
@@ -273,7 +273,7 @@ private fun PlaylistDetailScreen(
                         )
                     }
                 },
-                windowInsets = WindowInsets(0)
+                windowInsets = WindowInsets.statusBars
             )
         }
     ) { padding ->

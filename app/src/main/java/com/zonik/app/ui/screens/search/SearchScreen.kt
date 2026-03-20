@@ -161,7 +161,7 @@ fun SearchScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Search") },
-                windowInsets = WindowInsets(0)
+                windowInsets = WindowInsets.statusBars
             )
         }
     ) { padding ->

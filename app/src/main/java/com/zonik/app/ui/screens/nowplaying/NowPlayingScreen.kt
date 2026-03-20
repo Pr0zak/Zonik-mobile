@@ -19,11 +19,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +49,8 @@ import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
+import com.zonik.app.ui.theme.ZonikColors
+import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.ui.util.formatDurationMs
 import com.zonik.app.ui.util.formatFileSize
 import com.zonik.app.ui.util.formatDuration
@@ -232,7 +239,6 @@ fun NowPlayingScreen(
     var durationMs by remember { mutableLongStateOf(0L) }
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
-    var showDetails by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
 
     // Palette colors extracted from cover art
@@ -283,10 +289,46 @@ fun NowPlayingScreen(
 
     val track = currentTrack
 
+    // Swipe down to dismiss — smooth animated offset
+    val dragOffset = remember { Animatable(0f) }
+    val dismissThreshold = 300f
+    val coroutineScope = rememberCoroutineScope()
+
     // Full screen with blurred background
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .graphicsLayer {
+                val offset = dragOffset.value.coerceAtLeast(0f)
+                translationY = offset
+                alpha = 1f - (offset / (dismissThreshold * 3f))
+            }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        coroutineScope.launch {
+                            if (dragOffset.value > dismissThreshold) {
+                                onBack()
+                            } else {
+                                dragOffset.animateTo(0f, androidx.compose.animation.core.spring(
+                                    dampingRatio = 0.7f,
+                                    stiffness = 400f
+                                ))
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        coroutineScope.launch {
+                            dragOffset.animateTo(0f, androidx.compose.animation.core.spring())
+                        }
+                    },
+                    onVerticalDrag = { _, dragAmount ->
+                        coroutineScope.launch {
+                            dragOffset.snapTo((dragOffset.value + dragAmount).coerceAtLeast(0f))
+                        }
+                    }
+                )
+            }
             .background(Color.Black)
     ) {
         // Blurred album art background
@@ -337,7 +379,7 @@ fun NowPlayingScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top bar
+            // Top bar — minimal, glass pill
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -353,72 +395,126 @@ fun NowPlayingScreen(
                         modifier = Modifier.size(32.dp)
                     )
                 }
-                Text(
-                    text = "Now Playing",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color.White.copy(alpha = 0.7f)
+                Surface(
+                    color = Color.White.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        text = "NOW PLAYING",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            letterSpacing = 3.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+                }
+                // Spacer to balance the top bar layout
+                Spacer(modifier = Modifier.size(48.dp))
+            }
+
+            Spacer(modifier = Modifier.weight(0.4f))
+
+            // Album art — large, centered, rounded with glow
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+                    .aspectRatio(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                // Glow layer behind album art
+                CoverArt(
+                    coverArtId = track?.coverArt,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(50.dp)
+                        .alpha(0.5f),
+                    size = 300
                 )
-                IconButton(onClick = { showDetails = !showDetails }) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "More",
-                        tint = Color.White
+                // Main album art with shadow-like border
+                CoverArt(
+                    coverArtId = track?.coverArt,
+                    contentDescription = track?.album,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(RoundedCornerShape(28.dp)),
+                    size = 600
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(0.4f))
+
+            // Track info in a glass card
+            Surface(
+                color = Color.White.copy(alpha = 0.06f),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
+                    // Format badge inline with title
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = track?.title ?: "",
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (track?.suffix != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            val isLossless = track.suffix?.lowercase() in listOf("flac", "alac")
+                            Surface(
+                                color = if (isLossless) ZonikColors.gold.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = listOfNotNull(
+                                        track.suffix?.uppercase(),
+                                        track.bitRate?.let { "${it}k" }
+                                    ).joinToString(" "),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isLossless) ZonikColors.gold else Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = track?.artist ?: "",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = animatedAccent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        text = (track?.album ?: "").uppercase(),
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            letterSpacing = 1.5.sp
+                        ),
+                        color = Color.White.copy(alpha = 0.5f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.5f))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Album art — large, centered, rounded
-            CoverArt(
-                coverArtId = track?.coverArt,
-                contentDescription = track?.album,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp)),
-                size = 600
-            )
-
-            Spacer(modifier = Modifier.weight(0.5f))
-
-            // Track info
-            Text(
-                text = track?.title ?: "",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Start,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = track?.artist ?: "",
-                style = MaterialTheme.typography.bodyLarge,
-                color = animatedAccent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Start,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Text(
-                text = track?.album ?: "",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.6f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Start,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Seek bar — thin, accent colored
+            // Seek bar — custom thin style
             val sliderValue = if (isSeeking) {
                 seekPosition
             } else if (durationMs > 0) {
@@ -440,10 +536,18 @@ fun NowPlayingScreen(
                     isSeeking = false
                 },
                 modifier = Modifier.fillMaxWidth(),
+                thumb = {
+                    // Small dot thumb instead of large vertical bar
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    )
+                },
                 colors = SliderDefaults.colors(
-                    thumbColor = animatedAccent,
                     activeTrackColor = animatedAccent,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+                    inactiveTrackColor = Color.White.copy(alpha = 0.12f)
                 )
             )
 
@@ -458,18 +562,18 @@ fun NowPlayingScreen(
                 Text(
                     text = formatDurationMs(displayPos),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = Color.White.copy(alpha = 0.5f)
                 )
                 Text(
                     text = formatDurationMs(durationMs),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = Color.White.copy(alpha = 0.5f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Primary controls
+            // Primary controls — larger, more breathing room
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -479,29 +583,35 @@ fun NowPlayingScreen(
                     Icon(
                         Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (shuffleEnabled) animatedAccent else Color.White.copy(alpha = 0.5f)
+                        tint = if (shuffleEnabled) animatedAccent else Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
                 IconButton(
                     onClick = { viewModel.skipPrevious() },
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(60.dp)
                 ) {
                     Icon(
                         Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
                         tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(40.dp)
                     )
                 }
 
-                // Play/Pause — large circle (shows spinner when buffering)
-                FloatingActionButton(
-                    onClick = { viewModel.togglePlayPause() },
-                    shape = CircleShape,
-                    containerColor = animatedAccent,
-                    contentColor = Color.Black,
-                    modifier = Modifier.size(72.dp)
+                // Play/Pause — gradient circle
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(animatedAccent, animatedAccent.copy(alpha = 0.7f))
+                            )
+                        )
+                        .clickable { viewModel.togglePlayPause() },
+                    contentAlignment = Alignment.Center
                 ) {
                     if (isBuffering) {
                         CircularProgressIndicator(
@@ -513,20 +623,21 @@ fun NowPlayingScreen(
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
-                            modifier = Modifier.size(40.dp)
+                            tint = Color.Black,
+                            modifier = Modifier.size(44.dp)
                         )
                     }
                 }
 
                 IconButton(
                     onClick = { viewModel.skipNext() },
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(60.dp)
                 ) {
                     Icon(
                         Icons.Default.SkipNext,
                         contentDescription = "Next",
                         tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(40.dp)
                     )
                 }
 
@@ -537,128 +648,122 @@ fun NowPlayingScreen(
                             else -> Icons.Default.Repeat
                         },
                         contentDescription = "Repeat",
-                        tint = if (repeatState != RepeatState.OFF) animatedAccent else Color.White.copy(alpha = 0.5f)
+                        tint = if (repeatState != RepeatState.OFF) animatedAccent else Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Secondary controls
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+            // Secondary controls — glass pill bar
+            Surface(
+                color = Color.White.copy(alpha = 0.06f),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                IconButton(onClick = { viewModel.toggleStar() }) {
-                    Icon(
-                        imageVector = if (isStarred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (isStarred) animatedAccent else Color.White.copy(alpha = 0.5f)
-                    )
-                }
-
-                IconButton(onClick = { viewModel.toggleMarkForDeletion() }) {
-                    Icon(
-                        imageVector = if (isMarkedForDeletion) Icons.Default.Delete else Icons.Default.DeleteOutline,
-                        contentDescription = "Mark for Deletion",
-                        tint = if (isMarkedForDeletion) MaterialTheme.colorScheme.error else Color.White.copy(alpha = 0.5f)
-                    )
-                }
-
-                // Start Radio button
-                IconButton(
-                    onClick = { viewModel.startRadio() },
-                    enabled = !isLoadingRadio && track != null
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isLoadingRadio) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                    } else {
+                    IconButton(onClick = { viewModel.toggleStar() }) {
                         Icon(
-                            imageVector = Icons.Default.Sensors,
-                            contentDescription = "Start Radio",
-                            tint = Color.White.copy(alpha = 0.5f)
+                            imageVector = if (isStarred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (isStarred) animatedAccent else Color.White.copy(alpha = 0.5f)
                         )
                     }
-                }
 
-                // Format badge
-                if (track?.suffix != null || track?.bitRate != null) {
-                    Surface(
-                        color = Color.White.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(4.dp)
+                    IconButton(onClick = { viewModel.toggleMarkForDeletion() }) {
+                        Icon(
+                            imageVector = if (isMarkedForDeletion) Icons.Default.Delete else Icons.Default.DeleteOutline,
+                            contentDescription = "Mark for Deletion",
+                            tint = if (isMarkedForDeletion) MaterialTheme.colorScheme.error else Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+
+                    // Start Radio button
+                    IconButton(
+                        onClick = { viewModel.startRadio() },
+                        enabled = !isLoadingRadio && track != null
                     ) {
-                        Text(
-                            text = listOfNotNull(
-                                track.suffix?.uppercase(),
-                                track.bitRate?.let { "${it}k" }
-                            ).joinToString(" "),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        if (isLoadingRadio) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Sensors,
+                                contentDescription = "Start Radio",
+                                tint = Color.White.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
+                    // Cast button
+                    val activityContext = LocalContext.current
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { _ ->
+                            androidx.mediarouter.app.MediaRouteButton(activityContext).apply {
+                                try {
+                                    com.google.android.gms.cast.framework.CastButtonFactory.setUpMediaRouteButton(activityContext, this)
+                                } catch (e: Exception) {
+                                    com.zonik.app.data.DebugLog.w("NowPlaying", "Cast button setup failed: ${e.message}")
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(48.dp)
+                    )
+
+                    IconButton(onClick = { showQueue = !showQueue }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = "Queue",
+                            tint = if (showQueue) animatedAccent else Color.White.copy(alpha = 0.5f)
                         )
                     }
-                }
-
-                // Cast button — uses AndroidView to wrap MediaRouteButton from Cast SDK
-                // MediaRouteButton needs FragmentActivity context (for showDialog).
-                // Compose's AndroidView ctx may be wrapped; find the real Activity.
-                val activityContext = LocalContext.current
-                androidx.compose.ui.viewinterop.AndroidView(
-                    factory = { _ ->
-                        androidx.mediarouter.app.MediaRouteButton(activityContext).apply {
-                            try {
-                                com.google.android.gms.cast.framework.CastButtonFactory.setUpMediaRouteButton(activityContext, this)
-                            } catch (e: Exception) {
-                                com.zonik.app.data.DebugLog.w("NowPlaying", "Cast button setup failed: ${e.message}")
-                            }
-                        }
-                    },
-                    modifier = Modifier.size(48.dp)
-                )
-
-                IconButton(onClick = { showQueue = !showQueue }) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.QueueMusic,
-                        contentDescription = "Queue",
-                        tint = if (showQueue) animatedAccent else Color.White.copy(alpha = 0.5f)
-                    )
                 }
             }
 
             // Casting indicator
             if (isCasting && castDeviceName != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    color = animatedAccent.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Cast,
-                        contentDescription = null,
-                        tint = animatedAccent,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Casting to $castDeviceName",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = animatedAccent
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Cast,
+                            contentDescription = null,
+                            tint = animatedAccent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Casting to $castDeviceName",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = animatedAccent
+                        )
+                    }
                 }
             }
 
             // Connection error banner
             if (playbackError != null) {
+                Spacer(modifier = Modifier.height(4.dp))
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -681,51 +786,45 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Collapsible song details
-            AnimatedVisibility(visible = showDetails) {
-                if (track != null) {
-                    Surface(
-                        color = Color.White.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            track.bitRate?.let { DetailRow("Bitrate", "$it kbps") }
-                            track.suffix?.let { DetailRow("Format", it.uppercase()) }
-                            track.size?.let {
-                                val s = formatFileSize(it)
-                                if (s.isNotEmpty()) DetailRow("Size", s)
-                            }
-                            if (track.duration > 0) DetailRow("Duration", formatDuration(track.duration))
-                            track.genre?.let { DetailRow("Genre", it) }
-                            track.year?.let { DetailRow("Year", it.toString()) }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         // Queue bottom sheet
         if (showQueue) {
             ModalBottomSheet(
                 onDismissRequest = { showQueue = false },
-                containerColor = Color(0xFF1A1F24)
+                containerColor = Color(0xFF151320),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Queue (${queue.size} tracks)",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "QUEUE",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                letterSpacing = 2.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = animatedAccent.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "${queue.size}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = animatedAccent,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
                     val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
                     // Auto-scroll to currently playing track when queue opens
                     val currentIndex = queue.indexOfFirst { it.id == track?.id }
@@ -745,9 +844,11 @@ fun NowPlayingScreen(
                     ) {
                         itemsIndexed(queue, key = { index, t -> "$index-${t.id}" }) { index, queueTrack ->
                             val isCurrent = queueTrack.id == track?.id
+                            val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .background(rowBg)
                                     .clickable { viewModel.skipToIndex(index) }
                             ) {
                                 ListItem(

@@ -16,10 +16,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.zonik.app.ui.theme.ZonikColors
+import com.zonik.app.ui.theme.ZonikShapes
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModel
@@ -286,19 +293,19 @@ fun LibraryScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = LibraryTab.entries
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Library") },
-                windowInsets = WindowInsets(0)
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
+        // Custom top bar
+        Text(
+            text = "Library",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        )
+
             ScrollableTabRow(selectedTabIndex = selectedTab, edgePadding = 0.dp) {
                 tabs.forEachIndexed { index, tab ->
                     Tab(
@@ -339,7 +346,6 @@ fun LibraryScreen(
                     onPlayPlaylist = viewModel::playPlaylist
                 )
             }
-        }
     }
 }
 
@@ -421,6 +427,7 @@ private fun AlbumsTab(
                     selected = selected,
                     onClick = { viewModel.setAlbumSort(sort) },
                     label = { Text(sort.label, style = MaterialTheme.typography.labelSmall) },
+                    shape = RoundedCornerShape(20.dp),
                     trailingIcon = if (selected) {
                         {
                             Icon(
@@ -458,7 +465,8 @@ private fun AlbumGridCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        shape = ZonikShapes.cardShape
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             CoverArt(
@@ -467,6 +475,7 @@ private fun AlbumGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
+                    .clip(ZonikShapes.coverArtShape)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -595,11 +604,12 @@ private fun TracksTab(
         } else emptyMap()
     }
 
+    val hasAlphaBar = letterIndex.isNotEmpty()
     Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 4.dp)
+        contentPadding = PaddingValues(start = 0.dp, top = 4.dp, end = if (hasAlphaBar) 28.dp else 0.dp, bottom = 4.dp)
     ) {
         // Play All / Shuffle row
         item {
@@ -609,13 +619,29 @@ private fun TracksTab(
                     .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilledTonalButton(
+                Button(
                     onClick = { viewModel.playAllTracks() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    contentPadding = PaddingValues(0.dp),
+                    shape = ZonikShapes.buttonShape,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Play All")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.horizontalGradient(listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)),
+                                shape = ZonikShapes.buttonShape
+                            )
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Play All", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
                 FilledTonalButton(
                     onClick = { viewModel.shuffleAllTracks() },
@@ -641,6 +667,7 @@ private fun TracksTab(
                         selected = selected,
                         onClick = { viewModel.setTrackSort(sort) },
                         label = { Text(sort.label, style = MaterialTheme.typography.labelSmall) },
+                        shape = RoundedCornerShape(20.dp),
                         trailingIcon = if (selected) {
                             {
                                 Icon(
@@ -691,7 +718,7 @@ private fun TracksTab(
                         CoverArt(
                             coverArtId = track.coverArt,
                             contentDescription = track.title,
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))
                         )
                     },
                     trailingContent = {
@@ -792,7 +819,12 @@ private fun TracksTab(
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = 4.dp)
+                .padding(end = 2.dp)
+                .background(
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                )
+                .padding(vertical = 4.dp)
                 .pointerInput(letters) {
                     detectVerticalDragGestures(
                         onDragStart = { offset ->
@@ -842,7 +874,7 @@ private fun TracksTab(
             letters.forEach { letter ->
                 Text(
                     text = letter.toString(),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     fontWeight = if (letter == activeLetter) androidx.compose.ui.text.font.FontWeight.Bold else null,
                     color = if (letter == activeLetter) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -852,7 +884,7 @@ private fun TracksTab(
                                 coroutineScope.launch { listState.scrollToItem(index) }
                             }
                         }
-                        .padding(horizontal = 10.dp, vertical = 2.dp)
+                        .padding(horizontal = 8.dp, vertical = 1.dp)
                 )
             }
         }

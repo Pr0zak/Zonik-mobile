@@ -93,9 +93,11 @@ class PlaybackManager @Inject constructor(
     // Adaptive bitrate: step down on connection issues, restore when stable
     private val bitrateSteps = listOf(0, 320, 256, 192, 128, 64) // 0 = original
     @Volatile private var bitrateOverride: Int? = null
-    @Volatile private var consecutiveBuffers = 0
     @Volatile private var stableTrackCount = 0
     @Volatile private var adaptiveBitrateEnabled = true
+    // Rolling window: track buffering event timestamps instead of a simple counter
+    // (counter resets on every READY, which happens between every buffer event, so it never reaches 3)
+    private val bufferingTimestamps = mutableListOf<Long>()
 
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
@@ -230,7 +232,6 @@ class PlaybackManager @Inject constructor(
                 _isBuffering.value = playbackState == Player.STATE_BUFFERING
                 if (playbackState == Player.STATE_READY) {
                     _playbackError.value = null
-                    consecutiveBuffers = 0
                     // Auto-restore bitrate after 3 consecutive stable tracks
                     if (bitrateOverride != null) {
                         stableTrackCount++
@@ -240,9 +241,13 @@ class PlaybackManager @Inject constructor(
                     }
                 }
                 if (playbackState == Player.STATE_BUFFERING) {
-                    consecutiveBuffers++
-                    if (consecutiveBuffers >= 3 && adaptiveBitrateEnabled) {
+                    val now = System.currentTimeMillis()
+                    bufferingTimestamps.add(now)
+                    // Keep only events from the last 60 seconds
+                    bufferingTimestamps.removeAll { now - it > 60_000 }
+                    if (bufferingTimestamps.size >= 3 && adaptiveBitrateEnabled) {
                         degradeBitrate()
+                        bufferingTimestamps.clear()
                     }
                 }
             }
@@ -634,7 +639,7 @@ class PlaybackManager @Inject constructor(
         if (bitrateOverride != null) {
             DebugLog.d("Playback", "Restored original bitrate")
             bitrateOverride = null
-            consecutiveBuffers = 0
+            bufferingTimestamps.clear()
         }
     }
 

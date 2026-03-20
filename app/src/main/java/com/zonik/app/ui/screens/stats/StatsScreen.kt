@@ -138,7 +138,7 @@ fun StatsScreen(
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
                 },
-                windowInsets = WindowInsets(0)
+                windowInsets = WindowInsets.statusBars
             )
         }
     ) { padding ->

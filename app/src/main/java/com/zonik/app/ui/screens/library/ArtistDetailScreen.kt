@@ -92,7 +92,7 @@ fun ArtistDetailScreen(
                         )
                     }
                 },
-                windowInsets = WindowInsets(0)
+                windowInsets = WindowInsets.statusBars
             )
         }
     ) { padding ->
