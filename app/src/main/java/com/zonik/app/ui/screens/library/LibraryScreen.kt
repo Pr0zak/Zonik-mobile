@@ -109,6 +109,12 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    private val _favorites = MutableStateFlow<List<Track>>(emptyList())
+    val favorites: StateFlow<List<Track>> = _favorites.asStateFlow()
+
+    private val _isLoadingFavorites = MutableStateFlow(false)
+    val isLoadingFavorites: StateFlow<Boolean> = _isLoadingFavorites.asStateFlow()
+
     private val _genres = MutableStateFlow<List<Genre>>(emptyList())
     val genres: StateFlow<List<Genre>> = _genres.asStateFlow()
 
@@ -122,6 +128,7 @@ class LibraryViewModel @Inject constructor(
     val isLoadingPlaylists: StateFlow<Boolean> = _isLoadingPlaylists.asStateFlow()
 
     init {
+        loadFavorites()
         loadGenres()
         loadPlaylists()
     }
@@ -159,6 +166,33 @@ class LibraryViewModel @Inject constructor(
             } else {
                 libraryRepository.markForDeletion(track.id)
             }
+        }
+    }
+
+    fun loadFavorites() {
+        viewModelScope.launch {
+            _isLoadingFavorites.value = true
+            try {
+                _favorites.value = libraryRepository.getStarredTracks()
+            } catch (_: Exception) {
+                _favorites.value = emptyList()
+            } finally {
+                _isLoadingFavorites.value = false
+            }
+        }
+    }
+
+    fun playAllFavorites() {
+        val favs = _favorites.value
+        if (favs.isNotEmpty()) {
+            playbackManager.playTracks(favs, startIndex = 0)
+        }
+    }
+
+    fun shuffleFavorites() {
+        val favs = _favorites.value
+        if (favs.isNotEmpty()) {
+            playbackManager.playTracks(favs.shuffled(), startIndex = 0)
         }
     }
 
@@ -227,6 +261,7 @@ private enum class LibraryTab(val label: String) {
     TRACKS("Tracks"),
     ALBUMS("Albums"),
     ARTISTS("Artists"),
+    FAVORITES("Favorites"),
     GENRES("Genres"),
     PLAYLISTS("Playlists")
 }
@@ -241,6 +276,8 @@ fun LibraryScreen(
     val artists by viewModel.artists.collectAsState()
     val albums by viewModel.albums.collectAsState()
     val tracks by viewModel.tracks.collectAsState()
+    val favorites by viewModel.favorites.collectAsState()
+    val isLoadingFavorites by viewModel.isLoadingFavorites.collectAsState()
     val genres by viewModel.genres.collectAsState()
     val isLoadingGenres by viewModel.isLoadingGenres.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
@@ -284,6 +321,11 @@ fun LibraryScreen(
                 )
                 LibraryTab.TRACKS -> TracksTab(
                     tracks = tracks,
+                    viewModel = viewModel
+                )
+                LibraryTab.FAVORITES -> FavoritesTab(
+                    favorites = favorites,
+                    isLoading = isLoadingFavorites,
                     viewModel = viewModel
                 )
                 LibraryTab.GENRES -> GenresTab(
@@ -836,6 +878,167 @@ private fun TracksTab(
         }
     }
     } // close Box
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FavoritesTab(
+    favorites: List<Track>,
+    isLoading: Boolean,
+    viewModel: LibraryViewModel
+) {
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    if (favorites.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.FavoriteBorder,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "No favorites yet",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Star tracks to see them here",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 4.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = { viewModel.playAllFavorites() },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Play All")
+                }
+                FilledTonalButton(
+                    onClick = { viewModel.shuffleFavorites() },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Shuffle")
+                }
+            }
+        }
+
+        item {
+            Text(
+                text = "${favorites.size} starred track${if (favorites.size != 1) "s" else ""}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+
+        items(favorites, key = { it.id }) { track ->
+            var showMenu by remember { mutableStateOf(false) }
+
+            Box {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = track.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (track.markedForDeletion) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = "${track.artist} · ${track.album}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingContent = {
+                        CoverArt(
+                            coverArtId = track.coverArt,
+                            contentDescription = track.title,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    },
+                    trailingContent = {
+                        Icon(
+                            Icons.Default.Favorite,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    modifier = Modifier.combinedClickable(
+                        onClick = { viewModel.playTrack(track) },
+                        onLongClick = { showMenu = true }
+                    )
+                )
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Play") },
+                        onClick = { showMenu = false; viewModel.playTrack(track) },
+                        leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Play Next") },
+                        onClick = { showMenu = false; viewModel.playNext(track) },
+                        leadingIcon = { Icon(Icons.Default.QueuePlayNext, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Add to Queue") },
+                        onClick = { showMenu = false; viewModel.addToQueue(track) },
+                        leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Start Radio") },
+                        onClick = { showMenu = false; viewModel.startRadio(track) },
+                        leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) }
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
 }
 
 @Composable
