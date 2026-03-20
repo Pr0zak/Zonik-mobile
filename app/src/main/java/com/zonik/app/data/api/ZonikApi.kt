@@ -93,7 +93,9 @@ data class BulkDownloadRequest(
 @Serializable
 data class BulkDownloadTrack(
     val artist: String,
-    val track: String
+    val track: String,
+    val username: String? = null,
+    val filename: String? = null
 )
 
 @Serializable

@@ -186,7 +186,9 @@ class DownloadsViewModel @Inject constructor(
                 val tracks = selected.map { result ->
                     BulkDownloadTrack(
                         artist = state.searchArtist.trim(),
-                        track = result.displayName
+                        track = result.displayName,
+                        username = result.username,
+                        filename = result.filename
                     )
                 }
                 val response = zonikApi.bulkDownload(BulkDownloadRequest(tracks = tracks))

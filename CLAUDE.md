@@ -29,6 +29,7 @@ A native Android music player app that streams music from a self-hosted [Zonik](
 - `/version` — show current version; `/version bump patch|minor|major` or `/version set X.Y.Z`
 - `/release [patch|minor|major]` — bump version, build, commit, push, create GitHub release
 - `/update-release` — rebuild APK and update current GitHub release (hotfix, no version bump)
+- `/logs [id]` — list uploaded app logs from server, or fetch a specific log by ID
 
 ## Build & Run
 ```bash
@@ -50,7 +51,7 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 - Two API layers: OpenSubsonic (`/rest`) for playback/library, Zonik native (`/api`) for downloads
 - Fast library sync via `search3` empty query (Symfonium approach) — bulk fetches all artists/albums/tracks
 - Self-update checker queries GitHub releases API
-- Debug log upload to private GitHub Gists
+- Debug log upload to Zonik server or private GitHub Gists
 
 ## Key Conventions
 - Package: `com.zonik.app`
@@ -163,11 +164,13 @@ app/src/main/java/com/zonik/app/
 - Cover art: `GET /rest/getCoverArt.view?id={coverId}&size={pixels}` (NO `f=json`)
 - Library sync: `search3` with empty query, 500 items per page (Symfonium approach) + `getStarred2` for starred status + `userRating` for flagged-for-deletion status
 - Zonik native API: `POST /api/download/search`, `/api/download/trigger`, `GET /api/jobs` (`Accept: application/json` header required, response wrapped in `{"items": [...]}`)
+- Zonik log API: `POST /api/logs` (Subsonic auth via query params, request: `{device, app_version, timestamp, logs}`), `GET /api/logs/app` (list, unauthenticated), `GET /api/logs/app/{id}` (detail, unauthenticated)
 
 ## Debugging
 - `DebugLog` singleton captures last 500 entries with timestamps
-- Settings > Debug: "Copy Logs" to clipboard or "Upload Logs" to private GitHub Gist
-- Requires GitHub PAT with gist scope for upload
+- Settings > Debug: "Upload to Server" sends logs to Zonik server (`POST /api/logs` with Subsonic auth) — no extra config needed
+- Settings > Debug: "Upload Logs" to private GitHub Gist (requires GitHub PAT with gist scope)
+- Settings > Debug: "Copy Logs" to clipboard
 - Logs cover: API calls (path + status), sync progress, playback events (connect, play, errors, state changes), login flow
 
 ## Release Process
