@@ -123,13 +123,15 @@ class DownloadsViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                DebugLog.d(TAG, "Searching: artist='${state.searchArtist}' track='${state.searchQuery}'")
-                val response = zonikApi.searchDownloads(
-                    DownloadSearchRequest(
-                        artist = state.searchArtist.trim(),
-                        track = state.searchQuery.trim()
-                    )
-                )
+                val artist = state.searchArtist.trim()
+                val track = state.searchQuery.trim()
+                DebugLog.d(TAG, "Searching: artist='$artist' track='$track'")
+                val request = if (artist.isNotEmpty()) {
+                    DownloadSearchRequest(artist = artist, track = track)
+                } else {
+                    DownloadSearchRequest(query = track)
+                }
+                val response = zonikApi.searchDownloads(request)
                 DebugLog.d(TAG, "Search returned ${response.results.size} results")
                 _uiState.update {
                     it.copy(

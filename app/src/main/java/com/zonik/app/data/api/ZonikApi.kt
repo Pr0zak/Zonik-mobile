@@ -73,8 +73,9 @@ data class LogUploadResponse(
 
 @Serializable
 data class DownloadSearchRequest(
-    val artist: String,
-    val track: String
+    val artist: String? = null,
+    val track: String? = null,
+    val query: String? = null
 )
 
 @Serializable
