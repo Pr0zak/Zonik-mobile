@@ -31,6 +31,11 @@ interface ZonikApi {
     @GET("api/download/status")
     suspend fun getDownloadStatus(): DownloadStatusResponse
 
+    // --- Logs ---
+
+    @POST("api/logs")
+    suspend fun uploadLogs(@Body request: LogUploadRequest): LogUploadResponse
+
     // --- Jobs ---
 
     @GET("api/jobs/active")
@@ -47,6 +52,22 @@ interface ZonikApi {
     @GET("api/jobs/{id}")
     suspend fun getJob(@Path("id") id: String): JobDetailResponse
 }
+
+// --- Log Models ---
+
+@Serializable
+data class LogUploadRequest(
+    val device: String,
+    val app_version: String,
+    val timestamp: String,
+    val logs: String
+)
+
+@Serializable
+data class LogUploadResponse(
+    val id: String = "",
+    val message: String = ""
+)
 
 // --- Request Models ---
 

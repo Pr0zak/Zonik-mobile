@@ -472,6 +472,8 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
     val githubToken by viewModel.githubToken.collectAsState()
     val isUploading by viewModel.isUploadingLogs.collectAsState()
     val uploadUrl by viewModel.logUploadUrl.collectAsState()
+    val isUploadingToServer by viewModel.isUploadingLogsToServer.collectAsState()
+    val serverUploadResult by viewModel.serverUploadResult.collectAsState()
     var showTokenDialog by remember { mutableStateOf(false) }
 
     Card(
@@ -487,6 +489,46 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
                     Icon(Icons.Default.BugReport, contentDescription = null)
                 }
             )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Upload to Zonik server (no extra config needed)
+            ListItem(
+                headlineContent = {
+                    Button(
+                        onClick = viewModel::uploadLogsToServer,
+                        enabled = !isUploadingToServer
+                    ) {
+                        if (isUploadingToServer) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (isUploadingToServer) "Uploading..." else "Upload to Server")
+                    }
+                }
+            )
+
+            if (serverUploadResult != null) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                val isSuccess = serverUploadResult!!.startsWith("Uploaded")
+                ListItem(
+                    headlineContent = { Text(if (isSuccess) "Logs uploaded" else "Upload failed") },
+                    supportingContent = { Text(serverUploadResult!!) },
+                    leadingContent = {
+                        Icon(
+                            if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
+                            contentDescription = null,
+                            tint = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                    }
+                )
+            }
+
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
             if (githubToken == null) {

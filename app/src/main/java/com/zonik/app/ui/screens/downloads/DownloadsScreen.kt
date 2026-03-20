@@ -50,7 +50,8 @@ data class DownloadsUiState(
     val expandedJobId: String? = null,
     val jobDetail: JobDetailResponse? = null,
     val isLoadingDetail: Boolean = false,
-    val libraryTitleArtistPairs: Set<String> = emptySet()
+    val libraryTitleArtistPairs: Set<String> = emptySet(),
+    val successMessage: String? = null
 )
 
 // endregion
@@ -151,15 +152,19 @@ class DownloadsViewModel @Inject constructor(
     fun triggerDownload(result: DownloadResult) {
         viewModelScope.launch {
             try {
-                DebugLog.d(TAG, "Triggering download: ${result.displayName}")
-                zonikApi.triggerDownload(
+                val artist = _uiState.value.searchArtist.trim()
+                val track = result.displayName
+                DebugLog.d(TAG, "Triggering download: artist='$artist' track='$track' user=${result.username} file=${result.filename}")
+                val response = zonikApi.triggerDownload(
                     DownloadTriggerRequest(
-                        artist = _uiState.value.searchArtist.trim(),
-                        track = _uiState.value.searchQuery.trim(),
+                        artist = artist,
+                        track = track,
                         username = result.username,
                         filename = result.filename
                     )
                 )
+                DebugLog.d(TAG, "Trigger response: jobId=${response.jobId} message=${response.message}")
+                _uiState.update { it.copy(error = null, successMessage = "Download started: $track") }
                 refreshStatus()
             } catch (e: Exception) {
                 DebugLog.e(TAG, "Download trigger failed", e)
@@ -184,8 +189,9 @@ class DownloadsViewModel @Inject constructor(
                         track = result.displayName
                     )
                 }
-                zonikApi.bulkDownload(BulkDownloadRequest(tracks = tracks))
-                _uiState.update { it.copy(selectedResults = emptySet()) }
+                val response = zonikApi.bulkDownload(BulkDownloadRequest(tracks = tracks))
+                DebugLog.d(TAG, "Bulk trigger response: jobId=${response.jobId} message=${response.message}")
+                _uiState.update { it.copy(selectedResults = emptySet(), successMessage = "Downloading ${selected.size} tracks") }
                 refreshStatus()
             } catch (e: Exception) {
                 DebugLog.e(TAG, "Bulk download failed", e)
@@ -281,7 +287,7 @@ class DownloadsViewModel @Inject constructor(
     }
 
     fun dismissError() {
-        _uiState.update { it.copy(error = null) }
+        _uiState.update { it.copy(error = null, successMessage = null) }
     }
 }
 
@@ -332,7 +338,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
             }
         },
         snackbarHost = {
-            uiState.error?.let { error ->
+            if (uiState.error != null) {
                 Snackbar(
                     action = {
                         TextButton(onClick = { viewModel.dismissError() }) {
@@ -341,7 +347,19 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                     },
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(error)
+                    Text(uiState.error!!)
+                }
+            } else if (uiState.successMessage != null) {
+                LaunchedEffect(uiState.successMessage) {
+                    delay(3000)
+                    viewModel.dismissError()
+                }
+                Snackbar(
+                    modifier = Modifier.padding(16.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Text(uiState.successMessage!!)
                 }
             }
         }

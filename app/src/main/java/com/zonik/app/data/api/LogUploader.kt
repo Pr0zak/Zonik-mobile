@@ -12,6 +12,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -35,12 +38,41 @@ data class GistResponse(
 
 @Singleton
 class LogUploader @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
+    private val zonikApi: ZonikApi
 ) {
 
     private val client = OkHttpClient()
     private val json = Json { ignoreUnknownKeys = true }
     private var lastGistId: String? = null
+
+    /**
+     * Upload current debug logs to the Zonik server.
+     * Returns the log ID or null on failure.
+     */
+    suspend fun uploadLogsToServer(): String? = withContext(Dispatchers.IO) {
+        try {
+            val device = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})"
+            val appVersion = getAppVersion()
+            val timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
+            val logs = DebugLog.getPersistedLogs()
+
+            val response = zonikApi.uploadLogs(
+                LogUploadRequest(
+                    device = device,
+                    app_version = appVersion,
+                    timestamp = timestamp,
+                    logs = logs
+                )
+            )
+
+            DebugLog.d("LogUploader", "Logs uploaded to server: ${response.id}")
+            response.id
+        } catch (e: Exception) {
+            DebugLog.e("LogUploader", "Server upload failed", e)
+            null
+        }
+    }
 
     /**
      * Upload current debug logs to a private GitHub Gist.

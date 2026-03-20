@@ -71,6 +71,12 @@ class SettingsViewModel @Inject constructor(
     private val _isUploadingLogs = MutableStateFlow(false)
     val isUploadingLogs: StateFlow<Boolean> = _isUploadingLogs.asStateFlow()
 
+    private val _isUploadingLogsToServer = MutableStateFlow(false)
+    val isUploadingLogsToServer: StateFlow<Boolean> = _isUploadingLogsToServer.asStateFlow()
+
+    private val _serverUploadResult = MutableStateFlow<String?>(null)
+    val serverUploadResult: StateFlow<String?> = _serverUploadResult.asStateFlow()
+
     fun setGithubToken(token: String) {
         viewModelScope.launch {
             settingsRepository.setGithubToken(token.ifBlank { null })
@@ -83,6 +89,16 @@ class SettingsViewModel @Inject constructor(
             _isUploadingLogs.value = true
             _logUploadUrl.value = logUploader.uploadLogs(token)
             _isUploadingLogs.value = false
+        }
+    }
+
+    fun uploadLogsToServer() {
+        viewModelScope.launch {
+            _isUploadingLogsToServer.value = true
+            _serverUploadResult.value = null
+            val id = logUploader.uploadLogsToServer()
+            _serverUploadResult.value = if (id != null) "Uploaded (ID: $id)" else "Upload failed"
+            _isUploadingLogsToServer.value = false
         }
     }
 
