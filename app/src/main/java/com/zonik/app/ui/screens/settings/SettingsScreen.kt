@@ -59,7 +59,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2838))
             ) {
                 val stats = uiState.libraryStats
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -99,7 +99,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF252331))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF332F44))
             ) {
                 Column {
                     ListItem(
@@ -183,7 +183,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2838))
             ) {
                 Column {
                     BitrateDropdown(
@@ -228,7 +228,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2838))
             ) {
                 Column {
                     SyncIntervalDropdown(
@@ -283,7 +283,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF252331))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF332F44))
             ) {
                 Column {
                     ListItem(
@@ -383,7 +383,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2838))
             ) {
                 val context = LocalContext.current
                 val versionName = remember {
@@ -446,7 +446,7 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2838))
     ) {
         Column {
             val update = availableUpdate
@@ -541,7 +541,7 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF252331))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF332F44))
     ) {
         Column {
             ListItem(
@@ -753,7 +753,7 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C28))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2838))
     ) {
         Column {
             ListItem(
@@ -808,7 +808,7 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF252331))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF332F44))
     ) {
         Column {
             ListItem(
