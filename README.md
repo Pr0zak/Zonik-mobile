@@ -20,7 +20,8 @@
 - **Connection resilience** — automatic retry with exponential backoff, network reconnect recovery, larger buffers
 - **Library sync** via OpenSubsonic `search3` API with starred track sync via `getStarred2` and flagged-for-deletion sync via `userRating`
 - **Mark for deletion** synced with Zonik server (rating=1 = flagged) — tracks appear in server's "Flagged" view for review/bulk delete
-- **Now Playing** with album art, Palette colors, queue with alpha scroll, star/delete actions, keep-screen-on
+- **Premium dark UI** — glass morphism, gradient buttons, gold lossless badges, floating mini player, swipe-to-dismiss Now Playing
+- **Now Playing** with album art glow, glass info card, glass control bar, Palette colors, queue with zebra-stripe, star/delete actions, keep-screen-on
 - **Stats page** — format/bitrate/genre/decade distributions, most played albums, top artists
 - **Scrobbling** via Subsonic API (server forwards to Last.fm)
 - **Self-update** from GitHub releases
@@ -77,7 +78,7 @@ APK outputs:
 
 ## Tech Stack
 
-- Kotlin, Jetpack Compose, Material 3
+- Kotlin, Jetpack Compose, Material 3 (custom dark theme with glass morphism)
 - AndroidX Media3 (ExoPlayer) + MediaLibraryService
 - SimpleCache + CacheDataSource for audio caching
 - Retrofit + OkHttp + Kotlinx Serialization

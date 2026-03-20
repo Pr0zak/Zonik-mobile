@@ -11,7 +11,7 @@ A native Android music player app that streams music from a self-hosted [Zonik](
 
 ## Tech Stack
 - **Language:** Kotlin
-- **UI:** Jetpack Compose + Material 3 + custom dark theme (gold/amber accents, vinyl record logo)
+- **UI:** Jetpack Compose + Material 3 + custom dark theme (glass morphism, gradient buttons, gold format badges, floating MiniPlayer)
 - **Playback:** AndroidX Media3 (ExoPlayer) + MediaLibraryService + Google Cast + SimpleCache
 - **Networking:** Retrofit + OkHttp + Kotlinx Serialization
 - **Local DB:** Room (v2) + Paging 3
@@ -63,6 +63,12 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 - Track identification: use metadata matching (title/artist) for transitions — `mediaId` and index are unreliable after IPC
 - Keep UI state in ViewModels using StateFlow
 - All track lists support long-press context menus (Play, Play Next, Add to Queue, Mark for Deletion)
+- **UI design system**: `ZonikColors` (gold, goldDim, glassBg, gradientStart/End, navBarBg), `ZonikShapes` (cardShape 16dp, miniPlayerShape 16dp, navBarShape 24dp top, coverArtShape 12dp, coverArtLargeShape 24dp, buttonShape 12dp, badgeShape 6dp)
+- **Glass morphism**: semi-transparent backgrounds (80-90% opacity `ZonikColors.glassBg`/`navBarBg`) — true backdrop blur requires API 31+ so not used (min SDK 26)
+- **Gradient buttons**: `Brush.horizontalGradient` with `containerColor = Color.Transparent` wrapping a `Box` with gradient background
+- **Format badges**: gold (`ZonikColors.gold`) for lossless (FLAC/ALAC), gray for lossy (MP3/AAC/OGG/OPUS)
+- **MainScreen layout**: `Box` instead of `Scaffold` — floating MiniPlayer above glass nav bar
+- **Screens use custom top bars** (Row with headlineMedium bold title) instead of M3 TopAppBar, with `statusBarsPadding()`
 
 ## Project Structure
 ```
@@ -82,22 +88,22 @@ app/src/main/java/com/zonik/app/
   ui/
     components/
       CoverArt.kt       # Reusable album art via Coil (auth handled by ImageLoader)
-      MiniPlayer.kt     # Persistent mini player bar with progress indicator
-      TrackListItem.kt  # Unified track row with format badge and context menu
+      MiniPlayer.kt     # Floating glass mini player with skip prev/next, circular play/pause, progress bar at bottom
+      TrackListItem.kt  # Unified track row with gold/gray format badge, left accent border for playing track, context menu
     navigation/   # Screen/MainTab route definitions
     screens/
-      home/       # HomeScreen — app icon in top bar, recent albums, recent tracks, shuffle/random, recently played
-      library/    # LibraryScreen (5 tabs: Tracks/Albums/Artists/Genres/Playlists), AlbumDetail, ArtistDetail
+      home/       # HomeScreen — custom top bar, gradient shuffle button, recently played cards (176dp), recent tracks
+      library/    # LibraryScreen (6 tabs: Tracks/Albums/Artists/Favorites/Genres/Playlists), AlbumDetail, ArtistDetail — gradient Play All, alpha scroll sidebar
       search/     # SearchScreen — debounced search across library
       downloads/  # DownloadsScreen — Soulseek search/active transfers/job history (real Zonik API)
       playlists/  # PlaylistsScreen
-      nowplaying/ # NowPlayingScreen — Symfonium-style with blurred background, Palette colors, queue (85% height, auto-scroll to current)
+      nowplaying/ # NowPlayingScreen — glass info card, glass control bar, album art glow, swipe-to-dismiss, gradient play button, zebra-stripe queue
       login/      # LoginScreen — connection test (ping + auth verification)
       stats/      # StatsScreen — library overview, format/bitrate/genre/decade distributions, most played, top artists
-      settings/   # SettingsScreen — server, sync, playback (bitrate, crossfade, keep screen on), cache (size, read-ahead), Android Auto (tab order), Last.fm, updates, debug logs
-    theme/        # ZonikTheme — custom dark color scheme (dark brown/black + gold/amber accents)
+      settings/   # SettingsScreen — uppercase section headers, rounded cards, cache progress bar, rounded icon containers
+    theme/        # ZonikTheme — ZonikColors (gold, glass, gradients), ZonikShapes (cards, nav, cover art), custom Typography
     util/         # FormatUtils (duration, file size formatting)
-  MainActivity.kt     # Main activity, nav host, bottom nav, Now Playing overlay with slide animation
+  MainActivity.kt     # Main activity, nav host, glass bottom nav bar, floating MiniPlayer, Now Playing overlay with slide animation
   ZonikApplication.kt # Hilt app, notification channels, WorkManager, Coil ImageLoader
 ```
 
@@ -117,6 +123,7 @@ app/src/main/java/com/zonik/app/
 - **Equalizer**: 5-band EQ (60Hz/230Hz/910Hz/3.6kHz/14kHz) via `android.media.audiofx.Equalizer` bound to ExoPlayer's audio session ID. 10 presets + custom band levels. Settings persisted in DataStore, restored on service startup. System EQ launch button for OEM equalizers. EQ commands sent via `SET_EQ` SessionCommand (must be on main thread).
 - **Keep screen on**: optional setting prevents display sleep while Now Playing is visible and playing (uses `FLAG_KEEP_SCREEN_ON`)
 - Now Playing auto-shows instantly on tap via `playbackRequested` SharedFlow (emits before buffering)
+- Now Playing: swipe-down to dismiss (vertical drag gesture with 300px threshold), glass info card with format badge, glass secondary control bar, gradient play/pause button (80dp), small dot seek thumb
 - `currentTrack` set immediately in `playTracks()` for instant UI update
 - Slide animation: 250ms up / 200ms down
 - Seek bar polling: 100ms (Now Playing), 200ms (MiniPlayer)
@@ -210,3 +217,7 @@ app/src/main/java/com/zonik/app/
 - Cast `MediaRouteButton` crashes without `AppCompatActivity` context — `MainActivity` extends `AppCompatActivity` (not `ComponentActivity`)
 - Cast initialization wrapped in try-catch — graceful fallback on devices without Google Play Services
 - Cast receiver CSS/images must use jsdelivr CDN URLs (raw GitHub returns wrong MIME types)
+- **MainScreen uses `Box` not `Scaffold`** — MiniPlayer and nav bar are manually positioned at bottom; content needs explicit bottom padding for floating elements
+- **Album art glow** uses `Modifier.blur()` + `alpha()` — degrades gracefully on API < 31 (blur is a no-op)
+- **Now Playing swipe-to-dismiss** uses `detectVerticalDragGestures` with `graphicsLayer` translation — only allows downward drag (`coerceAtLeast(0f)`)
+- **Library alpha scroll sidebar** has semi-transparent background + LazyColumn has `end` padding to prevent overlap with track trailing content
