@@ -537,10 +537,12 @@ fun NowPlayingScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 thumb = {
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .background(Color.White, CircleShape)
+                    SliderDefaults.Thumb(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White
+                        ),
+                        thumbSize = androidx.compose.ui.unit.DpSize(14.dp, 14.dp)
                     )
                 },
                 colors = SliderDefaults.colors(
