@@ -537,12 +537,10 @@ fun NowPlayingScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 thumb = {
-                    // Small dot thumb instead of large vertical bar
                     Box(
                         modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
+                            .size(14.dp)
+                            .background(Color.White, CircleShape)
                     )
                 },
                 colors = SliderDefaults.colors(
