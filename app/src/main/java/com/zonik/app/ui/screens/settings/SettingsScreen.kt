@@ -57,7 +57,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                shape = ZonikShapes.cardShape
+                shape = ZonikShapes.cardShape,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 val stats = uiState.libraryStats
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -96,7 +97,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                shape = ZonikShapes.cardShape
+                shape = ZonikShapes.cardShape,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 Column {
                     ListItem(
@@ -179,7 +181,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                shape = ZonikShapes.cardShape
+                shape = ZonikShapes.cardShape,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 Column {
                     BitrateDropdown(
@@ -223,7 +226,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                shape = ZonikShapes.cardShape
+                shape = ZonikShapes.cardShape,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 Column {
                     SyncIntervalDropdown(
@@ -277,7 +281,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                shape = ZonikShapes.cardShape
+                shape = ZonikShapes.cardShape,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 Column {
                     ListItem(
@@ -376,7 +381,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                shape = ZonikShapes.cardShape
+                shape = ZonikShapes.cardShape,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 val context = LocalContext.current
                 val versionName = remember {
@@ -438,7 +444,8 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
-        shape = ZonikShapes.cardShape
+        shape = ZonikShapes.cardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column {
             val update = availableUpdate
@@ -532,7 +539,8 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
-        shape = ZonikShapes.cardShape
+        shape = ZonikShapes.cardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column {
             ListItem(
@@ -743,7 +751,8 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
-        shape = ZonikShapes.cardShape
+        shape = ZonikShapes.cardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column {
             ListItem(
@@ -797,7 +806,8 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
-        shape = ZonikShapes.cardShape
+        shape = ZonikShapes.cardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column {
             ListItem(
