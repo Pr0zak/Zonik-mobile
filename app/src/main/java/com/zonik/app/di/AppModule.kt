@@ -48,9 +48,11 @@ object AppModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
+        @ApplicationContext context: Context,
         authInterceptor: SubsonicAuthInterceptor,
         settingsRepository: SettingsRepository
     ): OkHttpClient {
+        val httpCache = okhttp3.Cache(File(context.cacheDir, "http_cache"), 50L * 1024 * 1024) // 50 MB
         // Dynamic base URL interceptor — rewrites every request to the current server URL
         val dynamicBaseUrlInterceptor = Interceptor { chain ->
             val serverUrl = runBlocking {
@@ -78,6 +80,7 @@ object AppModule {
         }
 
         return OkHttpClient.Builder()
+            .cache(httpCache)
             .addInterceptor(dynamicBaseUrlInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(HttpLoggingInterceptor().apply {

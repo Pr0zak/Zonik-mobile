@@ -129,13 +129,18 @@ class ZonikMediaService : MediaLibraryService() {
         com.zonik.app.data.DebugLog.d("MediaService", "onCreate — setting up ExoPlayer with OkHttpDataSource (clean client)")
         // Use a clean OkHttpClient without auth interceptor — auth is baked into URLs
         val streamClient = okhttp3.OkHttpClient.Builder()
+            .connectionPool(okhttp3.ConnectionPool(5, 30, java.util.concurrent.TimeUnit.SECONDS))
             .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .addInterceptor { chain ->
-                val url = chain.request().url.toString()
-                com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer fetching: ${url.take(100)}...")
-                val response = chain.proceed(chain.request())
-                com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer response: ${response.code} ${response.header("Content-Type")} ${response.header("Content-Length") ?: "chunked"}")
+                val request = chain.request()
+                val url = request.url.toString()
+                val rangeHeader = request.header("Range") ?: "none"
+                com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer fetching: ${url.take(100)}... Range=$rangeHeader")
+                val response = chain.proceed(request)
+                val acceptRanges = response.header("Accept-Ranges") ?: "unknown"
+                val contentRange = response.header("Content-Range")
+                com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer response: ${response.code} ${response.header("Content-Type")} len=${response.header("Content-Length") ?: "chunked"} accept-ranges=$acceptRanges${if (contentRange != null) " range=$contentRange" else ""}")
                 response
             }
             .build()
@@ -150,13 +155,13 @@ class ZonikMediaService : MediaLibraryService() {
             .setCacheKeyFactory(cacheKeyFactory)
         cacheDataSourceFactory = dataSourceFactory
 
-        // Larger buffers for streaming resilience
+        // Buffer config tuned for low-latency transcoding server
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                30_000,   // min buffer: 30s (default 15s)
-                120_000,  // max buffer: 2 min (default 50s)
-                2_000,    // buffer for playback: 2s
-                10_000    // buffer for playback after rebuffer: 10s (prevents rapid rebuffer cycles)
+                15_000,   // min buffer: 15s (reduced from 30s — server now uses low-latency transcoding)
+                120_000,  // max buffer: 2 min
+                1_500,    // buffer for playback: 1.5s (faster start with server flush_packets)
+                5_000     // buffer for playback after rebuffer: 5s (reduced — pre-cache now yields to playback)
             )
             .build()
 
