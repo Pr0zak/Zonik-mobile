@@ -1,8 +1,6 @@
 package com.zonik.app.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -29,7 +27,6 @@ import com.zonik.app.ui.util.formatLargeFileSize
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,51 +45,14 @@ fun SettingsScreen(
             )
         }
     ) { padding ->
-        val sectionTitles = listOf("Stats", "Server", "Playback", "Equalizer", "Sync", "Cache", "Auto", "Debug", "About")
-        val pagerState = rememberPagerState(pageCount = { sectionTitles.size })
-        val coroutineScope = rememberCoroutineScope()
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ScrollableTabRow(
-                selectedTabIndex = pagerState.currentPage,
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary,
-                edgePadding = 16.dp,
-                divider = {}
-            ) {
-                sectionTitles.forEachIndexed { index, title ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
-                        text = {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
-                }
-            }
-
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    when (page) {
-                        0 -> { // Library Stats
+            // Library Stats section (at top)
             SettingsSectionHeader(title = "Library Stats")
             Card(
                 modifier = Modifier
@@ -132,9 +92,7 @@ fun SettingsScreen(
                 }
             }
 
-                        } // end Stats
-
-                        1 -> { // Server
+            // Server section
             SettingsSectionHeader(title = "Server")
             Card(
                 modifier = Modifier
@@ -222,9 +180,7 @@ fun SettingsScreen(
                 }
             }
 
-                        } // end Server
-
-                        2 -> { // Playback
+            // Playback section
             SettingsSectionHeader(title = "Playback")
             Card(
                 modifier = Modifier
@@ -266,15 +222,11 @@ fun SettingsScreen(
                 }
             }
 
-                        } // end Playback
-
-                        3 -> { // Equalizer
+            // Equalizer section
             SettingsSectionHeader(title = "Equalizer")
             EqualizerSection(viewModel = viewModel, uiState = uiState)
 
-                        } // end Equalizer
-
-                        4 -> { // Sync
+            // Sync section
             SettingsSectionHeader(title = "Sync")
             Card(
                 modifier = Modifier
@@ -332,9 +284,7 @@ fun SettingsScreen(
                 }
             }
 
-                        } // end Sync
-
-                        5 -> { // Cache & Buffering
+            // Cache & Buffering section
             SettingsSectionHeader(title = "Cache & Buffering")
             Card(
                 modifier = Modifier
@@ -430,21 +380,15 @@ fun SettingsScreen(
                 }
             }
 
-                        } // end Cache & Buffering
-
-                        6 -> { // Android Auto
+            // Android Auto section
             SettingsSectionHeader(title = "Android Auto")
             AutoTabOrderSection(viewModel = viewModel)
 
-                        } // end Android Auto
-
-                        7 -> { // Debug
+            // Debug logs section
             SettingsSectionHeader(title = "Debug")
             DebugLogsSection(viewModel = viewModel)
 
-                        } // end Debug
-
-                        8 -> { // About
+            // About & Updates section
             SettingsSectionHeader(title = "About")
             Card(
                 modifier = Modifier
@@ -477,14 +421,10 @@ fun SettingsScreen(
                 )
             }
             UpdateSection(viewModel = viewModel)
-                        } // end About
-                    } // end when
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                } // end scrollable Column
-            } // end HorizontalPager
-        } // end outer Column
-    } // end Scaffold
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
 }
 
 // region Components

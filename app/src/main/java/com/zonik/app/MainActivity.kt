@@ -20,13 +20,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.zonik.app.data.repository.SettingsRepository
@@ -49,8 +46,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import com.zonik.app.ui.theme.ZonikColors
 import com.zonik.app.ui.theme.ZonikShapes
+import kotlinx.coroutines.launch
 import com.zonik.app.ui.theme.ZonikTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -238,42 +238,36 @@ fun MainScreen(
     rootNavController: NavHostController,
     onExpandNowPlaying: () -> Unit
 ) {
-    val tabNavController = rememberNavController()
-    val navBackStackEntry by tabNavController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
+    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    val coroutineScope = rememberCoroutineScope()
 
     // Measure nav bar + mini player height for bottom padding
     val navBarHeight = 80.dp
     val miniPlayerHeight = 72.dp
     val miniPlayerBottomPadding = 8.dp
 
+    // Sync pager swipes → nav bar selection
+    val currentPage = pagerState.currentPage
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // Content area with bottom padding for floating elements
-        NavHost(
-            navController = tabNavController,
-            startDestination = MainTab.Home.route,
+        // Content area with swipeable pages
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = navBarHeight + miniPlayerHeight + miniPlayerBottomPadding)
-        ) {
-            composable(MainTab.Home.route) {
-                HomeScreen(
+                .padding(bottom = navBarHeight + miniPlayerHeight + miniPlayerBottomPadding),
+            beyondViewportPageCount = 1
+        ) { page ->
+            when (page) {
+                0 -> HomeScreen(
                     onNavigateToLibraryTracks = {
-                        tabNavController.navigate(MainTab.Library.route) {
-                            popUpTo(tabNavController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
                     },
                     onNavigateToAlbum = { albumId ->
                         rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
                     }
                 )
-            }
-            composable(MainTab.Library.route) {
-                LibraryScreen(
+                1 -> LibraryScreen(
                     onNavigateToAlbum = { albumId ->
                         rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
                     },
@@ -281,9 +275,7 @@ fun MainScreen(
                         rootNavController.navigate(Screen.ArtistDetail.createRoute(artistId))
                     }
                 )
-            }
-            composable(MainTab.Search.route) {
-                SearchScreen(
+                2 -> SearchScreen(
                     onNavigateToAlbum = { albumId ->
                         rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
                     },
@@ -291,12 +283,8 @@ fun MainScreen(
                         rootNavController.navigate(Screen.ArtistDetail.createRoute(artistId))
                     }
                 )
-            }
-            composable(MainTab.Downloads.route) {
-                DownloadsScreen()
-            }
-            composable(MainTab.Settings.route) {
-                SettingsScreen(
+                3 -> DownloadsScreen()
+                4 -> SettingsScreen(
                     onDisconnected = {
                         rootNavController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
@@ -330,10 +318,7 @@ fun MainScreen(
                     containerColor = Color.Transparent,
                     tonalElevation = 0.dp
                 ) {
-                    tabs.forEach { tabItem ->
-                        val selected = currentDestination?.hierarchy?.any {
-                            it.route == tabItem.tab.route
-                        } == true
+                    tabs.forEachIndexed { index, tabItem ->
                         NavigationBarItem(
                             icon = {
                                 Icon(
@@ -349,15 +334,9 @@ fun MainScreen(
                                     style = MaterialTheme.typography.labelSmall
                                 )
                             },
-                            selected = selected,
+                            selected = currentPage == index,
                             onClick = {
-                                tabNavController.navigate(tabItem.tab.route) {
-                                    popUpTo(tabNavController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                                coroutineScope.launch { pagerState.animateScrollToPage(index) }
                             },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.primary,
