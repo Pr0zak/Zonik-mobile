@@ -23,6 +23,7 @@ import com.zonik.app.data.DebugLog
 import com.zonik.app.data.api.*
 import com.zonik.app.data.db.ZonikDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,11 +72,22 @@ class DownloadsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DownloadsUiState())
     val uiState: StateFlow<DownloadsUiState> = _uiState.asStateFlow()
 
+    private var autoRefreshJob: Job? = null
+
     init {
         refreshStatus()
         loadHistory()
-        startAutoRefresh()
         loadLibraryPairs()
+    }
+
+    fun startPolling() {
+        if (autoRefreshJob?.isActive == true) return
+        autoRefreshJob = startAutoRefresh()
+    }
+
+    fun stopPolling() {
+        autoRefreshJob?.cancel()
+        autoRefreshJob = null
     }
 
     private fun loadLibraryPairs() {
@@ -87,8 +99,8 @@ class DownloadsViewModel @Inject constructor(
         }
     }
 
-    private fun startAutoRefresh() {
-        viewModelScope.launch {
+    private fun startAutoRefresh(): Job {
+        return viewModelScope.launch {
             while (true) {
                 delay(3000)
                 try {
@@ -317,6 +329,12 @@ private enum class DownloadsTab(val label: String) {
 @Composable
 fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Start/stop polling when screen enters/leaves composition
+    DisposableEffect(viewModel) {
+        viewModel.startPolling()
+        onDispose { viewModel.stopPolling() }
+    }
 
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = DownloadsTab.entries

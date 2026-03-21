@@ -13,3 +13,4 @@ wear/build/
 node_modules/
 package.json
 package-lock.json
+docs/backend-streaming-improvements.md

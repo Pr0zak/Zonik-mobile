@@ -200,6 +200,15 @@ class PlaybackManager @Inject constructor(
                 }
 
                 // PLAYLIST_CHANGED fires when the service sets items on the player directly
+                // Skip duplicate transitions for the same track (prevents UI flicker and extra scrobbles)
+                val current = _currentTrack.value
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED
+                    && current != null && metaTitle == current.title
+                    && (metaArtist == null || metaArtist == current.artist)) {
+                    DebugLog.d("Playback", "Skipping duplicate PLAYLIST_CHANGED for '${current.title}'")
+                    return
+                }
+
                 // Match by metadata first (more reliable than index after shuffle/IPC)
                 if (metaTitle != null) {
                     val match = findTrackByMetadata(metaTitle, metaArtist)
@@ -243,8 +252,9 @@ class PlaybackManager @Inject constructor(
                 if (playbackState == Player.STATE_BUFFERING) {
                     val now = System.currentTimeMillis()
                     bufferingTimestamps.add(now)
-                    // Keep only events from the last 60 seconds
-                    bufferingTimestamps.removeAll { now - it > 60_000 }
+                    // Keep only events from the last 2 minutes
+                    bufferingTimestamps.removeAll { now - it > 120_000 }
+                    DebugLog.d("Playback", "Buffering events in window: ${bufferingTimestamps.size}, adaptive=$adaptiveBitrateEnabled, override=$bitrateOverride")
                     if (bufferingTimestamps.size >= 3 && adaptiveBitrateEnabled) {
                         degradeBitrate()
                         bufferingTimestamps.clear()

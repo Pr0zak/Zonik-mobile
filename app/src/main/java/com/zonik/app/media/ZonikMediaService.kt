@@ -58,9 +58,14 @@ class ZonikMediaService : MediaLibraryService() {
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var equalizer: android.media.audiofx.Equalizer? = null
+    private var lastEqEnabled: Boolean? = null
+    private var lastEqPreset: Int? = null
+    private var lastEqBandLevels: String? = null
     private val preCacheScope = CoroutineScope(Dispatchers.IO)
     private var preCacheJob: Job? = null
     private var cacheDataSourceFactory: CacheDataSource.Factory? = null
+    private val preCachingInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    @Volatile private var isPlayerBuffering = false
     private var connectivityManager: android.net.ConnectivityManager? = null
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
     private val starredTrackIds = mutableSetOf<String>()
@@ -145,13 +150,13 @@ class ZonikMediaService : MediaLibraryService() {
             .setCacheKeyFactory(cacheKeyFactory)
         cacheDataSourceFactory = dataSourceFactory
 
-        // Larger buffers for driving resilience
+        // Larger buffers for streaming resilience
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 30_000,   // min buffer: 30s (default 15s)
                 120_000,  // max buffer: 2 min (default 50s)
                 2_000,    // buffer for playback: 2s
-                5_000     // buffer for playback after rebuffer: 5s
+                10_000    // buffer for playback after rebuffer: 10s (prevents rapid rebuffer cycles)
             )
             .build()
 
@@ -253,6 +258,11 @@ class ZonikMediaService : MediaLibraryService() {
                     else -> "UNKNOWN"
                 }
                 com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer state: $state")
+                isPlayerBuffering = playbackState == androidx.media3.common.Player.STATE_BUFFERING
+                // Cancel pre-caching when player is buffering to free bandwidth
+                if (isPlayerBuffering) {
+                    preCacheJob?.cancel()
+                }
             }
         })
 
@@ -378,6 +388,11 @@ class ZonikMediaService : MediaLibraryService() {
     }
 
     private fun applyEqualizer(audioSessionId: Int, enabled: Boolean, preset: Int, bandLevelsStr: String?) {
+        // Skip if settings unchanged
+        if (enabled == lastEqEnabled && preset == lastEqPreset && bandLevelsStr == lastEqBandLevels && equalizer != null) return
+        lastEqEnabled = enabled
+        lastEqPreset = preset
+        lastEqBandLevels = bandLevelsStr
         try {
             if (equalizer == null) {
                 equalizer = android.media.audiofx.Equalizer(0, audioSessionId)
@@ -1041,16 +1056,19 @@ class ZonikMediaService : MediaLibraryService() {
                     val factory = cacheDataSourceFactory
                     if (factory != null) {
                         preCacheJob?.cancel()
+                        preCachingInProgress.clear()
                         preCacheJob = preCacheScope.launch {
                             val readAhead = settingsRepository.cacheReadAhead.first()
                             if (readAhead <= 0) return@launch
                             // Cache from startIndex+1 onward (current track streams via CacheDataSource which auto-caches)
                             val preCacheCount = minOf(readAhead, tracks.size - startIndex - 1)
                             for (i in 1..preCacheCount) {
+                                if (isPlayerBuffering) break // Yield to active playback
                                 val idx = startIndex + i
                                 if (idx >= tracks.size) break
                                 val track = tracks[idx]
                                 if (simpleCache.getCachedBytes(track.id, 0, Long.MAX_VALUE) > 0) continue
+                                if (!preCachingInProgress.add(track.id)) continue
                                 try {
                                     com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: pre-caching track $i/$preCacheCount (${track.id})")
                                     val streamUrl = buildStreamUrlForTrack(track.id)
@@ -1058,7 +1076,9 @@ class ZonikMediaService : MediaLibraryService() {
                                     val dataSource = factory.createDataSource()
                                     CacheWriter(dataSource, dataSpec, null, null).cache()
                                     com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: cached ${track.id}")
+                                    preCachingInProgress.remove(track.id)
                                 } catch (e: Exception) {
+                                    preCachingInProgress.remove(track.id)
                                     if (e is kotlinx.coroutines.CancellationException) throw e
                                     com.zonik.app.data.DebugLog.w("MediaService", "PLAY_TRACKS: pre-cache failed: ${e.message}")
                                 }
@@ -1147,6 +1167,7 @@ class ZonikMediaService : MediaLibraryService() {
 
     private fun preCacheUpcoming(player: androidx.media3.common.Player) {
         preCacheJob?.cancel()
+        if (isPlayerBuffering) return // Don't pre-cache while player is buffering
         val factory = cacheDataSourceFactory ?: return
         val allUpcoming = mutableListOf<Uri>()
         try {
@@ -1172,16 +1193,21 @@ class ZonikMediaService : MediaLibraryService() {
             if (readAhead <= 0) return@launch
             val upcoming = allUpcoming.take(readAhead)
             for (uri in upcoming) {
+                if (isPlayerBuffering) break // Yield to active playback
                 try {
                     val trackId = uri.getQueryParameter("id") ?: continue
                     if (simpleCache.getCachedBytes(trackId, 0, Long.MAX_VALUE) > 0) continue
+                    if (!preCachingInProgress.add(trackId)) continue // Already caching this track
                     com.zonik.app.data.DebugLog.d("MediaService", "Pre-caching track: $trackId")
                     val dataSpec = DataSpec(uri)
                     val dataSource = factory.createDataSource()
                     val writer = CacheWriter(dataSource, dataSpec, null, null)
                     writer.cache()
                     com.zonik.app.data.DebugLog.d("MediaService", "Pre-cached track: $trackId")
+                    preCachingInProgress.remove(trackId)
                 } catch (e: Exception) {
+                    val trackId = uri.getQueryParameter("id")
+                    if (trackId != null) preCachingInProgress.remove(trackId)
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     com.zonik.app.data.DebugLog.w("MediaService", "Pre-cache failed: ${e.message}")
                 }
