@@ -101,11 +101,21 @@ class DownloadsViewModel @Inject constructor(
 
     private fun startAutoRefresh(): Job {
         return viewModelScope.launch {
+            var idleChecks = 0
             while (true) {
-                delay(3000)
+                // Adaptive polling: 5s when active, 30s when idle, stop after 3 idle checks
+                val interval = if (idleChecks >= 1) 30_000L else 5_000L
+                delay(interval)
                 try {
                     val statusResponse = zonikApi.getDownloadStatus()
                     val activeJobs = zonikApi.getActiveJobs()
+                    val hasActive = statusResponse.transfers.isNotEmpty() || activeJobs.isNotEmpty()
+                    if (hasActive) {
+                        idleChecks = 0
+                    } else {
+                        idleChecks++
+                        if (idleChecks >= 3) break // Stop polling when idle
+                    }
                     _uiState.update {
                         it.copy(
                             activeTransfers = statusResponse.transfers,

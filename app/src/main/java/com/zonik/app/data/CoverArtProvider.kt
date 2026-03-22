@@ -3,6 +3,7 @@ package com.zonik.app.data
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.database.Cursor
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import com.zonik.app.data.repository.SettingsRepository
@@ -35,6 +36,7 @@ class CoverArtProvider : ContentProvider() {
 
     companion object {
         const val AUTHORITY = "com.zonik.app.artwork"
+        @Volatile private var lastErrorLogTime = 0L
 
         fun buildUri(coverArtId: String, size: Int = 300): Uri {
             return Uri.parse("content://$AUTHORITY/$coverArtId/$size")
@@ -74,6 +76,10 @@ class CoverArtProvider : ContentProvider() {
             return ParcelFileDescriptor.open(cacheFile, ParcelFileDescriptor.MODE_READ_ONLY)
         }
 
+        // Skip network call if offline — avoids DNS crash and error spam
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        if (cm?.activeNetwork == null) return null
+
         return try {
             val request = Request.Builder().url(url).build()
             val response = okHttpClient.newCall(request).execute()
@@ -82,7 +88,12 @@ class CoverArtProvider : ContentProvider() {
             cacheFile.writeBytes(bytes)
             ParcelFileDescriptor.open(cacheFile, ParcelFileDescriptor.MODE_READ_ONLY)
         } catch (e: Exception) {
-            DebugLog.w("CoverArtProvider", "Failed to fetch cover art: ${e.message}")
+            // Throttle error logging to avoid spam (1 log per 30s)
+            val now = System.currentTimeMillis()
+            if (now - lastErrorLogTime > 30_000) {
+                lastErrorLogTime = now
+                DebugLog.w("CoverArtProvider", "Failed to fetch cover art: ${e.message}")
+            }
             null
         }
     }

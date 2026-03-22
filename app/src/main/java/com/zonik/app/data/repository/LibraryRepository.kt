@@ -54,6 +54,12 @@ class LibraryRepository @Inject constructor(
     suspend fun getTrackById(id: String): Track? =
         database.trackDao().getById(id)?.toDomain()
 
+    suspend fun getTracksByIds(ids: List<String>): List<Track> {
+        val entities = database.trackDao().getByIds(ids)
+        val entityMap = entities.associateBy { it.id }
+        return ids.mapNotNull { id -> entityMap[id]?.toDomain() }
+    }
+
     suspend fun getStarredTracks(): List<Track> =
         database.trackDao().getStarred().map { it.toDomain() }
 

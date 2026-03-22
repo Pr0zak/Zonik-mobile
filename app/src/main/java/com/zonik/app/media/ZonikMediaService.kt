@@ -522,8 +522,9 @@ class ZonikMediaService : MediaLibraryService() {
 
     private fun buildCustomLayout(trackId: String): List<CommandButton> {
         val isStarred = trackId.isNotBlank() && trackId in starredTrackIds
+        val isMarked = trackId.isNotBlank() && trackId in markedForDeletionIds
         val isShuffled = mediaLibrarySession?.player?.shuffleModeEnabled ?: false
-        return listOf(buildStarButton(isStarred), buildShuffleButton(isShuffled), buildRadioButton())
+        return listOf(buildStarButton(isStarred), buildDeleteButton(isMarked), buildShuffleButton(isShuffled), buildRadioButton())
     }
 
     /**
