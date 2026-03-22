@@ -1310,6 +1310,14 @@ private fun FlaggedTab(
             val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
             ListItem(
                 colors = ListItemDefaults.colors(containerColor = rowBg),
+                leadingContent = {
+                    CoverArt(
+                        coverArtId = track.coverArt,
+                        contentDescription = track.title,
+                        size = 48,
+                        modifier = Modifier.clip(ZonikShapes.coverArtShape)
+                    )
+                },
                 headlineContent = {
                     Text(
                         text = track.title,
