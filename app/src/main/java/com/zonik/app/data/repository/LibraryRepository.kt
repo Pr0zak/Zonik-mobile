@@ -1,5 +1,6 @@
 package com.zonik.app.data.repository
 
+import androidx.room.withTransaction
 import com.zonik.app.data.api.SubsonicApi
 import com.zonik.app.data.db.*
 import com.zonik.app.model.*
@@ -314,12 +315,14 @@ class LibraryRepository @Inject constructor(
         }
 
         val entities = allArtists.map { ArtistEntity.fromDomain(it.toDomain()) }
-        database.artistDao().upsertAll(entities)
-        val newIds = entities.map { it.id }.toSet()
-        val existingIds = database.artistDao().getAllIds()
-        val toDelete = existingIds.filter { it !in newIds }
-        toDelete.chunked(900).forEach { chunk ->
-            database.artistDao().deleteByIds(chunk)
+        database.withTransaction {
+            database.artistDao().upsertAll(entities)
+            val newIds = entities.map { it.id }.toSet()
+            val existingIds = database.artistDao().getAllIds()
+            val toDelete = existingIds.filter { it !in newIds }
+            toDelete.chunked(900).forEach { chunk ->
+                database.artistDao().deleteByIds(chunk)
+            }
         }
         return entities.size
     }
@@ -342,12 +345,14 @@ class LibraryRepository @Inject constructor(
         }
 
         val entities = allAlbums.map { AlbumEntity.fromDomain(it.toDomain()) }
-        database.albumDao().upsertAll(entities)
-        val newIds = entities.map { it.id }.toSet()
-        val existingIds = database.albumDao().getAllIds()
-        val toDelete = existingIds.filter { it !in newIds }
-        toDelete.chunked(900).forEach { chunk ->
-            database.albumDao().deleteByIds(chunk)
+        database.withTransaction {
+            database.albumDao().upsertAll(entities)
+            val newIds = entities.map { it.id }.toSet()
+            val existingIds = database.albumDao().getAllIds()
+            val toDelete = existingIds.filter { it !in newIds }
+            toDelete.chunked(900).forEach { chunk ->
+                database.albumDao().deleteByIds(chunk)
+            }
         }
         return entities.size
     }
@@ -389,12 +394,14 @@ class LibraryRepository @Inject constructor(
             if (entity.id in serverStarredIds) entity = entity.copy(starred = true)
             entity
         }
-        database.trackDao().upsertAll(entities)
-        val newIds = entities.map { it.id }.toSet()
-        val existingIds = database.trackDao().getAllIds()
-        val toDelete = existingIds.filter { it !in newIds }
-        toDelete.chunked(900).forEach { chunk ->
-            database.trackDao().deleteByIds(chunk)
+        database.withTransaction {
+            database.trackDao().upsertAll(entities)
+            val newIds = entities.map { it.id }.toSet()
+            val existingIds = database.trackDao().getAllIds()
+            val toDelete = existingIds.filter { it !in newIds }
+            toDelete.chunked(900).forEach { chunk ->
+                database.trackDao().deleteByIds(chunk)
+            }
         }
         return entities.size
     }

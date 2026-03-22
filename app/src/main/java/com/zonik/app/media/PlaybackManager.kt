@@ -131,29 +131,12 @@ class PlaybackManager @Inject constructor(
         DebugLog.d("Playback", "Connected to MediaService")
 
         // Restore queue from player's current media items (e.g. after playback resumption)
-        val ctrl = controller
-        if (ctrl != null && _queue.value.isEmpty() && ctrl.mediaItemCount > 0) {
-            val mediaIds = (0 until ctrl.mediaItemCount).mapNotNull { i ->
-                ctrl.getMediaItemAt(i).mediaId.takeIf { it.isNotBlank() }
-            }
-            if (mediaIds.isNotEmpty()) {
-                scope.launch {
-                    val tracks = libraryRepository.getTracksByIds(mediaIds)
-                    if (tracks.isNotEmpty()) {
-                        _queue.value = tracks
-                        // Set current track from what the player is currently on
-                        val currentIndex = ctrl.currentMediaItemIndex
-                        if (currentIndex in tracks.indices) {
-                            _currentTrack.value = tracks[currentIndex]
-                        }
-                        DebugLog.d("Playback", "Restored queue: ${tracks.size} tracks from player")
-                    }
-                }
-            }
+        if (_queue.value.isEmpty() && (controller?.mediaItemCount ?: 0) > 0) {
+            syncQueueFromPlayer()
         }
 
         // Track Cast track changes and update currentTrack
-        scope.launch {
+        scope.launch(Dispatchers.Main) {
             castManager.castTrackTitle.collect { title ->
                 if (title != null && castManager.isCasting.value) {
                     val artist = castManager.castTrackArtist.value
@@ -615,11 +598,40 @@ class PlaybackManager @Inject constructor(
     private fun updateCurrentTrackByIndex(index: Int) {
         val queue = _queue.value
         if (index < 0 || index >= queue.size) {
-            DebugLog.w("Playback", "Invalid track index: $index (queue size: ${queue.size})")
-            _currentTrack.value = null
+            // Queue is out of sync (e.g. Android Auto started playback) — resync from player
+            syncQueueFromPlayer()
             return
         }
         setCurrentTrack(queue[index])
+    }
+
+    /**
+     * Rebuilds _queue from the player's current media items via Room DB lookup.
+     * Called when the player has items but PlaybackManager's queue is empty/stale
+     * (e.g. playback started from Android Auto or playback resumption).
+     */
+    private fun syncQueueFromPlayer() {
+        val ctrl = controller ?: return
+        val count = ctrl.mediaItemCount
+        if (count == 0) return
+        val mediaIds = (0 until count).mapNotNull { i ->
+            ctrl.getMediaItemAt(i).mediaId.takeIf { it.isNotBlank() }
+        }
+        if (mediaIds.isEmpty()) return
+        val currentIndex = ctrl.currentMediaItemIndex
+        scope.launch {
+            val tracks = libraryRepository.getTracksByIds(mediaIds)
+            if (tracks.isNotEmpty()) {
+                _queue.value = tracks
+                // setCurrentTrack calls persistPlaybackState which accesses controller (main thread only)
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    if (currentIndex in tracks.indices) {
+                        setCurrentTrack(tracks[currentIndex])
+                    }
+                }
+                DebugLog.d("Playback", "Synced queue from player: ${tracks.size} tracks, index=$currentIndex")
+            }
+        }
     }
 
     private fun getServerConfig(): ServerConfig? {
