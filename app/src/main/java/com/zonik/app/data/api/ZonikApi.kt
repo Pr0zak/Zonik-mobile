@@ -51,7 +51,17 @@ interface ZonikApi {
 
     @GET("api/jobs/{id}")
     suspend fun getJob(@Path("id") id: String): JobDetailResponse
+
+    // --- Track Management ---
+
+    @POST("api/tracks/bulk-delete")
+    suspend fun bulkDeleteTracks(@Body request: BulkDeleteTracksRequest)
 }
+
+@Serializable
+data class BulkDeleteTracksRequest(
+    val track_ids: List<String>
+)
 
 // --- Log Models ---
 

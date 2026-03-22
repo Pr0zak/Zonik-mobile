@@ -88,12 +88,13 @@ app/src/main/java/com/zonik/app/
   ui/
     components/
       CoverArt.kt       # Reusable album art via Coil (auth handled by ImageLoader)
+    CoverArtProvider.kt # ContentProvider for Android Auto cover art (disk cache, network check, log throttle)
       MiniPlayer.kt     # Floating glass mini player with skip prev/next, circular play/pause, progress bar at bottom
       TrackListItem.kt  # Unified track row with gold/gray format badge, left accent border for playing track, context menu
     navigation/   # Screen/MainTab route definitions
     screens/
       home/       # HomeScreen — custom top bar, gradient shuffle button, recently played cards (176dp), recent tracks
-      library/    # LibraryScreen (6 tabs: Tracks/Albums/Artists/Favorites/Genres/Playlists), AlbumDetail, ArtistDetail — gradient Play All, alpha scroll sidebar
+      library/    # LibraryScreen (7 tabs: Tracks/Albums/Artists/Favorites/Genres/Playlists/Flagged), AlbumDetail, ArtistDetail — gradient Play All, alpha scroll sidebar
       search/     # SearchScreen — debounced search across library
       downloads/  # DownloadsScreen — Soulseek search/active transfers/job history (real Zonik API)
       playlists/  # PlaylistsScreen
@@ -112,7 +113,7 @@ app/src/main/java/com/zonik/app/
 - Auth params baked into stream URLs (ExoPlayer doesn't go through app's OkHttp interceptors)
 - **Playlist loading**: `PlaybackManager` sends track IDs via custom `PLAY_TRACKS` SessionCommand → service looks up tracks from Room DB, builds MediaItems, sets them directly on ExoPlayer. This bypasses Media3's per-item `onAddMediaItems` IPC which reorders playlists.
 - `onAddMediaItems` still handles Android Auto browse-tree playback and single-item URI resolution
-- `PlaybackManager` connects via `MediaController`, tracks queue locally
+- `PlaybackManager` connects via `MediaController`, tracks queue locally. Queue auto-syncs from player's media items when out of sync (e.g. Android Auto starts playback or playback resumption restores queue).
 - Track transitions matched by metadata (title/artist) — `mediaId` and index are unreliable after IPC
 - Skip next/previous: use `seekToNext()` / `seekToPrevious()` (NOT `seekToNextMediaItem()` — command availability issues)
 - **Smart bitrate**: auto-detects Wi-Fi vs cellular, applies configured max bitrate. Adaptive degradation on slow connections (steps down 320→256→192→128→64 after 3 buffering events in 2-minute rolling window, auto-restores after 3 stable tracks).
@@ -138,6 +139,7 @@ app/src/main/java/com/zonik/app/
 - Server is authoritative during sync: `userRating == 1` in `search3` response → `markedForDeletion = true`
 - Zonik server treats `rating=1` as "flagged for deletion" — tracks appear in server web UI's "Flagged" filter
 - Available on: HomeScreen, LibraryScreen, AlbumDetailScreen, SearchScreen, TrackListItem component, Android Auto
+- **Flagged tab** in Library: shows all flagged tracks with "Delete All from Server" button (confirmation dialog). Calls `POST /api/tracks/bulk-delete` to permanently remove tracks from server filesystem + DB, then removes from local Room DB.
 - **Star/Unstar**: calls Subsonic `star`/`unstar` API then updates local Room DB; available in Now Playing, Android Auto, AlbumDetailScreen
 - Starred status synced from server: `getStarred2` API is authoritative — during sync, server starred list replaces local starred state
 - Now Playing reads starred status directly from Room DB (not stale in-memory Track object)
@@ -148,7 +150,7 @@ app/src/main/java/com/zonik/app/
 - Mix section: Shuffle, Newly Added, Favorites, Non-Favorites
 - Content style: GRID for albums/artists, LIST for tracks/playlists
 - Voice search with empty query handling
-- Custom buttons in now playing: Star/Unstar (heart) + Mark for Deletion (trash)
+- Custom buttons in now playing: Star/Unstar (heart), Mark for Deletion (trash), Shuffle, Start Radio
 - `starredTrackIds` and `markedForDeletionIds` loaded from Room DB on service startup
 - Browse tree works without Activity; rebuilds from scratch on force-stop
 - Cover art URIs include baked-in auth params (fetched by system UI)
@@ -174,7 +176,7 @@ app/src/main/java/com/zonik/app/
 - Scrobble: `GET /rest/scrobble.view?id={trackId}&submission=false` for now-playing, `submission=true` (default) for final scrobble at 50% playback.
 - Track metadata: `search3` response includes `transcodedSuffix` and `transcodedContentType` for lossless files (server will transcode to MP3).
 - Library sync: `search3` with empty query, 500 items per page (Symfonium approach) + `getStarred2` for starred status + `userRating` for flagged-for-deletion status
-- Zonik native API: `POST /api/download/search`, `/api/download/trigger`, `GET /api/jobs` (`Accept: application/json` header required, response wrapped in `{"items": [...]}`)
+- Zonik native API: `POST /api/download/search`, `/api/download/trigger`, `GET /api/jobs` (`Accept: application/json` header required, response wrapped in `{"items": [...]}`), `POST /api/tracks/bulk-delete` (request: `{"track_ids": [...]}`, response: `{"deleted": N}`)
 - Zonik log API: `POST /api/logs` (Subsonic auth via query params, request: `{device, app_version, timestamp, logs}`), `GET /api/logs/app` (list, unauthenticated), `GET /api/logs/app/{id}` (detail, unauthenticated)
 
 ## Debugging
@@ -229,3 +231,8 @@ app/src/main/java/com/zonik/app/
 - **Album art glow** uses `Modifier.blur()` + `alpha()` — degrades gracefully on API < 31 (blur is a no-op)
 - **Now Playing swipe-to-dismiss** uses `detectVerticalDragGestures` with `graphicsLayer` translation — only allows downward drag (`coerceAtLeast(0f)`)
 - **Library alpha scroll sidebar** has semi-transparent background + LazyColumn has `end` padding to prevent overlap with track trailing content
+- **CoverArtProvider must check network** before making OkHttp calls — returns null if offline to avoid crash and error spam. Error logging throttled to 1 per 30s.
+- **Sync writes must be wrapped in `database.withTransaction{}`** — upsert+delete without transaction causes CursorWindow crash when Room Flow re-queries mid-write (seen with 4400+ tracks)
+- **Cast track change collector must run on `Dispatchers.Main`** — it calls `setCurrentTrack` → `persistPlaybackState` → `controller.currentPosition` which requires main thread
+- **`PlaybackManager._queue` is NOT populated by playback resumption or Android Auto** — only `playTracks()` from UI sets it. `syncQueueFromPlayer()` auto-rebuilds queue from player's media items via Room DB lookup when queue is out of sync (triggered on connect and on track transitions with empty queue).
+- **Downloads polling uses adaptive intervals** — 5s when active transfers, 30s when idle, stops after 3 consecutive idle checks. Restarts via `DisposableEffect` when screen re-enters composition.

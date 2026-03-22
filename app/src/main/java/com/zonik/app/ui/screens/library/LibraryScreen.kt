@@ -135,6 +135,15 @@ class LibraryViewModel @Inject constructor(
     private val _isLoadingPlaylists = MutableStateFlow(false)
     val isLoadingPlaylists: StateFlow<Boolean> = _isLoadingPlaylists.asStateFlow()
 
+    val flaggedTracks = libraryRepository.getTracksMarkedForDeletion()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _isDeleting = MutableStateFlow(false)
+    val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
+
+    private val _deleteResult = MutableStateFlow<String?>(null)
+    val deleteResult: StateFlow<String?> = _deleteResult.asStateFlow()
+
     init {
         loadFavorites()
         loadGenres()
@@ -263,6 +272,26 @@ class LibraryViewModel @Inject constructor(
             }
         }
     }
+
+    fun deleteAllFlagged() {
+        val trackIds = flaggedTracks.value.map { it.id }
+        if (trackIds.isEmpty()) return
+        viewModelScope.launch {
+            _isDeleting.value = true
+            try {
+                libraryRepository.deleteTracksFromServer(trackIds)
+                _deleteResult.value = "Deleted ${trackIds.size} tracks from server"
+            } catch (e: Exception) {
+                _deleteResult.value = "Delete failed: ${e.message}"
+            } finally {
+                _isDeleting.value = false
+            }
+        }
+    }
+
+    fun clearDeleteResult() {
+        _deleteResult.value = null
+    }
 }
 
 private enum class LibraryTab(val label: String) {
@@ -271,7 +300,8 @@ private enum class LibraryTab(val label: String) {
     ARTISTS("Artists"),
     FAVORITES("Favorites"),
     GENRES("Genres"),
-    PLAYLISTS("Playlists")
+    PLAYLISTS("Playlists"),
+    FLAGGED("Flagged")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -290,6 +320,9 @@ fun LibraryScreen(
     val isLoadingGenres by viewModel.isLoadingGenres.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
     val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsState()
+    val flaggedTracks by viewModel.flaggedTracks.collectAsState()
+    val isDeleting by viewModel.isDeleting.collectAsState()
+    val deleteResult by viewModel.deleteResult.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = LibraryTab.entries
@@ -345,6 +378,12 @@ fun LibraryScreen(
                     playlists = playlists,
                     isLoading = isLoadingPlaylists,
                     onPlayPlaylist = viewModel::playPlaylist
+                )
+                LibraryTab.FLAGGED -> FlaggedTab(
+                    tracks = flaggedTracks,
+                    isDeleting = isDeleting,
+                    deleteResult = deleteResult,
+                    viewModel = viewModel
                 )
             }
     }
@@ -1148,5 +1187,155 @@ private fun EmptyState(message: String) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun FlaggedTab(
+    tracks: List<Track>,
+    isDeleting: Boolean,
+    deleteResult: String?,
+    viewModel: LibraryViewModel
+) {
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
+    if (deleteResult != null) {
+        LaunchedEffect(deleteResult) {
+            kotlinx.coroutines.delay(3000)
+            viewModel.clearDeleteResult()
+        }
+    }
+
+    if (tracks.isEmpty() && !isDeleting) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = if (deleteResult != null) deleteResult else "No flagged tracks",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (deleteResult != null) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        return
+    }
+
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            title = { Text("Delete ${tracks.size} tracks?") },
+            text = { Text("This will permanently delete these tracks from the Zonik server. This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showConfirmDialog = false
+                        viewModel.deleteAllFlagged()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 4.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { showConfirmDialog = true },
+                    enabled = !isDeleting,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onError
+                        )
+                    } else {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (isDeleting) "Deleting..." else "Delete All from Server")
+                }
+            }
+        }
+
+        if (deleteResult != null) {
+            item {
+                Text(
+                    text = deleteResult,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        item {
+            Text(
+                text = "${tracks.size} flagged track${if (tracks.size != 1) "s" else ""}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+
+        itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+            val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = rowBg),
+                headlineContent = {
+                    Text(
+                        text = track.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                },
+                supportingContent = {
+                    Text(
+                        text = "${track.artist} · ${track.album}",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                trailingContent = {
+                    IconButton(onClick = { viewModel.toggleMarkForDeletion(track) }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Unflag",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            )
+        }
     }
 }

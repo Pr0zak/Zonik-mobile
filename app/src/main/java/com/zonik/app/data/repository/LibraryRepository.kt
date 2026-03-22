@@ -1,7 +1,9 @@
 package com.zonik.app.data.repository
 
 import androidx.room.withTransaction
+import com.zonik.app.data.api.BulkDeleteTracksRequest
 import com.zonik.app.data.api.SubsonicApi
+import com.zonik.app.data.api.ZonikApi
 import com.zonik.app.data.db.*
 import com.zonik.app.model.*
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class LibraryRepository @Inject constructor(
     private val api: SubsonicApi,
+    private val zonikApi: ZonikApi,
     private val database: ZonikDatabase
 ) {
     fun artistCount(): Flow<Int> = database.artistDao().count()
@@ -167,6 +170,14 @@ class LibraryRepository @Inject constructor(
 
     fun markedForDeletionCount(): Flow<Int> =
         database.trackDao().markedForDeletionCount()
+
+    suspend fun deleteTracksFromServer(trackIds: List<String>) {
+        zonikApi.bulkDeleteTracks(BulkDeleteTracksRequest(trackIds))
+        // Remove from local DB after server confirms
+        trackIds.chunked(900).forEach { chunk ->
+            database.trackDao().deleteByIds(chunk)
+        }
+    }
 
     // Stats
     suspend fun getFormatDistribution() = database.trackDao().getFormatDistribution()
