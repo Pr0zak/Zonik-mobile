@@ -217,6 +217,7 @@ class LibraryRepository @Inject constructor(
         }
     }
     suspend fun scrobble(id: String) { api.scrobble(id) }
+    suspend fun scrobbleNowPlaying(id: String) { api.scrobble(id, submission = false) }
     suspend fun setRating(id: String, rating: Int) { api.setRating(id, rating) }
 
     suspend fun getSimilarSongs(id: String, count: Int = 50): List<Track> {

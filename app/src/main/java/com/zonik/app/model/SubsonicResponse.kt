@@ -185,6 +185,8 @@ data class SubsonicTrack(
     val size: Long? = null,
     val suffix: String? = null,
     val contentType: String? = null,
+    val transcodedSuffix: String? = null,
+    val transcodedContentType: String? = null,
     val path: String? = null,
     val starred: String? = null,
     val userRating: Int? = null
@@ -205,6 +207,8 @@ data class SubsonicTrack(
         size = size,
         suffix = suffix,
         contentType = contentType,
+        transcodedSuffix = transcodedSuffix,
+        transcodedContentType = transcodedContentType,
         path = path,
         starred = starred != null,
         markedForDeletion = userRating == 1

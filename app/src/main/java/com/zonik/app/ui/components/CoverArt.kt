@@ -21,7 +21,7 @@ fun CoverArt(
     coverArtId: String?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    size: Int = 300
+    size: Int = 100
 ) {
     if (coverArtId == null) {
         // Placeholder

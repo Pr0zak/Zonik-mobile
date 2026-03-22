@@ -130,7 +130,7 @@ class ZonikMediaService : MediaLibraryService() {
         // Use a clean OkHttpClient without auth interceptor — auth is baked into URLs
         val streamClient = okhttp3.OkHttpClient.Builder()
             .connectionPool(okhttp3.ConnectionPool(5, 30, java.util.concurrent.TimeUnit.SECONDS))
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS) // 30s for transcode queue backpressure
             .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val request = chain.request()
@@ -1179,7 +1179,7 @@ class ZonikMediaService : MediaLibraryService() {
             val currentIndex = player.currentMediaItemIndex
             val itemCount = player.mediaItemCount
             if (itemCount == 0) return
-            val maxPossible = minOf(10, itemCount - currentIndex - 1)
+            val maxPossible = minOf(5, itemCount - currentIndex - 1) // Cap at 5 to avoid server transcode queue overload
             if (maxPossible <= 0) return
             for (i in 1..maxPossible) {
                 val idx = currentIndex + i

@@ -42,6 +42,8 @@ data class Track(
     val size: Long? = null,
     val suffix: String? = null,
     val contentType: String? = null,
+    val transcodedSuffix: String? = null,
+    val transcodedContentType: String? = null,
     val path: String? = null,
     val starred: Boolean = false,
     val markedForDeletion: Boolean = false

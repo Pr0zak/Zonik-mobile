@@ -115,10 +115,12 @@ app/src/main/java/com/zonik/app/
 - `PlaybackManager` connects via `MediaController`, tracks queue locally
 - Track transitions matched by metadata (title/artist) — `mediaId` and index are unreliable after IPC
 - Skip next/previous: use `seekToNext()` / `seekToPrevious()` (NOT `seekToNextMediaItem()` — command availability issues)
-- **Smart bitrate**: auto-detects Wi-Fi vs cellular, applies configured max bitrate. Adaptive degradation on slow connections (steps down 320→256→192→128→64 after 3 consecutive buffering events, auto-restores after 3 stable tracks).
-- **Connection resilience**: custom `LoadErrorHandlingPolicy` with 10 retries + exponential backoff (up to 16s). `DefaultLoadControl` with 30s min / 2min max buffer. 60s read timeout. `ConnectivityManager.NetworkCallback` auto-resumes playback when network returns. `onPlayerError` auto-prepares on IO errors.
+- **Smart bitrate**: auto-detects Wi-Fi vs cellular, applies configured max bitrate. Adaptive degradation on slow connections (steps down 320→256→192→128→64 after 3 buffering events in 2-minute rolling window, auto-restores after 3 stable tracks).
+- **Connection resilience**: custom `LoadErrorHandlingPolicy` with 10 retries + exponential backoff (up to 16s). `DefaultLoadControl` with 15s min / 2min max buffer, 1.5s playback start, 5s rebuffer. 60s read timeout, 30s connect timeout (for server transcode queue backpressure). `ConnectivityManager.NetworkCallback` auto-resumes playback when network returns. `onPlayerError` auto-prepares on IO errors. OkHttp connection pool (5 connections, 30s keep-alive) for connection reuse.
+- **Now playing scrobble**: sends `submission=false` scrobble on track start for server now-playing state.
+- **Track transition dedup**: PLAYLIST_CHANGED transitions for the same track are skipped to prevent UI flicker and duplicate scrobbles.
 - **Audio caching**: `SimpleCache` (Hilt singleton) with `LeastRecentlyUsedCacheEvictor`, custom `CacheKeyFactory` uses track ID (not full URL with auth salt). Configurable size (off/250MB–10GB, default 500MB).
-- **Read-ahead pre-caching**: on track transition (AUTO/SEEK) and on queue load (`PLAY_TRACKS`), next N tracks are pre-cached via `CacheWriter` on IO thread. Configurable count (0–10, default 5).
+- **Read-ahead pre-caching**: on track transition (AUTO/SEEK) and on queue load (`PLAY_TRACKS`), next N tracks are pre-cached via `CacheWriter` on IO thread. Configurable count (0–5, default 5). Pre-caching pauses when player is buffering to yield bandwidth. Deduplicates via `ConcurrentHashMap.newKeySet` to prevent redundant downloads.
 - **Buffering UI**: Now Playing shows spinner on play button when buffering, error banner for connection issues. Android Auto gets buffering state automatically via MediaSession.
 - **Equalizer**: 5-band EQ (60Hz/230Hz/910Hz/3.6kHz/14kHz) via `android.media.audiofx.Equalizer` bound to ExoPlayer's audio session ID. 10 presets + custom band levels. Settings persisted in DataStore, restored on service startup. System EQ launch button for OEM equalizers. EQ commands sent via `SET_EQ` SessionCommand (must be on main thread).
 - **Keep screen on**: optional setting prevents display sleep while Now Playing is visible and playing (uses `FLAG_KEEP_SCREEN_ON`)
@@ -167,8 +169,10 @@ app/src/main/java/com/zonik/app/
 ## API Notes
 - Subsonic API at `{server}/rest/{endpoint}.view`
 - Auth params: `u`, `t` (md5(apiKey+salt)), `s` (random salt), `v=1.16.1`, `c=ZonikApp`, `f=json`
-- Streaming: `GET /rest/stream.view?id={trackId}&estimateContentLength=true` (NO `f=json` — returns binary)
-- Cover art: `GET /rest/getCoverArt.view?id={coverId}&size={pixels}` (NO `f=json`)
+- Streaming: `GET /rest/stream.view?id={trackId}&estimateContentLength=true` (NO `f=json` — returns binary). Server supports Range requests on direct files (206 Partial Content) and returns `Accept-Ranges: none` on transcoded streams. Server caches transcoded output — second play is instant with range support.
+- Cover art: `GET /rest/getCoverArt.view?id={coverId}&size={pixels}` (NO `f=json`). Server resizes server-side (Pillow LANCZOS, JPEG q85, max 1200px). Default CoverArt size is 100px for list items; 600px for Now Playing main art. `Cache-Control: public, max-age=604800` (7 days).
+- Scrobble: `GET /rest/scrobble.view?id={trackId}&submission=false` for now-playing, `submission=true` (default) for final scrobble at 50% playback.
+- Track metadata: `search3` response includes `transcodedSuffix` and `transcodedContentType` for lossless files (server will transcode to MP3).
 - Library sync: `search3` with empty query, 500 items per page (Symfonium approach) + `getStarred2` for starred status + `userRating` for flagged-for-deletion status
 - Zonik native API: `POST /api/download/search`, `/api/download/trigger`, `GET /api/jobs` (`Accept: application/json` header required, response wrapped in `{"items": [...]}`)
 - Zonik log API: `POST /api/logs` (Subsonic auth via query params, request: `{device, app_version, timestamp, logs}`), `GET /api/logs/app` (list, unauthenticated), `GET /api/logs/app/{id}` (detail, unauthenticated)
@@ -207,6 +211,10 @@ app/src/main/java/com/zonik/app/
 - Job history response is `{"items": [...]}` not a raw array
 - `cleartext` HTTP must be allowed via `network_security_config.xml` for local servers
 - Coil ImageLoader must use the auth-aware OkHttpClient for cover art (configured in ZonikApplication)
+- OkHttp HTTP cache (50MB) on primary client enables Cache-Control header support (cover art 7-day cache, stream 24h private)
+- Pre-cache downloads may queue on server (concurrent transcode limit: 3) — don't cancel/retry requests that are just waiting; 30s connect timeout handles this
+- Server transcode cache means second play of same track+bitrate is instant with full range support — response changes from StreamingResponse to FileResponse between first and subsequent requests
+- `transcodedSuffix`/`transcodedContentType` are NOT stored in Room DB — only available from API responses (set to null in `TrackEntity.toDomain()`)
 - Android Auto requires Developer Mode + Unknown Sources for sideloaded APKs
 - DataStore emits on any field change — don't use `collect` on `isLoggedIn` to trigger sync (causes infinite loop); use `first()` instead
 - Room DB uses `fallbackToDestructiveMigration()` — DO NOT remove entities or change DB version without testing on device (caused startup crash on Android 16)

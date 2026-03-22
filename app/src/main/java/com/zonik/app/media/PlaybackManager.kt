@@ -568,6 +568,12 @@ class PlaybackManager @Inject constructor(
         scrobbledTrackId = null
         addToRecentlyPlayed(track)
         persistPlaybackState()
+        // Send "now playing" scrobble to server
+        scope.launch {
+            try {
+                libraryRepository.scrobbleNowPlaying(track.id)
+            } catch (_: Exception) { }
+        }
     }
 
     private fun persistPlaybackState() {
