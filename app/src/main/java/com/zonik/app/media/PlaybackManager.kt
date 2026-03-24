@@ -247,6 +247,9 @@ class PlaybackManager @Inject constructor(
                     return
                 }
 
+                // Any real track change clears the post-seek ignore flag
+                _ignoreNextAutoTransition = false
+
                 // Match by metadata first (more reliable than index after shuffle/IPC)
                 if (metaTitle != null) {
                     val match = findTrackByMetadata(metaTitle, metaArtist)
