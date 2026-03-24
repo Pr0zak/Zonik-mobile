@@ -609,9 +609,12 @@ class PlaybackManager @Inject constructor(
         if (queue.isEmpty()) return
         val trackIds = queue.map { it.id }
         val index = queue.indexOfFirst { it.id == _currentTrack.value?.id }.coerceAtLeast(0)
-        // controller.currentPosition must be called on main thread — read it here
-        // (setCurrentTrack is called from Player.Listener which runs on main)
-        val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+        // During Cast, use castManager position (avoids main-thread requirement for controller)
+        val position = if (castManager.isCasting.value) {
+            castManager.getCurrentPosition()
+        } else {
+            controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+        }
         scope.launch {
             settingsRepository.savePlaybackState(trackIds, index, position)
         }
