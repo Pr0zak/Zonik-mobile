@@ -151,11 +151,9 @@ class PlaybackManager @Inject constructor(
                         if (tracks.isNotEmpty()) {
                             val startIndex = savedIndex.coerceIn(0, tracks.size - 1)
                             DebugLog.d("Playback", "Restoring saved queue: ${tracks.size} tracks, index=$startIndex, pos=${savedPosition}ms")
-                            _queue.value = tracks
-                            _currentTrack.value = tracks[startIndex]
-                            // Load tracks into player without auto-playing
                             playTracks(tracks, startIndex)
-                            delay(500)
+                            // Wait for player to load, then seek to saved position and pause
+                            delay(1000)
                             withContext(Dispatchers.Main) {
                                 controller?.seekTo(savedPosition)
                                 controller?.pause()
@@ -424,6 +422,10 @@ class PlaybackManager @Inject constructor(
             }
         }
         if (exoIndex < 0) {
+            if (ctrl.mediaItemCount == 0) {
+                DebugLog.w("Playback", "skipToIndex: player is empty, cannot skip")
+                return
+            }
             DebugLog.w("Playback", "skipToIndex: track '${track.title}' (${track.id}) not found in ExoPlayer queue, falling back to index $index")
             exoIndex = index.coerceIn(0, ctrl.mediaItemCount - 1)
         }
