@@ -178,6 +178,7 @@ class SettingsRepository @Inject constructor(
         private val COVER_ART_CACHE_SIZE_MB = intPreferencesKey("cover_art_cache_size_mb")
         private val CACHE_READ_AHEAD = intPreferencesKey("cache_read_ahead")
         private val AUTO_TAB_ORDER = stringPreferencesKey("auto_tab_order")
+        private val VISUALIZER_ENABLED = booleanPreferencesKey("visualizer_enabled")
         private val EQ_ENABLED = booleanPreferencesKey("eq_enabled")
         private val EQ_PRESET = intPreferencesKey("eq_preset")
         private val EQ_BAND_LEVELS = stringPreferencesKey("eq_band_levels")
@@ -208,6 +209,9 @@ class SettingsRepository @Inject constructor(
             prefs[LAST_QUEUE_POSITION_MS] = positionMs
         }
     }
+
+    val visualizerEnabled: Flow<Boolean> = dataStore.data.map { prefs -> prefs[VISUALIZER_ENABLED] ?: false }
+    suspend fun setVisualizerEnabled(enabled: Boolean) { dataStore.edit { it[VISUALIZER_ENABLED] = enabled } }
 
     val eqEnabled: Flow<Boolean> = dataStore.data.map { prefs -> prefs[EQ_ENABLED] ?: false }
     suspend fun setEqEnabled(enabled: Boolean) { dataStore.edit { it[EQ_ENABLED] = enabled } }

@@ -47,7 +47,8 @@ data class SettingsUiState(
     val serverType: String? = null,
     val eqEnabled: Boolean = false,
     val eqPreset: Int = 0,
-    val eqBandLevels: String? = null
+    val eqBandLevels: String? = null,
+    val visualizerEnabled: Boolean = false
 )
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -194,7 +195,8 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.adaptiveBitrate,
         settingsRepository.eqEnabled,
         settingsRepository.eqPreset,
-        settingsRepository.eqBandLevels
+        settingsRepository.eqBandLevels,
+        settingsRepository.visualizerEnabled
     ) { values ->
         val serverConfig = values[0] as com.zonik.app.model.ServerConfig?
         val isLoggedIn = values[1] as Boolean
@@ -215,6 +217,7 @@ class SettingsViewModel @Inject constructor(
         val eqOn = values[16] as Boolean
         val eqPr = values[17] as Int
         val eqBands = values[18] as String?
+        val vizOn = values[19] as Boolean
 
         SettingsUiState(
             serverUrl = serverConfig?.url ?: "",
@@ -236,7 +239,8 @@ class SettingsViewModel @Inject constructor(
             adaptiveBitrate = adaptive,
             eqEnabled = eqOn,
             eqPreset = eqPr,
-            eqBandLevels = eqBands
+            eqBandLevels = eqBands,
+            visualizerEnabled = vizOn
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -316,6 +320,13 @@ class SettingsViewModel @Inject constructor(
 
     fun disconnect() {
         viewModelScope.launch { settingsRepository.clearAll() }
+    }
+
+    fun setVisualizerEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setVisualizerEnabled(enabled)
+            playbackManager.setVisualizerEnabled(enabled)
+        }
     }
 
     fun setEqEnabled(enabled: Boolean) {

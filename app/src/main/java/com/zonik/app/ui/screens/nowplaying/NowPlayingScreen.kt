@@ -69,7 +69,8 @@ class NowPlayingViewModel @Inject constructor(
     private val playbackManager: PlaybackManager,
     private val libraryRepository: LibraryRepository,
     private val settingsRepository: com.zonik.app.data.repository.SettingsRepository,
-    private val database: com.zonik.app.data.db.ZonikDatabase
+    private val database: com.zonik.app.data.db.ZonikDatabase,
+    private val audioVisualizerManager: com.zonik.app.media.AudioVisualizerManager
 ) : ViewModel() {
 
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
@@ -79,6 +80,8 @@ class NowPlayingViewModel @Inject constructor(
     val castDeviceName: StateFlow<String?> = playbackManager.castManager.castDeviceName
     val isBuffering: StateFlow<Boolean> = playbackManager.isBuffering
     val playbackError: StateFlow<String?> = playbackManager.playbackError
+    val fftMagnitudes: StateFlow<FloatArray> = audioVisualizerManager.fftMagnitudes
+    val visualizerEnabled: StateFlow<Boolean> = audioVisualizerManager.isEnabled
 
     fun getCastContext() = playbackManager.castManager.getCastContext()
 
@@ -223,6 +226,8 @@ fun NowPlayingScreen(
     val isBuffering by viewModel.isBuffering.collectAsState()
     val playbackError by viewModel.playbackError.collectAsState()
     val isLoadingRadio by viewModel.isLoadingRadio.collectAsState()
+    val fftMagnitudes by viewModel.fftMagnitudes.collectAsState()
+    val visualizerEnabled by viewModel.visualizerEnabled.collectAsState()
 
     // Keep screen on while Now Playing is visible (if enabled in settings)
     val activity = LocalContext.current as? android.app.Activity
@@ -514,7 +519,7 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Seek bar — custom thin style
+            // Seek bar with audio visualizer
             val sliderValue = if (isSeeking) {
                 seekPosition
             } else if (durationMs > 0) {
@@ -523,66 +528,84 @@ fun NowPlayingScreen(
                 0f
             }
 
-            Slider(
-                value = sliderValue,
-                onValueChange = { value ->
-                    isSeeking = true
-                    seekPosition = value
-                },
-                onValueChangeFinished = {
-                    val seekMs = (seekPosition * durationMs).toLong()
-                    viewModel.seekTo(seekMs)
-                    positionMs = seekMs
-                    isSeeking = false
-                },
-                modifier = Modifier.fillMaxWidth(),
-                thumb = {
-                    Box(
-                        modifier = Modifier.size(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(14.dp)
-                                .background(Color.White, CircleShape)
-                        )
-                    }
-                },
-                track = { sliderState ->
-                    SliderDefaults.Track(
-                        sliderState = sliderState,
+            Box(modifier = Modifier.fillMaxWidth()) {
+                // Visualizer bars behind the seek bar
+                if (visualizerEnabled && !isCasting) {
+                    com.zonik.app.ui.components.AudioVisualizerBars(
+                        magnitudes = fftMagnitudes,
+                        accentColor = animatedAccent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 14.dp)
+                            .alpha(0.35f)
+                    )
+                }
+
+                Column {
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { value ->
+                            isSeeking = true
+                            seekPosition = value
+                        },
+                        onValueChangeFinished = {
+                            val seekMs = (seekPosition * durationMs).toLong()
+                            viewModel.seekTo(seekMs)
+                            positionMs = seekMs
+                            isSeeking = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        thumb = {
+                            Box(
+                                modifier = Modifier.size(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .background(Color.White, CircleShape)
+                                )
+                            }
+                        },
+                        track = { sliderState ->
+                            SliderDefaults.Track(
+                                sliderState = sliderState,
+                                colors = SliderDefaults.colors(
+                                    activeTrackColor = animatedAccent,
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.12f)
+                                ),
+                                thumbTrackGapSize = 0.dp,
+                                drawStopIndicator = null
+                            )
+                        },
                         colors = SliderDefaults.colors(
                             activeTrackColor = animatedAccent,
                             inactiveTrackColor = Color.White.copy(alpha = 0.12f)
-                        ),
-                        thumbTrackGapSize = 0.dp,
-                        drawStopIndicator = null
+                        )
                     )
-                },
-                colors = SliderDefaults.colors(
-                    activeTrackColor = animatedAccent,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.12f)
-                )
-            )
 
-            // Time labels
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                val displayPos = if (isSeeking) (seekPosition * durationMs).toLong() else positionMs
-                Text(
-                    text = formatDurationMs(displayPos),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.5f)
-                )
-                Text(
-                    text = formatDurationMs(durationMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.5f)
-                )
+                    // Time labels
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val displayPos = if (isSeeking) (seekPosition * durationMs).toLong() else positionMs
+                        Text(
+                            text = formatDurationMs(displayPos),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = formatDurationMs(durationMs),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

@@ -828,6 +828,15 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
 private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiState) {
     val context = LocalContext.current
 
+    // Permission launcher for RECORD_AUDIO (needed for audio visualization)
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.setVisualizerEnabled(true)
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -836,6 +845,34 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C2A))
     ) {
         Column {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text("Audio Visualization") },
+                supportingContent = { Text("Show frequency bars on seek bar") },
+                leadingContent = { Icon(Icons.Default.GraphicEq, contentDescription = null) },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.visualizerEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context, android.Manifest.permission.RECORD_AUDIO
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                if (hasPermission) {
+                                    viewModel.setVisualizerEnabled(true)
+                                } else {
+                                    permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                }
+                            } else {
+                                viewModel.setVisualizerEnabled(false)
+                            }
+                        }
+                    )
+                }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
             ListItem(
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text("Equalizer") },

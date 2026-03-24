@@ -55,9 +55,12 @@ class ZonikMediaService : MediaLibraryService() {
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var database: ZonikDatabase
     @Inject lateinit var simpleCache: SimpleCache
+    @Inject lateinit var audioVisualizerManager: AudioVisualizerManager
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var equalizer: android.media.audiofx.Equalizer? = null
+    private var visualizer: android.media.audiofx.Visualizer? = null
+    private var visualizerEnabled = false
     private var lastEqEnabled: Boolean? = null
     private var lastEqPreset: Int? = null
     private var lastEqBandLevels: String? = null
@@ -76,6 +79,7 @@ class ZonikMediaService : MediaLibraryService() {
     private val setEqCommand = SessionCommand(ACTION_SET_EQ, Bundle.EMPTY)
     private val toggleShuffleCommand = SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY)
     private val startRadioCommand = SessionCommand(ACTION_START_RADIO, Bundle.EMPTY)
+    private val setVisualizerCommand = SessionCommand(ACTION_SET_VISUALIZER, Bundle.EMPTY)
 
     companion object {
         // Browse tree node IDs
@@ -99,6 +103,8 @@ class ZonikMediaService : MediaLibraryService() {
         private const val ACTION_SET_EQ = "com.zonik.app.SET_EQ"
         private const val ACTION_TOGGLE_SHUFFLE = "com.zonik.app.TOGGLE_SHUFFLE"
         private const val ACTION_START_RADIO = "com.zonik.app.START_RADIO"
+        private const val ACTION_SET_VISUALIZER = "com.zonik.app.SET_VISUALIZER"
+        private const val EXTRA_VISUALIZER_ENABLED = "visualizer_enabled"
         private const val EXTRA_TRACK_IDS = "track_ids"
         private const val EXTRA_START_INDEX = "start_index"
         private const val EXTRA_EQ_ENABLED = "eq_enabled"
@@ -254,6 +260,14 @@ class ZonikMediaService : MediaLibraryService() {
                 }
             }
 
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                // Pause/resume visualizer capture to save battery
+                if (visualizerEnabled) {
+                    try { visualizer?.enabled = isPlaying } catch (_: Exception) {}
+                    if (!isPlaying) audioVisualizerManager.updateMagnitudes(FloatArray(AudioVisualizerManager.BAR_COUNT))
+                }
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val state = when (playbackState) {
                     androidx.media3.common.Player.STATE_IDLE -> "IDLE"
@@ -298,6 +312,16 @@ class ZonikMediaService : MediaLibraryService() {
             com.zonik.app.data.DebugLog.w("MediaService", "EQ init failed: ${e.message}")
         }
 
+        // Restore visualizer settings
+        try {
+            val vizEnabled = runBlocking { settingsRepository.visualizerEnabled.first() }
+            if (vizEnabled) {
+                setupVisualizer(player.audioSessionId, true)
+            }
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("MediaService", "Visualizer init failed: ${e.message}")
+        }
+
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, callback)
             .setSessionActivity(pendingIntent)
             .build()
@@ -323,6 +347,8 @@ class ZonikMediaService : MediaLibraryService() {
         }
         networkCallback = null
         preCacheJob?.cancel()
+        visualizer?.release()
+        visualizer = null
         equalizer?.release()
         equalizer = null
         mediaLibrarySession?.run {
@@ -423,6 +449,59 @@ class ZonikMediaService : MediaLibraryService() {
         } catch (e: Exception) {
             com.zonik.app.data.DebugLog.w("MediaService", "EQ failed: ${e.message}")
         }
+    }
+
+    private fun setupVisualizer(audioSessionId: Int, enabled: Boolean) {
+        visualizerEnabled = enabled
+        if (!enabled) {
+            visualizer?.release()
+            visualizer = null
+            audioVisualizerManager.setEnabled(false)
+            com.zonik.app.data.DebugLog.d("MediaService", "Visualizer disabled")
+            return
+        }
+        try {
+            if (visualizer == null) {
+                visualizer = android.media.audiofx.Visualizer(audioSessionId).apply {
+                    captureSize = 128
+                    scalingMode = android.media.audiofx.Visualizer.SCALING_MODE_NORMALIZED
+                    setDataCaptureListener(object : android.media.audiofx.Visualizer.OnDataCaptureListener {
+                        override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, samplingRate: Int) {}
+                        override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, samplingRate: Int) {
+                            fft?.let { audioVisualizerManager.updateMagnitudes(processFftData(it)) }
+                        }
+                    }, android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, false, true)
+                }
+            }
+            visualizer?.enabled = true
+            audioVisualizerManager.setEnabled(true)
+            com.zonik.app.data.DebugLog.d("MediaService", "Visualizer enabled (session=$audioSessionId)")
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("MediaService", "Visualizer failed: ${e.message}")
+            audioVisualizerManager.setEnabled(false)
+        }
+    }
+
+    private fun processFftData(fft: ByteArray): FloatArray {
+        val barCount = AudioVisualizerManager.BAR_COUNT
+        val result = FloatArray(barCount)
+        val n = fft.size / 2 // number of frequency bins
+        if (n <= 1) return result
+        for (bar in 0 until barCount) {
+            // Logarithmic frequency mapping: lower bars cover fewer bins (bass), higher bars cover more (treble)
+            val startBin = (1 + (n - 1) * (bar.toDouble() / barCount).let { it * it }).toInt()
+            val endBin = (1 + (n - 1) * ((bar + 1).toDouble() / barCount).let { it * it }).toInt()
+            var sum = 0f
+            var count = 0
+            for (bin in startBin until minOf(endBin, n)) {
+                val real = fft[2 * bin].toFloat()
+                val imag = if (2 * bin + 1 < fft.size) fft[2 * bin + 1].toFloat() else 0f
+                sum += kotlin.math.sqrt(real * real + imag * imag)
+                count++
+            }
+            result[bar] = if (count > 0) (sum / count / 128f).coerceIn(0f, 1f) else 0f
+        }
+        return result
     }
 
     private fun gridExtras(): Bundle = Bundle().apply {
@@ -979,6 +1058,7 @@ class ZonikMediaService : MediaLibraryService() {
                 .add(setEqCommand)
                 .add(toggleShuffleCommand)
                 .add(startRadioCommand)
+                .add(setVisualizerCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
@@ -1007,6 +1087,13 @@ class ZonikMediaService : MediaLibraryService() {
                 val bandLevels = args.getString(EXTRA_EQ_BAND_LEVELS)
                 val audioSessionId = (session.player as? ExoPlayer)?.audioSessionId ?: 0
                 applyEqualizer(audioSessionId, enabled, preset, bandLevels)
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+
+            if (customCommand.customAction == ACTION_SET_VISUALIZER) {
+                val enabled = args.getBoolean(EXTRA_VISUALIZER_ENABLED, false)
+                val audioSessionId = (session.player as? ExoPlayer)?.audioSessionId ?: 0
+                setupVisualizer(audioSessionId, enabled)
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
 

@@ -18,6 +18,9 @@
     <!-- Audio effects (Equalizer) -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- Audio visualization (Visualizer API) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- App updates -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
