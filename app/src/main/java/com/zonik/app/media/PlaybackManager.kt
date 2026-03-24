@@ -151,7 +151,9 @@ class PlaybackManager @Inject constructor(
                         if (tracks.isNotEmpty()) {
                             val startIndex = savedIndex.coerceIn(0, tracks.size - 1)
                             DebugLog.d("Playback", "Restoring saved queue: ${tracks.size} tracks, index=$startIndex, pos=${savedPosition}ms")
-                            playTracks(tracks, startIndex)
+                            withContext(Dispatchers.Main) {
+                                playTracks(tracks, startIndex)
+                            }
                             // Wait for player to load, then seek to saved position and pause
                             delay(1000)
                             withContext(Dispatchers.Main) {
