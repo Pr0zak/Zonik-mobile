@@ -1060,7 +1060,7 @@ class ZonikMediaService : MediaLibraryService() {
 
                     // Pre-cache upcoming tracks in background after playback starts
                     val factory = cacheDataSourceFactory
-                    if (factory != null) {
+                    if (factory != null && connectivityManager?.activeNetwork != null) {
                         preCacheJob?.cancel()
                         preCachingInProgress.clear()
                         preCacheJob = preCacheScope.launch {
@@ -1174,6 +1174,7 @@ class ZonikMediaService : MediaLibraryService() {
     private fun preCacheUpcoming(player: androidx.media3.common.Player) {
         preCacheJob?.cancel()
         if (isPlayerBuffering) return // Don't pre-cache while player is buffering
+        if (connectivityManager?.activeNetwork == null) return // Don't pre-cache when offline
         val factory = cacheDataSourceFactory ?: return
         val allUpcoming = mutableListOf<Uri>()
         try {

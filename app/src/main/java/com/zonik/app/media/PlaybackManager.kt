@@ -110,6 +110,8 @@ class PlaybackManager @Inject constructor(
 
     // Scrobble tracking — scrobble once when track plays >50%
     private var scrobbledTrackId: String? = null
+    // Pending scrobbles that failed due to network — retried when network returns
+    private val pendingScrobbles = java.util.concurrent.ConcurrentLinkedQueue<String>()
     // Throttle position saves to every 10 seconds
     @Volatile private var lastPositionSaveTime = 0L
 
@@ -478,7 +480,8 @@ class PlaybackManager @Inject constructor(
                     libraryRepository.scrobble(track.id)
                     DebugLog.d("Playback", "Scrobbled: ${track.title}")
                 } catch (e: Exception) {
-                    DebugLog.w("Playback", "Scrobble failed: ${e.message}")
+                    DebugLog.w("Playback", "Scrobble queued (offline): ${track.title}")
+                    pendingScrobbles.add(track.id)
                 }
             }
         }
@@ -573,11 +576,30 @@ class PlaybackManager @Inject constructor(
         scrobbledTrackId = null
         addToRecentlyPlayed(track)
         persistPlaybackState()
-        // Send "now playing" scrobble to server
+        // Send "now playing" scrobble to server + flush any pending scrobbles
         scope.launch {
+            flushPendingScrobbles()
             try {
                 libraryRepository.scrobbleNowPlaying(track.id)
             } catch (_: Exception) { }
+        }
+    }
+
+    private suspend fun flushPendingScrobbles() {
+        if (pendingScrobbles.isEmpty()) return
+        val flushed = mutableListOf<String>()
+        while (pendingScrobbles.isNotEmpty()) {
+            val trackId = pendingScrobbles.peek() ?: break
+            try {
+                libraryRepository.scrobble(trackId)
+                pendingScrobbles.poll()
+                flushed.add(trackId)
+            } catch (_: Exception) {
+                break // Still offline, stop trying
+            }
+        }
+        if (flushed.isNotEmpty()) {
+            DebugLog.d("Playback", "Flushed ${flushed.size} pending scrobbles")
         }
     }
 
