@@ -280,13 +280,6 @@ class PlaybackManager @Inject constructor(
             } catch (e: Exception) {
                 DebugLog.w("Playback", "EQ restore failed: ${e.message}")
             }
-            // Restore visualizer settings
-            try {
-                val vizEnabled = settingsRepository.visualizerEnabled.first()
-                setVisualizerEnabled(vizEnabled)
-            } catch (e: Exception) {
-                DebugLog.w("Playback", "Visualizer restore failed: ${e.message}")
-            }
         }
     }
 
@@ -696,18 +689,6 @@ class PlaybackManager @Inject constructor(
             stableTrackCount = 0
             DebugLog.d("Playback", "Degraded bitrate to ${newBitrate}kbps due to slow connection")
             _playbackError.value = "Slow connection — reduced to ${newBitrate}kbps"
-        }
-    }
-
-    fun setVisualizerEnabled(enabled: Boolean) {
-        val args = android.os.Bundle().apply {
-            putBoolean("visualizer_enabled", enabled)
-        }
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            controller?.sendCustomCommand(
-                androidx.media3.session.SessionCommand("com.zonik.app.SET_VISUALIZER", android.os.Bundle.EMPTY),
-                args
-            )
         }
     }
 

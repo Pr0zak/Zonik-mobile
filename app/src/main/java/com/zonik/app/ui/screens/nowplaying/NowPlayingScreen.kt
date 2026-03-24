@@ -70,7 +70,7 @@ class NowPlayingViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val settingsRepository: com.zonik.app.data.repository.SettingsRepository,
     private val database: com.zonik.app.data.db.ZonikDatabase,
-    private val audioVisualizerManager: com.zonik.app.media.AudioVisualizerManager
+    private val waveformManager: com.zonik.app.media.WaveformManager
 ) : ViewModel() {
 
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
@@ -80,8 +80,9 @@ class NowPlayingViewModel @Inject constructor(
     val castDeviceName: StateFlow<String?> = playbackManager.castManager.castDeviceName
     val isBuffering: StateFlow<Boolean> = playbackManager.isBuffering
     val playbackError: StateFlow<String?> = playbackManager.playbackError
-    val fftMagnitudes: StateFlow<FloatArray> = audioVisualizerManager.fftMagnitudes
-    val visualizerEnabled: StateFlow<Boolean> = audioVisualizerManager.isEnabled
+    val waveform: StateFlow<FloatArray?> = waveformManager.currentWaveform
+    val waveformEnabled: StateFlow<Boolean> = settingsRepository.visualizerEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun getCastContext() = playbackManager.castManager.getCastContext()
 
@@ -111,9 +112,25 @@ class NowPlayingViewModel @Inject constructor(
                     _isStarred.value = starred ?: false
                     val dbTrack = database.trackDao().getById(track.id)
                     _isMarkedForDeletion.value = dbTrack?.markedForDeletion ?: false
+                    // Load waveform for current track
+                    if (waveformEnabled.value) {
+                        waveformManager.loadWaveform(track.id)
+                    }
                 } else {
                     _isStarred.value = false
                     _isMarkedForDeletion.value = false
+                    waveformManager.clear()
+                }
+            }
+        }
+        // Also reload waveform when the setting is toggled on
+        viewModelScope.launch {
+            waveformEnabled.collect { enabled ->
+                val track = currentTrack.value
+                if (enabled && track != null) {
+                    waveformManager.loadWaveform(track.id)
+                } else if (!enabled) {
+                    waveformManager.clear()
                 }
             }
         }
@@ -226,8 +243,8 @@ fun NowPlayingScreen(
     val isBuffering by viewModel.isBuffering.collectAsState()
     val playbackError by viewModel.playbackError.collectAsState()
     val isLoadingRadio by viewModel.isLoadingRadio.collectAsState()
-    val fftMagnitudes by viewModel.fftMagnitudes.collectAsState()
-    val visualizerEnabled by viewModel.visualizerEnabled.collectAsState()
+    val waveform by viewModel.waveform.collectAsState()
+    val waveformEnabled by viewModel.waveformEnabled.collectAsState()
 
     // Keep screen on while Now Playing is visible (if enabled in settings)
     val activity = LocalContext.current as? android.app.Activity
@@ -519,7 +536,7 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Seek bar with audio visualizer
+            // Seek bar — waveform or standard slider
             val sliderValue = if (isSeeking) {
                 seekPosition
             } else if (durationMs > 0) {
@@ -528,48 +545,53 @@ fun NowPlayingScreen(
                 0f
             }
 
+            val showWaveform = waveformEnabled && waveform != null && !isCasting
+
             Box(modifier = Modifier.fillMaxWidth()) {
-                // Visualizer bars behind the seek bar
-                if (visualizerEnabled && !isCasting) {
-                    com.zonik.app.ui.components.AudioVisualizerBars(
-                        magnitudes = fftMagnitudes,
-                        accentColor = animatedAccent,
+                // Waveform visualization behind the slider
+                if (showWaveform) {
+                    com.zonik.app.ui.components.WaveformBars(
+                        waveform = waveform!!,
+                        progress = sliderValue,
+                        activeColor = animatedAccent,
+                        inactiveColor = Color.White.copy(alpha = 0.15f),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 14.dp)
-                            .alpha(0.35f)
+                            .height(40.dp)
+                            .align(Alignment.Center)
                     )
                 }
 
-                Column {
-                    Slider(
-                        value = sliderValue,
-                        onValueChange = { value ->
-                            isSeeking = true
-                            seekPosition = value
-                        },
-                        onValueChangeFinished = {
-                            val seekMs = (seekPosition * durationMs).toLong()
-                            viewModel.seekTo(seekMs)
-                            positionMs = seekMs
-                            isSeeking = false
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        thumb = {
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { value ->
+                        isSeeking = true
+                        seekPosition = value
+                    },
+                    onValueChangeFinished = {
+                        val seekMs = (seekPosition * durationMs).toLong()
+                        viewModel.seekTo(seekMs)
+                        positionMs = seekMs
+                        isSeeking = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    thumb = {
+                        Box(
+                            modifier = Modifier.size(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Box(
-                                modifier = Modifier.size(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .background(Color.White, CircleShape)
-                                )
-                            }
-                        },
-                        track = { sliderState ->
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .background(Color.White, CircleShape)
+                            )
+                        }
+                    },
+                    track = { sliderState ->
+                        if (showWaveform) {
+                            // Invisible track — waveform replaces it visually
+                            Spacer(modifier = Modifier.fillMaxWidth().height(4.dp))
+                        } else {
                             SliderDefaults.Track(
                                 sliderState = sliderState,
                                 colors = SliderDefaults.colors(
@@ -579,33 +601,33 @@ fun NowPlayingScreen(
                                 thumbTrackGapSize = 0.dp,
                                 drawStopIndicator = null
                             )
-                        },
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = animatedAccent,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.12f)
-                        )
+                        }
+                    },
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = animatedAccent,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.12f)
                     )
+                )
+            }
 
-                    // Time labels
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val displayPos = if (isSeeking) (seekPosition * durationMs).toLong() else positionMs
-                        Text(
-                            text = formatDurationMs(displayPos),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                        Text(
-                            text = formatDurationMs(durationMs),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                    }
-                }
+            // Time labels
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                val displayPos = if (isSeeking) (seekPosition * durationMs).toLong() else positionMs
+                Text(
+                    text = formatDurationMs(displayPos),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f)
+                )
+                Text(
+                    text = formatDurationMs(durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f)
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))

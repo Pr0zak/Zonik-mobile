@@ -1,65 +1,46 @@
 package com.zonik.app.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.zonik.app.media.AudioVisualizerManager
 
 @Composable
-fun AudioVisualizerBars(
-    magnitudes: FloatArray,
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-    barCount: Int = AudioVisualizerManager.BAR_COUNT
+fun WaveformBars(
+    waveform: FloatArray,
+    progress: Float,
+    activeColor: Color,
+    inactiveColor: Color,
+    modifier: Modifier = Modifier
 ) {
-    // Animate each bar independently with spring physics
-    val animatedBars = Array(barCount) { index ->
-        val target = magnitudes.getOrElse(index) { 0f }
-        val animated by animateFloatAsState(
-            targetValue = target,
-            animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
-            label = "bar_$index"
-        )
-        animated
-    }
-
-    val gapDp = 2.dp
-    val cornerDp = 2.dp
+    val barCount = waveform.size
+    val gapDp = 1.dp
+    val cornerDp = 1.dp
+    val minBarFraction = 0.05f
 
     Canvas(modifier = modifier) {
+        if (barCount == 0) return@Canvas
         val gapPx = gapDp.toPx()
         val cornerPx = cornerDp.toPx()
         val totalGaps = (barCount - 1) * gapPx
         val barWidth = (size.width - totalGaps) / barCount
+        val halfHeight = size.height / 2f
 
         for (i in 0 until barCount) {
-            val magnitude = animatedBars[i]
+            val magnitude = waveform[i].coerceAtLeast(minBarFraction)
             val barHeight = magnitude * size.height
-            if (barHeight < 1f) continue
-
             val x = i * (barWidth + gapPx)
-            val y = size.height - barHeight
+            val y = halfHeight - barHeight / 2f
 
-            val brush = Brush.verticalGradient(
-                colors = listOf(
-                    accentColor.copy(alpha = 0.5f),
-                    accentColor.copy(alpha = 0.15f)
-                ),
-                startY = y,
-                endY = size.height
-            )
+            val barProgress = (i + 0.5f) / barCount
+            val color = if (barProgress <= progress) activeColor else inactiveColor
 
             drawRoundRect(
-                brush = brush,
+                color = color,
                 topLeft = Offset(x, y),
                 size = Size(barWidth, barHeight),
                 cornerRadius = CornerRadius(cornerPx, cornerPx)

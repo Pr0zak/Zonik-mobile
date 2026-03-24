@@ -325,7 +325,6 @@ class SettingsViewModel @Inject constructor(
     fun setVisualizerEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setVisualizerEnabled(enabled)
-            playbackManager.setVisualizerEnabled(enabled)
         }
     }
 
