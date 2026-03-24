@@ -16,6 +16,8 @@ import com.zonik.app.data.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import com.zonik.app.model.ServerConfig
 import com.zonik.app.model.Track
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -135,6 +137,35 @@ class PlaybackManager @Inject constructor(
         // Restore queue from player's current media items (e.g. after playback resumption)
         if (_queue.value.isEmpty() && (controller?.mediaItemCount ?: 0) > 0) {
             syncQueueFromPlayer()
+        }
+
+        // If player is empty after process kill, restore saved queue from DataStore
+        if (_queue.value.isEmpty() && (controller?.mediaItemCount ?: 0) == 0) {
+            scope.launch {
+                try {
+                    val savedTrackIds = settingsRepository.lastQueueTrackIds.first()
+                    val savedIndex = settingsRepository.lastQueueIndex.first()
+                    val savedPosition = settingsRepository.lastQueuePositionMs.first()
+                    if (savedTrackIds.isNotEmpty()) {
+                        val tracks = libraryRepository.getTracksByIds(savedTrackIds)
+                        if (tracks.isNotEmpty()) {
+                            val startIndex = savedIndex.coerceIn(0, tracks.size - 1)
+                            DebugLog.d("Playback", "Restoring saved queue: ${tracks.size} tracks, index=$startIndex, pos=${savedPosition}ms")
+                            _queue.value = tracks
+                            _currentTrack.value = tracks[startIndex]
+                            // Load tracks into player without auto-playing
+                            playTracks(tracks, startIndex)
+                            delay(500)
+                            withContext(Dispatchers.Main) {
+                                controller?.seekTo(savedPosition)
+                                controller?.pause()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    DebugLog.w("Playback", "Queue restore failed: ${e.message}")
+                }
+            }
         }
 
         // Track Cast track changes and update currentTrack
@@ -649,7 +680,7 @@ class PlaybackManager @Inject constructor(
             if (tracks.isNotEmpty()) {
                 _queue.value = tracks
                 // setCurrentTrack calls persistPlaybackState which accesses controller (main thread only)
-                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     if (currentIndex in tracks.indices) {
                         setCurrentTrack(tracks[currentIndex])
                     }
