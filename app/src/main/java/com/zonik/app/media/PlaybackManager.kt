@@ -424,12 +424,17 @@ class PlaybackManager @Inject constructor(
             }
         }
         if (exoIndex < 0) {
-            if (ctrl.mediaItemCount == 0) {
+            if (ctrl.mediaItemCount == 0 && _queue.value.isNotEmpty()) {
+                // Controller hasn't synced yet after PLAY_TRACKS — use queue index directly
+                DebugLog.d("Playback", "skipToIndex: controller not synced, using queue index $index")
+                exoIndex = index
+            } else if (ctrl.mediaItemCount == 0) {
                 DebugLog.w("Playback", "skipToIndex: player is empty, cannot skip")
                 return
+            } else {
+                DebugLog.w("Playback", "skipToIndex: track '${track.title}' (${track.id}) not found in ExoPlayer queue, falling back to index $index")
+                exoIndex = index.coerceIn(0, ctrl.mediaItemCount - 1)
             }
-            DebugLog.w("Playback", "skipToIndex: track '${track.title}' (${track.id}) not found in ExoPlayer queue, falling back to index $index")
-            exoIndex = index.coerceIn(0, ctrl.mediaItemCount - 1)
         }
         if (exoIndex != index) {
             DebugLog.d("Playback", "skipToIndex: queue index $index maps to ExoPlayer index $exoIndex")
