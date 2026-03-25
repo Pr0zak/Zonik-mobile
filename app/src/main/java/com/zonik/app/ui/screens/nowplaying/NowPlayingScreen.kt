@@ -70,7 +70,8 @@ class NowPlayingViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val settingsRepository: com.zonik.app.data.repository.SettingsRepository,
     private val database: com.zonik.app.data.db.ZonikDatabase,
-    private val waveformManager: com.zonik.app.media.WaveformManager
+    private val waveformManager: com.zonik.app.media.WaveformManager,
+    private val offlineCacheManager: com.zonik.app.media.OfflineCacheManager
 ) : ViewModel() {
 
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
@@ -143,6 +144,16 @@ class NowPlayingViewModel @Inject constructor(
     fun skipToIndex(index: Int) = playbackManager.skipToIndex(index)
     fun getCurrentPosition(): Long = playbackManager.getCurrentPosition()
     fun getDuration(): Long = playbackManager.getDuration()
+
+    val offlineTrackIds: StateFlow<Set<String>> = offlineCacheManager.offlineTrackIds
+    val downloadStates: StateFlow<Map<String, com.zonik.app.media.DownloadState>> = offlineCacheManager.downloadStates
+
+    fun cacheQueueOffline() {
+        val trackIds = queue.value.map { it.id }
+        if (trackIds.isNotEmpty()) {
+            offlineCacheManager.downloadTracks(trackIds)
+        }
+    }
 
     fun toggleShuffle() {
         val newValue = !_shuffleEnabled.value
@@ -880,6 +891,25 @@ fun NowPlayingScreen(
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = animatedAccent,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        // Cache queue for offline button
+                        val offlineIds by viewModel.offlineTrackIds.collectAsState()
+                        val downloadStates by viewModel.downloadStates.collectAsState()
+                        val allCached = queue.isNotEmpty() && queue.all { it.id in offlineIds }
+                        val anyDownloading = downloadStates.values.any { it == com.zonik.app.media.DownloadState.DOWNLOADING || it == com.zonik.app.media.DownloadState.QUEUED }
+                        IconButton(
+                            onClick = { viewModel.cacheQueueOffline() },
+                            enabled = !allCached && !anyDownloading
+                        ) {
+                            Icon(
+                                if (allCached) Icons.Default.CloudDone else Icons.Default.CloudDownload,
+                                contentDescription = if (allCached) "Queue cached" else "Cache queue offline",
+                                tint = if (allCached) Color(0xFF4CAF50)
+                                       else if (anyDownloading) animatedAccent.copy(alpha = 0.5f)
+                                       else Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
