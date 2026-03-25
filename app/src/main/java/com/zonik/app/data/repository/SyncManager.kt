@@ -4,6 +4,7 @@ import com.zonik.app.data.DebugLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,7 +23,8 @@ data class SyncState(
 @Singleton
 class SyncManager @Inject constructor(
     private val libraryRepository: LibraryRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val offlineCacheManager: com.zonik.app.media.OfflineCacheManager
 ) {
     private val _syncState = MutableStateFlow(SyncState())
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
@@ -75,6 +77,21 @@ class SyncManager @Inject constructor(
             DebugLog.d("Sync", "Playlists synced: $playlistCount")
 
             settingsRepository.updateLastSyncTime(System.currentTimeMillis())
+
+            // Auto-cache favorites for offline if enabled
+            try {
+                val cacheEnabled = settingsRepository.offlineCacheEnabled.first()
+                val cacheFavs = settingsRepository.autoCacheFavorites.first()
+                if (cacheEnabled && cacheFavs) {
+                    val starredTracks = libraryRepository.getStarredTracks()
+                    if (starredTracks.isNotEmpty()) {
+                        offlineCacheManager.downloadTracks(starredTracks.map { it.id })
+                        DebugLog.d("Sync", "Queued ${starredTracks.size} starred tracks for offline cache")
+                    }
+                }
+            } catch (e: Exception) {
+                DebugLog.w("Sync", "Offline cache of favorites failed: ${e.message}")
+            }
 
             val summary = "$artistCount artists \u00b7 $albumCount albums \u00b7 $trackCount tracks \u00b7 $playlistCount playlists"
             DebugLog.d("Sync", "Sync complete: $summary")

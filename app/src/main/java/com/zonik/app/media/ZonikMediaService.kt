@@ -55,6 +55,7 @@ class ZonikMediaService : MediaLibraryService() {
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var database: ZonikDatabase
     @Inject lateinit var simpleCache: SimpleCache
+    @Inject lateinit var offlineCacheManager: OfflineCacheManager
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var equalizer: android.media.audiofx.Equalizer? = null
@@ -155,6 +156,52 @@ class ZonikMediaService : MediaLibraryService() {
             .setCacheKeyFactory(cacheKeyFactory)
         cacheDataSourceFactory = dataSourceFactory
 
+        // Wrap with offline-aware factory: check offline dir first, then streaming cache
+        val offlineAwareFactory = androidx.media3.datasource.DataSource.Factory {
+            object : androidx.media3.datasource.DataSource {
+                private var activeSource: androidx.media3.datasource.DataSource? = null
+                private var fileSource: androidx.media3.datasource.FileDataSource? = null
+                private var cacheSource: androidx.media3.datasource.DataSource? = null
+
+                override fun open(dataSpec: androidx.media3.datasource.DataSpec): Long {
+                    val trackId = dataSpec.uri.getQueryParameter("id")
+                    if (trackId != null) {
+                        val offlineFile = offlineCacheManager.getOfflineFile(trackId)
+                        if (offlineFile != null) {
+                            val fileDs = androidx.media3.datasource.FileDataSource()
+                            val fileSpec = dataSpec.buildUpon()
+                                .setUri(android.net.Uri.fromFile(offlineFile))
+                                .build()
+                            fileSource = fileDs
+                            activeSource = fileDs
+                            return fileDs.open(fileSpec)
+                        }
+                    }
+                    val ds = dataSourceFactory.createDataSource()
+                    cacheSource = ds
+                    activeSource = ds
+                    return ds.open(dataSpec)
+                }
+
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    return activeSource?.read(buffer, offset, length) ?: -1
+                }
+
+                override fun addTransferListener(transferListener: androidx.media3.datasource.TransferListener) {
+                    // No-op — individual sources handle their own listeners
+                }
+
+                override fun getUri(): android.net.Uri? = activeSource?.uri
+
+                override fun close() {
+                    activeSource?.close()
+                    activeSource = null
+                    fileSource = null
+                    cacheSource = null
+                }
+            }
+        }
+
         // Buffer config tuned for low-latency transcoding server
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
@@ -187,7 +234,7 @@ class ZonikMediaService : MediaLibraryService() {
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(
-                DefaultMediaSourceFactory(dataSourceFactory)
+                DefaultMediaSourceFactory(offlineAwareFactory)
                     .setLoadErrorHandlingPolicy(resilientErrorPolicy)
             )
             .setLoadControl(loadControl)

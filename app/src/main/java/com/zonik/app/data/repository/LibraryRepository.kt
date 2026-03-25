@@ -173,6 +173,11 @@ class LibraryRepository @Inject constructor(
             entities.map { it.toDomain() }
         }
 
+    fun getOfflineCachedTracks(): Flow<List<Track>> =
+        database.trackDao().getOfflineCached().map { entities ->
+            entities.map { it.toDomain() }
+        }
+
     fun markedForDeletionCount(): Flow<Int> =
         database.trackDao().markedForDeletionCount()
 

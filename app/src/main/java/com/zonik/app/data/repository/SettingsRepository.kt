@@ -182,6 +182,10 @@ class SettingsRepository @Inject constructor(
         private val EQ_ENABLED = booleanPreferencesKey("eq_enabled")
         private val EQ_PRESET = intPreferencesKey("eq_preset")
         private val EQ_BAND_LEVELS = stringPreferencesKey("eq_band_levels")
+        private val OFFLINE_CACHE_ENABLED = booleanPreferencesKey("offline_cache_enabled")
+        private val AUTO_CACHE_QUEUE = booleanPreferencesKey("auto_cache_queue")
+        private val AUTO_CACHE_FAVORITES = booleanPreferencesKey("auto_cache_favorites")
+        private val OFFLINE_STORAGE_LIMIT_MB = intPreferencesKey("offline_storage_limit_mb")
         private val LAST_QUEUE_TRACK_IDS = stringPreferencesKey("last_queue_track_ids")
         private val LAST_QUEUE_INDEX = intPreferencesKey("last_queue_index")
         private val LAST_QUEUE_POSITION_MS = longPreferencesKey("last_queue_position_ms")
@@ -212,6 +216,19 @@ class SettingsRepository @Inject constructor(
 
     val visualizerEnabled: Flow<Boolean> = dataStore.data.map { prefs -> prefs[VISUALIZER_ENABLED] ?: false }
     suspend fun setVisualizerEnabled(enabled: Boolean) { dataStore.edit { it[VISUALIZER_ENABLED] = enabled } }
+
+    // Offline cache settings
+    val offlineCacheEnabled: Flow<Boolean> = dataStore.data.map { prefs -> prefs[OFFLINE_CACHE_ENABLED] ?: false }
+    suspend fun setOfflineCacheEnabled(enabled: Boolean) { dataStore.edit { it[OFFLINE_CACHE_ENABLED] = enabled } }
+
+    val autoCacheQueue: Flow<Boolean> = dataStore.data.map { prefs -> prefs[AUTO_CACHE_QUEUE] ?: true }
+    suspend fun setAutoCacheQueue(enabled: Boolean) { dataStore.edit { it[AUTO_CACHE_QUEUE] = enabled } }
+
+    val autoCacheFavorites: Flow<Boolean> = dataStore.data.map { prefs -> prefs[AUTO_CACHE_FAVORITES] ?: true }
+    suspend fun setAutoCacheFavorites(enabled: Boolean) { dataStore.edit { it[AUTO_CACHE_FAVORITES] = enabled } }
+
+    val offlineStorageLimitMb: Flow<Int> = dataStore.data.map { prefs -> prefs[OFFLINE_STORAGE_LIMIT_MB] ?: 2048 }
+    suspend fun setOfflineStorageLimitMb(sizeMb: Int) { dataStore.edit { it[OFFLINE_STORAGE_LIMIT_MB] = sizeMb } }
 
     val eqEnabled: Flow<Boolean> = dataStore.data.map { prefs -> prefs[EQ_ENABLED] ?: false }
     suspend fun setEqEnabled(enabled: Boolean) { dataStore.edit { it[EQ_ENABLED] = enabled } }

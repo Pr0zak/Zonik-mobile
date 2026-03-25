@@ -226,6 +226,10 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "Equalizer")
             EqualizerSection(viewModel = viewModel, uiState = uiState)
 
+            // Offline section
+            SettingsSectionHeader(title = "Offline")
+            OfflineCacheSection(viewModel = viewModel)
+
             // Sync section
             SettingsSectionHeader(title = "Sync")
             Card(
@@ -944,6 +948,128 @@ private fun EqualizerSection(viewModel: SettingsViewModel, uiState: SettingsUiSt
                             Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("System Equalizer")
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineCacheSection(viewModel: SettingsViewModel) {
+    val offlineCacheEnabled by viewModel.offlineCacheEnabled.collectAsState()
+    val autoCacheQueue by viewModel.autoCacheQueue.collectAsState()
+    val autoCacheFavorites by viewModel.autoCacheFavorites.collectAsState()
+    val offlineStorageLimitMb by viewModel.offlineStorageLimitMb.collectAsState()
+    val offlineStorageUsedBytes by viewModel.offlineStorageUsedBytes.collectAsState()
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = ZonikShapes.cardShape,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C2A))
+    ) {
+        Column {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text("Offline Caching") },
+                supportingContent = { Text("Download tracks for offline playback") },
+                leadingContent = { Icon(Icons.Default.CloudDownload, contentDescription = null) },
+                trailingContent = {
+                    Switch(
+                        checked = offlineCacheEnabled,
+                        onCheckedChange = viewModel::setOfflineCacheEnabled
+                    )
+                }
+            )
+
+            if (offlineCacheEnabled) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    headlineContent = { Text("Auto-cache queue") },
+                    supportingContent = { Text("Download queued tracks in background") },
+                    trailingContent = {
+                        Switch(checked = autoCacheQueue, onCheckedChange = viewModel::setAutoCacheQueue)
+                    }
+                )
+
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    headlineContent = { Text("Auto-cache favorites") },
+                    supportingContent = { Text("Download starred tracks after sync") },
+                    trailingContent = {
+                        Switch(checked = autoCacheFavorites, onCheckedChange = viewModel::setAutoCacheFavorites)
+                    }
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                // Storage limit dropdown
+                var expanded by remember { mutableStateOf(false) }
+                val limitOptions = listOf(1024, 2048, 5120, 10240, 20480)
+                val limitLabel = when {
+                    offlineStorageLimitMb < 1024 -> "${offlineStorageLimitMb} MB"
+                    else -> "${"%.0f".format(offlineStorageLimitMb / 1024.0)} GB"
+                }
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    headlineContent = { Text("Storage limit") },
+                    supportingContent = {
+                        val usedMb = offlineStorageUsedBytes / (1024 * 1024)
+                        Text("${usedMb} MB / $limitLabel used")
+                    },
+                    trailingContent = {
+                        Box {
+                            TextButton(onClick = { expanded = true }) {
+                                Text(limitLabel)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                limitOptions.forEach { mb ->
+                                    val label = if (mb < 1024) "$mb MB" else "${"%.0f".format(mb / 1024.0)} GB"
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = { viewModel.setOfflineStorageLimitMb(mb); expanded = false },
+                                        trailingIcon = if (mb == offlineStorageLimitMb) {
+                                            { Icon(Icons.Default.Check, contentDescription = null) }
+                                        } else null
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+
+                // Progress bar
+                if (offlineStorageUsedBytes > 0) {
+                    val progress = (offlineStorageUsedBytes.toFloat() / (offlineStorageLimitMb * 1024 * 1024)).coerceIn(0f, 1f)
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .height(4.dp),
+                        color = if (progress > 0.9f) Color(0xFFE57373) else MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    headlineContent = {
+                        TextButton(
+                            onClick = { viewModel.clearOfflineCache() },
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE57373))
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Clear Offline Cache")
                         }
                     }
                 )

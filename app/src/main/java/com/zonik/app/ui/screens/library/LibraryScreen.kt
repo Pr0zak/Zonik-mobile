@@ -138,6 +138,9 @@ class LibraryViewModel @Inject constructor(
     val flaggedTracks = libraryRepository.getTracksMarkedForDeletion()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val offlineTracks = libraryRepository.getOfflineCachedTracks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _isDeleting = MutableStateFlow(false)
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
 
@@ -301,7 +304,8 @@ private enum class LibraryTab(val label: String) {
     FAVORITES("Favorites"),
     GENRES("Genres"),
     PLAYLISTS("Playlists"),
-    FLAGGED("Flagged")
+    FLAGGED("Flagged"),
+    OFFLINE("Offline")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -321,6 +325,7 @@ fun LibraryScreen(
     val playlists by viewModel.playlists.collectAsState()
     val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsState()
     val flaggedTracks by viewModel.flaggedTracks.collectAsState()
+    val offlineTracks by viewModel.offlineTracks.collectAsState()
     val isDeleting by viewModel.isDeleting.collectAsState()
     val deleteResult by viewModel.deleteResult.collectAsState()
 
@@ -383,6 +388,10 @@ fun LibraryScreen(
                     tracks = flaggedTracks,
                     isDeleting = isDeleting,
                     deleteResult = deleteResult,
+                    viewModel = viewModel
+                )
+                LibraryTab.OFFLINE -> OfflineTab(
+                    tracks = offlineTracks,
                     viewModel = viewModel
                 )
             }
@@ -1344,6 +1353,83 @@ private fun FlaggedTab(
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun OfflineTab(
+    tracks: List<Track>,
+    viewModel: LibraryViewModel
+) {
+    if (tracks.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.CloudDone,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "No offline tracks",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Enable offline caching in Settings",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        return
+    }
+
+    Column {
+        Text(
+            text = "${tracks.size} tracks available offline",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            items(tracks, key = { it.id }) { track ->
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = track.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = "${track.artist} · ${track.album}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.CloudDone,
+                            contentDescription = "Offline",
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    },
+                    modifier = Modifier.clickable { viewModel.playTrack(track) }
+                )
+            }
         }
     }
 }

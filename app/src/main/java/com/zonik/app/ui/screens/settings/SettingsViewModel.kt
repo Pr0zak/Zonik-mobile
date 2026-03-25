@@ -48,7 +48,12 @@ data class SettingsUiState(
     val eqEnabled: Boolean = false,
     val eqPreset: Int = 0,
     val eqBandLevels: String? = null,
-    val visualizerEnabled: Boolean = false
+    val visualizerEnabled: Boolean = false,
+    val offlineCacheEnabled: Boolean = false,
+    val autoCacheQueue: Boolean = true,
+    val autoCacheFavorites: Boolean = true,
+    val offlineStorageLimitMb: Int = 2048,
+    val offlineStorageUsedBytes: Long = 0L
 )
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -60,7 +65,8 @@ class SettingsViewModel @Inject constructor(
     private val syncManager: SyncManager,
     private val logUploader: LogUploader,
     private val simpleCache: SimpleCache,
-    private val playbackManager: PlaybackManager
+    private val playbackManager: PlaybackManager,
+    private val offlineCacheManager: com.zonik.app.media.OfflineCacheManager
 ) : ViewModel() {
 
     val githubToken = settingsRepository.githubToken
@@ -355,5 +361,47 @@ class SettingsViewModel @Inject constructor(
             settingsRepository.setEqPreset(-1) // Custom
             playbackManager.applyEqualizerSettings(uiState.value.eqEnabled, -1, levelsStr)
         }
+    }
+
+    // Offline cache settings
+    val offlineCacheEnabled = settingsRepository.offlineCacheEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val autoCacheQueue = settingsRepository.autoCacheQueue
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val autoCacheFavorites = settingsRepository.autoCacheFavorites
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val offlineStorageLimitMb = settingsRepository.offlineStorageLimitMb
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2048)
+
+    private val _offlineStorageUsedBytes = MutableStateFlow(0L)
+    val offlineStorageUsedBytes: StateFlow<Long> = _offlineStorageUsedBytes.asStateFlow()
+
+    init {
+        refreshOfflineStorageSize()
+    }
+
+    fun refreshOfflineStorageSize() {
+        _offlineStorageUsedBytes.value = offlineCacheManager.getStorageUsedBytes()
+    }
+
+    fun setOfflineCacheEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setOfflineCacheEnabled(enabled) }
+    }
+
+    fun setAutoCacheQueue(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setAutoCacheQueue(enabled) }
+    }
+
+    fun setAutoCacheFavorites(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setAutoCacheFavorites(enabled) }
+    }
+
+    fun setOfflineStorageLimitMb(sizeMb: Int) {
+        viewModelScope.launch { settingsRepository.setOfflineStorageLimitMb(sizeMb) }
+    }
+
+    fun clearOfflineCache() {
+        offlineCacheManager.clearAll()
+        refreshOfflineStorageSize()
     }
 }

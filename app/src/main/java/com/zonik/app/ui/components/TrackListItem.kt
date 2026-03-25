@@ -112,9 +112,19 @@ fun TrackListItem(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    track.suffix?.let { suffix ->
-                        Spacer(modifier = Modifier.height(2.dp))
-                        FormatBadge(suffix = suffix)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        track.suffix?.let { suffix ->
+                            FormatBadge(suffix = suffix)
+                        }
+                        if (track.offlineCached) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.CloudDone,
+                                contentDescription = "Offline",
+                                modifier = Modifier.size(14.dp),
+                                tint = Color(0xFF4CAF50)
+                            )
+                        }
                     }
                 }
             },

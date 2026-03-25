@@ -40,7 +40,8 @@ class PlaybackManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val libraryRepository: LibraryRepository,
-    val castManager: CastManager
+    val castManager: CastManager,
+    private val offlineCacheManager: OfflineCacheManager
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var controller: MediaController? = null
@@ -366,6 +367,19 @@ class PlaybackManager @Inject constructor(
             androidx.media3.session.SessionCommand("com.zonik.app.PLAY_TRACKS", android.os.Bundle.EMPTY),
             args
         )
+
+        // Auto-cache queue for offline if enabled
+        if (!startPaused) {
+            scope.launch {
+                try {
+                    val enabled = settingsRepository.offlineCacheEnabled.first()
+                    val autoCacheQueue = settingsRepository.autoCacheQueue.first()
+                    if (enabled && autoCacheQueue) {
+                        offlineCacheManager.downloadTracks(tracks.map { it.id })
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     fun playNext(track: Track) {
