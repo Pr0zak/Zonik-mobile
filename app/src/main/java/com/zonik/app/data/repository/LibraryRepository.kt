@@ -126,8 +126,13 @@ class LibraryRepository @Inject constructor(
     }
 
     suspend fun getRandomSongs(count: Int = 50, genre: String? = null): List<Track> {
-        val response = api.getRandomSongs(count, genre)
-        return response.response.randomSongs?.song?.map { it.toDomain() } ?: emptyList()
+        return try {
+            val response = api.getRandomSongs(count, genre)
+            response.response.randomSongs?.song?.map { it.toDomain() } ?: emptyList()
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("LibraryRepo", "getRandomSongs failed: ${e.message}")
+            emptyList()
+        }
     }
 
     suspend fun getGenres(): List<Genre> {

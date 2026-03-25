@@ -40,11 +40,34 @@ class ZonikApplication : Application(), Configuration.Provider, ImageLoaderFacto
     override fun onCreate() {
         super.onCreate()
         com.zonik.app.data.DebugLog.init(this)
+        setupUncaughtExceptionHandler()
         createNotificationChannels()
         try {
             castManager.initialize()
         } catch (e: Exception) {
             com.zonik.app.data.DebugLog.w("App", "Cast SDK init failed (no Play Services?): ${e.message}")
+        }
+    }
+
+    private fun setupUncaughtExceptionHandler() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            // Swallow network errors that escape coroutine/Retrofit exception handling
+            val rootCause = generateSequence(throwable) { it.cause }.last()
+            if (rootCause is java.net.UnknownHostException ||
+                rootCause is java.net.ConnectException ||
+                rootCause is java.net.SocketTimeoutException) {
+                com.zonik.app.data.DebugLog.w("App", "Swallowed network error on ${thread.name}: ${rootCause.message}")
+                return@setDefaultUncaughtExceptionHandler
+            }
+            // Also catch Retrofit HttpException (server errors like 500)
+            if (rootCause is retrofit2.HttpException) {
+                com.zonik.app.data.DebugLog.w("App", "Swallowed HTTP error on ${thread.name}: ${rootCause.message}")
+                return@setDefaultUncaughtExceptionHandler
+            }
+            // All other exceptions: log and delegate to default handler
+            com.zonik.app.data.DebugLog.e("CRASH", "!!! CRASH on thread '${thread.name}' !!!", throwable)
+            defaultHandler?.uncaughtException(thread, throwable)
         }
     }
 
