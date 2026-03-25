@@ -152,13 +152,12 @@ class PlaybackManager @Inject constructor(
                             val startIndex = savedIndex.coerceIn(0, tracks.size - 1)
                             DebugLog.d("Playback", "Restoring saved queue: ${tracks.size} tracks, index=$startIndex, pos=${savedPosition}ms")
                             withContext(Dispatchers.Main) {
-                                playTracks(tracks, startIndex)
+                                playTracks(tracks, startIndex, startPaused = true)
                             }
-                            // Wait for player to load, then seek to saved position and pause
+                            // Seek to saved position after player loads
                             delay(1000)
                             withContext(Dispatchers.Main) {
                                 controller?.seekTo(savedPosition)
-                                controller?.pause()
                             }
                         }
                     }
@@ -317,7 +316,7 @@ class PlaybackManager @Inject constructor(
         }
     }
 
-    fun playTracks(tracks: List<Track>, startIndex: Int = 0) {
+    fun playTracks(tracks: List<Track>, startIndex: Int = 0, startPaused: Boolean = false) {
         val config = getServerConfig() ?: return
         val serverUrl = config.url
         // Cap track list to avoid TransactionTooLargeException (Binder 1MB limit)
@@ -327,7 +326,7 @@ class PlaybackManager @Inject constructor(
             val end = minOf(tracks.size, start + maxTracks)
             val adjustedIndex = startIndex - start
             DebugLog.d("Playback", "Capping ${tracks.size} tracks to $maxTracks (offset $start, adjusted index $adjustedIndex)")
-            return playTracks(tracks.subList(start, end), adjustedIndex)
+            return playTracks(tracks.subList(start, end), adjustedIndex, startPaused)
         } else tracks
         _queue.value = cappedTracks
         // Set current track immediately for instant UI update (don't wait for ExoPlayer callback)
@@ -361,6 +360,7 @@ class PlaybackManager @Inject constructor(
         val args = android.os.Bundle().apply {
             putStringArrayList("track_ids", ArrayList(tracks.map { it.id }))
             putInt("start_index", startIndex)
+            if (startPaused) putBoolean("start_paused", true)
         }
         ctrl.sendCustomCommand(
             androidx.media3.session.SessionCommand("com.zonik.app.PLAY_TRACKS", android.os.Bundle.EMPTY),

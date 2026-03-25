@@ -1052,11 +1052,12 @@ class ZonikMediaService : MediaLibraryService() {
                         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
                     }
                     val mediaItems = tracks.map { buildFullMediaItem(it) }
+                    val startPaused = args.getBoolean("start_paused", false)
                     val player = session.player
                     player.setMediaItems(mediaItems, startIndex, 0)
                     player.prepare()
-                    player.play()
-                    com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: set ${mediaItems.size} items, playing from $startIndex")
+                    if (!startPaused) player.play()
+                    com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: set ${mediaItems.size} items, playing from $startIndex${if (startPaused) " (paused)" else ""}")
 
                     // Pre-cache upcoming tracks in background after playback starts
                     val factory = cacheDataSourceFactory
