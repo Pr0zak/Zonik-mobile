@@ -1,5 +1,6 @@
 package com.zonik.app.ui.screens.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -226,10 +227,6 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "Equalizer")
             EqualizerSection(viewModel = viewModel, uiState = uiState)
 
-            // Offline section
-            SettingsSectionHeader(title = "Offline")
-            OfflineCacheSection(viewModel = viewModel)
-
             // Sync section
             SettingsSectionHeader(title = "Sync")
             Card(
@@ -288,8 +285,8 @@ fun SettingsScreen(
                 }
             }
 
-            // Cache & Buffering section
-            SettingsSectionHeader(title = "Cache & Buffering")
+            // Cache & Offline section
+            SettingsSectionHeader(title = "Cache & Offline")
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -383,6 +380,8 @@ fun SettingsScreen(
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            OfflineCacheSection(viewModel = viewModel)
 
             // Android Auto section
             SettingsSectionHeader(title = "Android Auto")
@@ -421,6 +420,30 @@ fun SettingsScreen(
                                 Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp))
                             }
                         }
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    headlineContent = { Text("GitHub") },
+                    supportingContent = { Text("Source code & releases") },
+                    leadingContent = {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    },
+                    trailingContent = {
+                        Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    },
+                    modifier = Modifier.clickable {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/Pr0zak/Zonik-mobile"))
+                        context.startActivity(intent)
                     }
                 )
             }
