@@ -1054,6 +1054,7 @@ class ZonikMediaService : MediaLibraryService() {
                     val mediaItems = tracks.map { buildFullMediaItem(it) }
                     val startPaused = args.getBoolean("start_paused", false)
                     val player = session.player
+                    if (startPaused) player.playWhenReady = false
                     player.setMediaItems(mediaItems, startIndex, 0)
                     player.prepare()
                     if (!startPaused) player.play()

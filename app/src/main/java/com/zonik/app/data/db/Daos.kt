@@ -122,6 +122,18 @@ interface TrackDao {
     @Query("SELECT id FROM tracks WHERE markedForDeletion = 1")
     suspend fun getMarkedForDeletionIds(): List<String>
 
+    @Query("SELECT * FROM tracks WHERE offlineCached = 1 ORDER BY title COLLATE NOCASE")
+    fun getOfflineCached(): Flow<List<TrackEntity>>
+
+    @Query("SELECT id FROM tracks WHERE offlineCached = 1")
+    suspend fun getOfflineCachedIds(): List<String>
+
+    @Query("UPDATE tracks SET offlineCached = :cached WHERE id = :id")
+    suspend fun setOfflineCached(id: String, cached: Boolean)
+
+    @Query("UPDATE tracks SET offlineCached = 0")
+    suspend fun clearAllOfflineCached()
+
     @Query("DELETE FROM tracks")
     suspend fun deleteAll()
 

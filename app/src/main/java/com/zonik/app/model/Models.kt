@@ -46,7 +46,8 @@ data class Track(
     val transcodedContentType: String? = null,
     val path: String? = null,
     val starred: Boolean = false,
-    val markedForDeletion: Boolean = false
+    val markedForDeletion: Boolean = false,
+    val offlineCached: Boolean = false
 )
 
 @Serializable
