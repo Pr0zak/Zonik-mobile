@@ -378,6 +378,12 @@ class SettingsViewModel @Inject constructor(
 
     init {
         refreshOfflineStorageSize()
+        // Auto-refresh storage size when offline track set changes
+        viewModelScope.launch {
+            offlineCacheManager.offlineTrackIds.collect {
+                _offlineStorageUsedBytes.value = offlineCacheManager.getStorageUsedBytes()
+            }
+        }
     }
 
     fun refreshOfflineStorageSize() {

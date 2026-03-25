@@ -1033,8 +1033,9 @@ private fun OfflineCacheSection(viewModel: SettingsViewModel) {
 
                 // Storage limit dropdown
                 var expanded by remember { mutableStateOf(false) }
-                val limitOptions = listOf(1024, 2048, 5120, 10240, 20480)
+                val limitOptions = listOf(2048, 5120, 10240, 20480, 51200, 0)
                 val limitLabel = when {
+                    offlineStorageLimitMb == 0 -> "No limit"
                     offlineStorageLimitMb < 1024 -> "${offlineStorageLimitMb} MB"
                     else -> "${"%.0f".format(offlineStorageLimitMb / 1024.0)} GB"
                 }
@@ -1053,7 +1054,11 @@ private fun OfflineCacheSection(viewModel: SettingsViewModel) {
                             }
                             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                                 limitOptions.forEach { mb ->
-                                    val label = if (mb < 1024) "$mb MB" else "${"%.0f".format(mb / 1024.0)} GB"
+                                    val label = when {
+                                        mb == 0 -> "No limit"
+                                        mb < 1024 -> "$mb MB"
+                                        else -> "${"%.0f".format(mb / 1024.0)} GB"
+                                    }
                                     DropdownMenuItem(
                                         text = { Text(label) },
                                         onClick = { viewModel.setOfflineStorageLimitMb(mb); expanded = false },

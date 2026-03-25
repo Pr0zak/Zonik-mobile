@@ -101,10 +101,10 @@ class OfflineCacheManager @Inject constructor(
             while (downloadQueue.isNotEmpty()) {
                 val trackId = downloadQueue.poll() ?: break
 
-                // Check storage limit
+                // Check storage limit (0 = no limit)
                 val limitMb = settingsRepository.offlineStorageLimitMb.first()
                 val usedMb = getStorageUsedBytes() / (1024 * 1024)
-                if (usedMb >= limitMb) {
+                if (limitMb > 0 && usedMb >= limitMb) {
                     DebugLog.w("OfflineCache", "Storage limit reached (${usedMb}MB / ${limitMb}MB), stopping")
                     updateState(trackId, DownloadState.FAILED)
                     // Drain remaining queue
@@ -156,11 +156,12 @@ class OfflineCacheManager @Inject constructor(
                         input.copyTo(out, bufferSize = 8192)
                     }
                 }
+                val sizeKb = tempFile.length() / 1024
                 tempFile.renameTo(File(offlineDir, trackId))
                 database.trackDao().setOfflineCached(trackId, true)
                 refreshOfflineIds()
                 updateState(trackId, DownloadState.COMPLETE)
-                DebugLog.d("OfflineCache", "Downloaded: $trackId (${tempFile.length() / 1024}KB)")
+                DebugLog.d("OfflineCache", "Downloaded: $trackId (${sizeKb}KB)")
             } catch (e: Exception) {
                 tempFile.delete()
                 throw e
