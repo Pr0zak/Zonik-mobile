@@ -867,6 +867,8 @@ fun NowPlayingScreen(
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    val offlineIds by viewModel.offlineTrackIds.collectAsState()
+                    val downloadStates by viewModel.downloadStates.collectAsState()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -895,8 +897,6 @@ fun NowPlayingScreen(
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         // Cache queue for offline button
-                        val offlineIds by viewModel.offlineTrackIds.collectAsState()
-                        val downloadStates by viewModel.downloadStates.collectAsState()
                         val allCached = queue.isNotEmpty() && queue.all { it.id in offlineIds }
                         val anyDownloading = downloadStates.values.any { it == com.zonik.app.media.DownloadState.DOWNLOADING || it == com.zonik.app.media.DownloadState.QUEUED }
                         IconButton(
@@ -910,6 +910,14 @@ fun NowPlayingScreen(
                                        else if (anyDownloading) animatedAccent.copy(alpha = 0.5f)
                                        else Color.White.copy(alpha = 0.7f),
                                 modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        if (anyDownloading || (offlineIds.isNotEmpty() && queue.any { it.id in offlineIds })) {
+                            val cachedCount = queue.count { it.id in offlineIds }
+                            Text(
+                                text = "$cachedCount/${queue.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (allCached) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.4f)
                             )
                         }
                     }
@@ -970,11 +978,37 @@ fun NowPlayingScreen(
                                         )
                                     },
                                     trailingContent = {
-                                        Text(
-                                            text = "${index + 1}",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = if (isCurrent) animatedAccent else Color.White.copy(alpha = 0.4f)
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            // Offline status indicator
+                                            val trackDownloadState = downloadStates[queueTrack.id]
+                                            val isTrackOffline = queueTrack.id in offlineIds
+                                            when {
+                                                isTrackOffline -> Icon(
+                                                    Icons.Default.CloudDone,
+                                                    contentDescription = "Cached",
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = Color(0xFF4CAF50)
+                                                )
+                                                trackDownloadState == com.zonik.app.media.DownloadState.DOWNLOADING -> CircularProgressIndicator(
+                                                    modifier = Modifier.size(14.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = animatedAccent
+                                                )
+                                                trackDownloadState == com.zonik.app.media.DownloadState.QUEUED -> Icon(
+                                                    Icons.Default.Schedule,
+                                                    contentDescription = "Queued",
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = Color.White.copy(alpha = 0.3f)
+                                                )
+                                                else -> {}
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "${index + 1}",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = if (isCurrent) animatedAccent else Color.White.copy(alpha = 0.4f)
+                                            )
+                                        }
                                     },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                                 )
