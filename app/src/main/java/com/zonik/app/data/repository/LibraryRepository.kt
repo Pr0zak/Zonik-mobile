@@ -381,7 +381,7 @@ class LibraryRepository @Inject constructor(
                 query = "",
                 artistCount = 0, artistOffset = 0,
                 albumCount = 0, albumOffset = 0,
-                songCount = 500, songOffset = offset
+                songCount = 100, songOffset = offset
             )
             val tracks = response.response.searchResult3?.song ?: break
             if (tracks.isEmpty()) break
