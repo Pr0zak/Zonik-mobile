@@ -102,7 +102,11 @@ class LibraryRepository @Inject constructor(
         // markedForDeletion is derived from userRating == 1 in toDomain()
         val tracks = albumDetail.song.map { song -> song.toDomain() }
 
-        database.trackDao().upsertAll(tracks.map { TrackEntity.fromDomain(it) })
+        val offlineIds = database.trackDao().getOfflineCachedIds().toSet()
+        database.trackDao().upsertAll(tracks.map {
+            val entity = TrackEntity.fromDomain(it)
+            if (entity.id in offlineIds) entity.copy(offlineCached = true) else entity
+        })
 
         return album to tracks
     }
@@ -424,9 +428,12 @@ class LibraryRepository @Inject constructor(
         // markedForDeletion is now server-authoritative (userRating == 1); starred via getStarred2
         val serverMarkedCount = allTracks.count { it.userRating == 1 }
         com.zonik.app.data.DebugLog.d("Sync", "Server has ${serverStarredIds.size} starred, ${serverMarkedCount} flagged for deletion")
+        // Preserve offlineCached status from existing DB rows (upsert would overwrite with false)
+        val existingOfflineIds = database.trackDao().getOfflineCachedIds().toSet()
         val entities = allTracks.map { subsonicTrack ->
             var entity = TrackEntity.fromDomain(subsonicTrack.toDomain())
             if (entity.id in serverStarredIds) entity = entity.copy(starred = true)
+            if (entity.id in existingOfflineIds) entity = entity.copy(offlineCached = true)
             entity
         }
         database.withTransaction {
