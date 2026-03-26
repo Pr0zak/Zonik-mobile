@@ -125,6 +125,15 @@ class LibraryRepository @Inject constructor(
         )
     }
 
+    suspend fun ping(): Boolean {
+        return try {
+            val response = api.ping()
+            response.response.status == "ok"
+        } catch (e: Exception) {
+            throw e
+        }
+    }
+
     suspend fun getRandomSongs(count: Int = 50, genre: String? = null): List<Track> {
         return try {
             val response = api.getRandomSongs(count, genre)

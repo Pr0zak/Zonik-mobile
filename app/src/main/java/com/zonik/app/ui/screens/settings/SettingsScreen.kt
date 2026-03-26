@@ -95,91 +95,7 @@ fun SettingsScreen(
 
             // Server section
             SettingsSectionHeader(title = "Server")
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C2A))
-            ) {
-                Column {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text("Server URL") },
-                        supportingContent = {
-                            Text(
-                                text = uiState.serverUrl.ifEmpty { "Not connected" },
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        },
-                        leadingContent = {
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(20.dp))
-                                }
-                            }
-                        }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text("Username") },
-                        supportingContent = {
-                            Text(
-                                text = uiState.username.ifEmpty { "N/A" },
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.Person, contentDescription = null)
-                        }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text("Server version") },
-                        supportingContent = {
-                            Text(
-                                text = buildString {
-                                    append(uiState.serverVersion.ifEmpty { "Unknown" })
-                                    uiState.serverType?.let { append(" ($it)") }
-                                },
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.Cloud, contentDescription = null)
-                        }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = {
-                            TextButton(
-                                onClick = {
-                                    viewModel.disconnect()
-                                    onDisconnected()
-                                },
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Default.Logout,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Disconnect")
-                            }
-                        }
-                    )
-                }
-            }
+            ServerSection(viewModel = viewModel, uiState = uiState, onDisconnected = onDisconnected)
 
             // Playback section
             SettingsSectionHeader(title = "Playback")
@@ -434,7 +350,11 @@ fun SettingsScreen(
                             modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Icon(
+                                    painter = androidx.compose.ui.res.painterResource(id = com.zonik.app.R.drawable.ic_github),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                     },
@@ -455,6 +375,180 @@ fun SettingsScreen(
 }
 
 // region Components
+
+@Composable
+private fun ServerSection(viewModel: SettingsViewModel, uiState: SettingsUiState, onDisconnected: () -> Unit) {
+    var editField by remember { mutableStateOf<String?>(null) } // "url", "username", "apikey"
+    var editValue by remember { mutableStateOf("") }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = ZonikShapes.cardShape,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C2A))
+    ) {
+        Column {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text("Server URL") },
+                supportingContent = {
+                    Text(
+                        text = uiState.serverUrl.ifEmpty { "Not connected" },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                leadingContent = {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                },
+                trailingContent = {
+                    IconButton(onClick = { editField = "url"; editValue = uiState.serverUrl }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text("Username") },
+                supportingContent = {
+                    Text(
+                        text = uiState.username.ifEmpty { "N/A" },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
+                trailingContent = {
+                    IconButton(onClick = { editField = "username"; editValue = uiState.username }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text("API Key / Password") },
+                supportingContent = { Text("********", style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.Key, contentDescription = null) },
+                trailingContent = {
+                    IconButton(onClick = { editField = "apikey"; editValue = "" }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text("Server version") },
+                supportingContent = {
+                    Text(
+                        text = buildString {
+                            append(uiState.serverVersion.ifEmpty { "Unknown" })
+                            uiState.serverType?.let { append(" ($it)") }
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                leadingContent = { Icon(Icons.Default.Cloud, contentDescription = null) }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            // Test connection button
+            val isTestingConnection by viewModel.isTestingConnection.collectAsState()
+            val connectionTestResult by viewModel.connectionTestResult.collectAsState()
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = { viewModel.testConnection() },
+                            enabled = !isTestingConnection
+                        ) {
+                            if (isTestingConnection) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Test Connection")
+                        }
+                        if (connectionTestResult != null) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = connectionTestResult!!,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (connectionTestResult == "Connected") Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            )
+            if (connectionTestResult != null) {
+                LaunchedEffect(connectionTestResult) {
+                    kotlinx.coroutines.delay(5000)
+                    viewModel.clearConnectionTestResult()
+                }
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = {
+                    TextButton(
+                        onClick = { viewModel.disconnect(); onDisconnected() },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Disconnect")
+                    }
+                }
+            )
+        }
+    }
+
+    // Edit dialog
+    if (editField != null) {
+        val title = when (editField) {
+            "url" -> "Server URL"
+            "username" -> "Username"
+            "apikey" -> "API Key / Password"
+            else -> ""
+        }
+        AlertDialog(
+            onDismissRequest = { editField = null },
+            title = { Text("Edit $title") },
+            text = {
+                OutlinedTextField(
+                    value = editValue,
+                    onValueChange = { editValue = it },
+                    label = { Text(title) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    when (editField) {
+                        "url" -> viewModel.updateServerUrl(editValue)
+                        "username" -> viewModel.updateUsername(editValue)
+                        "apikey" -> if (editValue.isNotBlank()) viewModel.updateApiKey(editValue)
+                    }
+                    editField = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editField = null }) { Text("Cancel") }
+            }
+        )
+    }
+}
 
 @Composable
 private fun StatItem(label: String, value: String) {

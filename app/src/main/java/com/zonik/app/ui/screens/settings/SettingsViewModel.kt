@@ -328,6 +328,51 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.clearAll() }
     }
 
+    private val _connectionTestResult = MutableStateFlow<String?>(null)
+    val connectionTestResult: StateFlow<String?> = _connectionTestResult.asStateFlow()
+
+    private val _isTestingConnection = MutableStateFlow(false)
+    val isTestingConnection: StateFlow<Boolean> = _isTestingConnection.asStateFlow()
+
+    fun testConnection() {
+        viewModelScope.launch {
+            _isTestingConnection.value = true
+            _connectionTestResult.value = null
+            try {
+                val response = libraryRepository.ping()
+                _connectionTestResult.value = if (response) "Connected" else "Auth failed"
+            } catch (e: Exception) {
+                _connectionTestResult.value = "Failed: ${e.message?.take(50)}"
+            }
+            _isTestingConnection.value = false
+        }
+    }
+
+    fun clearConnectionTestResult() {
+        _connectionTestResult.value = null
+    }
+
+    fun updateServerUrl(url: String) {
+        viewModelScope.launch {
+            val config = settingsRepository.serverConfig.first() ?: return@launch
+            settingsRepository.saveServerConfig(config.copy(url = url.trimEnd('/')))
+        }
+    }
+
+    fun updateUsername(username: String) {
+        viewModelScope.launch {
+            val config = settingsRepository.serverConfig.first() ?: return@launch
+            settingsRepository.saveServerConfig(config.copy(username = username))
+        }
+    }
+
+    fun updateApiKey(apiKey: String) {
+        viewModelScope.launch {
+            val config = settingsRepository.serverConfig.first() ?: return@launch
+            settingsRepository.saveServerConfig(config.copy(apiKey = apiKey))
+        }
+    }
+
     fun setVisualizerEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setVisualizerEnabled(enabled)
