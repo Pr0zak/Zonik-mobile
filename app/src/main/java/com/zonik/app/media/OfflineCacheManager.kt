@@ -80,6 +80,15 @@ class OfflineCacheManager @Inject constructor(
         DebugLog.d("OfflineCache", "Removed offline track: $trackId")
     }
 
+    fun cancelDownloads() {
+        downloadJob?.cancel()
+        downloadJob = null
+        downloadQueue.clear()
+        // Clear non-complete states
+        _downloadStates.value = _downloadStates.value.filter { it.value == DownloadState.COMPLETE }
+        DebugLog.d("OfflineCache", "Downloads cancelled")
+    }
+
     fun clearAll() {
         downloadJob?.cancel()
         downloadQueue.clear()

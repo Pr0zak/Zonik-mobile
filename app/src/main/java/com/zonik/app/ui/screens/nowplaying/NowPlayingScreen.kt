@@ -155,6 +155,10 @@ class NowPlayingViewModel @Inject constructor(
         }
     }
 
+    fun cancelQueueDownloads() {
+        offlineCacheManager.cancelDownloads()
+    }
+
     fun toggleShuffle() {
         val newValue = !_shuffleEnabled.value
         _shuffleEnabled.value = newValue
@@ -896,19 +900,32 @@ fun NowPlayingScreen(
                             )
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                        // Cache queue for offline button
+                        // Cache queue for offline button (toggles between download/cancel)
                         val allCached = queue.isNotEmpty() && queue.all { it.id in offlineIds }
                         val anyDownloading = downloadStates.values.any { it == com.zonik.app.media.DownloadState.DOWNLOADING || it == com.zonik.app.media.DownloadState.QUEUED }
                         IconButton(
-                            onClick = { viewModel.cacheQueueOffline() },
-                            enabled = !allCached && !anyDownloading
+                            onClick = {
+                                if (anyDownloading) viewModel.cancelQueueDownloads()
+                                else viewModel.cacheQueueOffline()
+                            },
+                            enabled = !allCached
                         ) {
                             Icon(
-                                if (allCached) Icons.Default.CloudDone else Icons.Default.CloudDownload,
-                                contentDescription = if (allCached) "Queue cached" else "Cache queue offline",
-                                tint = if (allCached) Color(0xFF4CAF50)
-                                       else if (anyDownloading) animatedAccent.copy(alpha = 0.5f)
-                                       else Color.White.copy(alpha = 0.7f),
+                                when {
+                                    allCached -> Icons.Default.CloudDone
+                                    anyDownloading -> Icons.Default.Close
+                                    else -> Icons.Default.CloudDownload
+                                },
+                                contentDescription = when {
+                                    allCached -> "Queue cached"
+                                    anyDownloading -> "Cancel downloads"
+                                    else -> "Cache queue offline"
+                                },
+                                tint = when {
+                                    allCached -> Color(0xFF4CAF50)
+                                    anyDownloading -> Color(0xFFE57373)
+                                    else -> Color.White.copy(alpha = 0.7f)
+                                },
                                 modifier = Modifier.size(22.dp)
                             )
                         }
