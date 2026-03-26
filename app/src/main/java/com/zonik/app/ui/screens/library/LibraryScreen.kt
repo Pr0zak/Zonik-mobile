@@ -80,6 +80,9 @@ class LibraryViewModel @Inject constructor(
     val tracks = libraryRepository.getAllTracks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val tracksRecentFirst = libraryRepository.getAllTracksRecentFirst()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _trackSort = MutableStateFlow(TrackSort.RECENT)
     val trackSort: StateFlow<TrackSort> = _trackSort.asStateFlow()
 
@@ -324,6 +327,7 @@ fun LibraryScreen(
     val isLoadingGenres by viewModel.isLoadingGenres.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
     val isLoadingPlaylists by viewModel.isLoadingPlaylists.collectAsState()
+    val tracksRecentFirst by viewModel.tracksRecentFirst.collectAsState()
     val flaggedTracks by viewModel.flaggedTracks.collectAsState()
     val offlineTracks by viewModel.offlineTracks.collectAsState()
     val isDeleting by viewModel.isDeleting.collectAsState()
@@ -367,6 +371,7 @@ fun LibraryScreen(
                 )
                 LibraryTab.TRACKS -> TracksTab(
                     tracks = tracks,
+                    tracksRecentFirst = tracksRecentFirst,
                     viewModel = viewModel
                 )
                 LibraryTab.FAVORITES -> FavoritesTab(
@@ -610,6 +615,7 @@ private fun GenresTab(
 @Composable
 private fun TracksTab(
     tracks: List<Track>,
+    tracksRecentFirst: List<Track>,
     viewModel: LibraryViewModel
 ) {
     val trackSort by viewModel.trackSort.collectAsState()
@@ -620,13 +626,13 @@ private fun TracksTab(
     }
 
     // Apply sort
-    val sortedTracks = remember(tracks, trackSort, trackSortAsc) {
+    val sortedTracks = remember(tracks, tracksRecentFirst, trackSort, trackSortAsc) {
         val sorted = when (trackSort) {
             TrackSort.TITLE -> tracks.sortedBy { it.title.lowercase() }
             TrackSort.ARTIST -> tracks.sortedBy { it.artist.lowercase() }
             TrackSort.ALBUM -> tracks.sortedWith(compareBy({ it.album.lowercase() }, { it.track ?: 0 }))
             TrackSort.DURATION -> tracks.sortedBy { it.duration }
-            TrackSort.RECENT -> tracks // Already in recent order from DB
+            TrackSort.RECENT -> tracksRecentFirst
         }
         if (trackSortAsc || trackSort == TrackSort.RECENT && trackSortAsc) sorted else sorted.reversed()
     }

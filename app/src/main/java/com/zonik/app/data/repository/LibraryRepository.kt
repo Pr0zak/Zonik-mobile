@@ -75,6 +75,11 @@ class LibraryRepository @Inject constructor(
             entities.map { it.toDomain() }
         }
 
+    fun getAllTracksRecentFirst(): Flow<List<Track>> =
+        database.trackDao().getAllRecentFirst().map { entities ->
+            entities.map { it.toDomain() }
+        }
+
     fun getTracksByAlbum(albumId: String): Flow<List<Track>> =
         database.trackDao().getByAlbum(albumId).map { entities ->
             entities.map { it.toDomain() }
