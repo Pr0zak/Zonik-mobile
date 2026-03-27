@@ -195,9 +195,14 @@ class TvViewModel @Inject constructor(
         viewModelScope.launch { syncManager.fullSync() }
     }
 
+    private val _logUploadResult = MutableStateFlow<String?>(null)
+    val logUploadResult: StateFlow<String?> = _logUploadResult.asStateFlow()
+
     fun uploadLogs() {
         viewModelScope.launch {
-            logUploader.uploadLogsToServer()
+            _logUploadResult.value = "Uploading..."
+            val id = logUploader.uploadLogsToServer()
+            _logUploadResult.value = if (id != null) "Uploaded (ID: $id)" else "Upload failed"
         }
     }
 
@@ -768,18 +773,24 @@ private fun TvSettingsContent(
         TvSettingsButton(
             icon = Icons.Default.Sync,
             title = if (syncState.isSyncing) "Syncing..." else "Sync Library",
-            subtitle = "Sync tracks, albums, and artists from server",
+            subtitle = when {
+                syncState.isSyncing -> syncState.phase.ifEmpty { "Starting..." }
+                syncState.lastSyncResult != null -> syncState.lastSyncResult!!
+                else -> "Sync tracks, albums, and artists from server"
+            },
             onClick = { viewModel.syncNow() },
             enabled = !syncState.isSyncing,
             isLoading = syncState.isSyncing
         )
 
         // Upload Logs
+        val logResult by viewModel.logUploadResult.collectAsState()
         TvSettingsButton(
             icon = Icons.Default.Upload,
             title = "Upload Logs",
-            subtitle = "Send debug logs to server for troubleshooting",
-            onClick = { viewModel.uploadLogs() }
+            subtitle = logResult ?: "Send debug logs to server for troubleshooting",
+            onClick = { viewModel.uploadLogs() },
+            isLoading = logResult == "Uploading..."
         )
 
         // Check Update
