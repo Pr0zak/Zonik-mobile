@@ -14,6 +14,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -42,16 +43,20 @@ data class LoginUiState(
     val apiKey: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isSuccess: Boolean = false
+    val isSuccess: Boolean = false,
+    val pairingCode: String? = null,
+    val isPairingActive: Boolean = false
 )
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val zonikApi: com.zonik.app.data.api.ZonikApi
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+    private var pairingJob: kotlinx.coroutines.Job? = null
 
     fun updateServerUrl(url: String) {
         _uiState.value = _uiState.value.copy(serverUrl = url, error = null)
@@ -159,6 +164,61 @@ class LoginViewModel @Inject constructor(
             }
         }
 
+    fun startPairing() {
+        pairingJob?.cancel()
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isPairingActive = true, error = null)
+                val response = zonikApi.createPairingCode()
+                _uiState.value = _uiState.value.copy(pairingCode = response.code)
+                DebugLog.d("Login", "Pairing code: ${response.code}")
+
+                // Poll for config every 2 seconds
+                pairingJob = launch {
+                    while (true) {
+                        kotlinx.coroutines.delay(2000)
+                        try {
+                            val config = zonikApi.checkPairingCode(response.code)
+                            if (config.status == "ready" && config.url != null && config.username != null && config.apiKey != null) {
+                                val serverConfig = ServerConfig(
+                                    url = config.url.trimEnd('/'),
+                                    username = config.username,
+                                    apiKey = config.apiKey
+                                )
+                                // Test connection before saving
+                                val testResult = testConnection(serverConfig)
+                                if (testResult != null) {
+                                    _uiState.value = _uiState.value.copy(error = testResult, isPairingActive = false, pairingCode = null)
+                                    return@launch
+                                }
+                                settingsRepository.saveServerConfig(serverConfig)
+                                _uiState.value = _uiState.value.copy(isSuccess = true, isPairingActive = false)
+                                DebugLog.d("Login", "Paired successfully via code ${response.code}")
+                                return@launch
+                            } else if (config.status == "expired") {
+                                _uiState.value = _uiState.value.copy(error = "Pairing code expired", isPairingActive = false, pairingCode = null)
+                                return@launch
+                            }
+                        } catch (_: Exception) {
+                            // Server not reachable or code not found — keep polling
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Failed to get pairing code: ${e.message}",
+                    isPairingActive = false
+                )
+            }
+        }
+    }
+
+    fun stopPairing() {
+        pairingJob?.cancel()
+        pairingJob = null
+        _uiState.value = _uiState.value.copy(isPairingActive = false, pairingCode = null)
+    }
+
     private fun md5(input: String): String {
         val digest = MessageDigest.getInstance("MD5")
         val bytes = digest.digest(input.toByteArray())
@@ -173,9 +233,17 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var apiKeyVisible by remember { mutableStateOf(false) }
+    val isTv = com.zonik.app.ui.util.isTv()
 
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) onLoginSuccess()
+    }
+
+    // Auto-start pairing on TV
+    LaunchedEffect(isTv) {
+        if (isTv && uiState.pairingCode == null && !uiState.isPairingActive) {
+            viewModel.startPairing()
+        }
     }
 
     Column(
@@ -201,6 +269,58 @@ fun LoginScreen(
         )
 
         Spacer(modifier = Modifier.height(48.dp))
+
+        // TV pairing code mode
+        if (uiState.pairingCode != null) {
+            Text(
+                text = "Enter this code on your Zonik server",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = uiState.pairingCode!!,
+                style = MaterialTheme.typography.displayLarge.copy(
+                    letterSpacing = 12.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Waiting for pairing...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            if (uiState.error != null) {
+                Text(
+                    text = uiState.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+            OutlinedButton(onClick = { viewModel.stopPairing() }) {
+                Text("Enter manually instead")
+            }
+            return@Column
+        }
+
+        // Show pairing button (for both TV and phone)
+        if (!isTv && !uiState.isPairingActive) {
+            OutlinedButton(
+                onClick = { viewModel.startPairing() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Pair with code")
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         OutlinedTextField(
             value = uiState.serverUrl,

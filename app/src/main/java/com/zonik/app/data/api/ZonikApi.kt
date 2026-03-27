@@ -56,6 +56,14 @@ interface ZonikApi {
 
     @POST("api/tracks/bulk-delete")
     suspend fun bulkDeleteTracks(@Body request: BulkDeleteTracksRequest)
+
+    // --- Device Pairing ---
+
+    @POST("api/pair")
+    suspend fun createPairingCode(): PairingCodeResponse
+
+    @GET("api/pair/{code}")
+    suspend fun checkPairingCode(@Path("code") code: String): PairingConfigResponse
 }
 
 @Serializable
@@ -214,4 +222,20 @@ data class JobDetailResponse(
     val tracks: String? = null,
     @SerialName("started_at") val startedAt: String? = null,
     @SerialName("finished_at") val finishedAt: String? = null
+)
+
+// --- Pairing Models ---
+
+@Serializable
+data class PairingCodeResponse(
+    val code: String,
+    val expires: String? = null
+)
+
+@Serializable
+data class PairingConfigResponse(
+    val status: String, // "pending", "ready", "expired"
+    val url: String? = null,
+    val username: String? = null,
+    @SerialName("api_key") val apiKey: String? = null
 )
