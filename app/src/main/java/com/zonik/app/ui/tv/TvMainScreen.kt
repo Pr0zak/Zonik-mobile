@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,8 +28,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Shuffle
@@ -250,44 +254,47 @@ fun TvMainScreen(
                 } else false
             }
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Top navigation bar
-            TvTopNav(
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Left sidebar navigation
+            TvSidebar(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it }
             )
 
-            // Content area — fills available space above playback bar
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 48.dp)
-            ) {
-                when (selectedTab) {
-                    TvTab.HOME -> TvHomeContent(
+            // Content + playback bar column
+            Column(modifier = Modifier.weight(1f)) {
+                // Content area
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 48.dp, top = 27.dp)
+                ) {
+                    when (selectedTab) {
+                        TvTab.HOME -> TvHomeContent(
+                            viewModel = viewModel,
+                            onAlbumClick = onNavigateToAlbum
+                        )
+                        TvTab.LIBRARY -> TvLibraryContent(
+                            viewModel = viewModel,
+                            onAlbumClick = onNavigateToAlbum
+                        )
+                        TvTab.SETTINGS -> TvSettingsContent(
+                            viewModel = viewModel,
+                            onDisconnected = onDisconnected
+                        )
+                    }
+                }
+
+                // Playback bar at bottom
+                if (currentTrack != null) {
+                    TvPlaybackBar(
+                        track = currentTrack!!,
+                        isPlaying = isPlaying,
                         viewModel = viewModel,
-                        onAlbumClick = onNavigateToAlbum
-                    )
-                    TvTab.LIBRARY -> TvLibraryContent(
-                        viewModel = viewModel,
-                        onAlbumClick = onNavigateToAlbum
-                    )
-                    TvTab.SETTINGS -> TvSettingsContent(
-                        viewModel = viewModel,
-                        onDisconnected = onDisconnected
+                        modifier = Modifier.padding(bottom = 27.dp, end = 48.dp)
                     )
                 }
-            }
-
-            // Playback bar with bottom padding for TV overscan
-            if (currentTrack != null) {
-                TvPlaybackBar(
-                    track = currentTrack!!,
-                    isPlaying = isPlaying,
-                    viewModel = viewModel,
-                    modifier = Modifier.padding(bottom = 27.dp)
-                )
             }
         }
     }
@@ -298,49 +305,66 @@ fun TvMainScreen(
 // ──────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun TvTopNav(
+private fun TvSidebar(
     selectedTab: TvTab,
     onTabSelected: (TvTab) -> Unit
 ) {
-    Row(
+    val sidebarIcons = mapOf(
+        TvTab.HOME to Icons.Default.Home,
+        TvTab.LIBRARY to Icons.Default.LibraryMusic,
+        TvTab.SETTINGS to Icons.Default.Settings
+    )
+
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 48.dp, vertical = 27.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .fillMaxHeight()
+            .width(80.dp)
+            .background(Color(0xFF1A1824))
+            .padding(vertical = 27.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Logo
+        // Logo at top
         Icon(
             painter = androidx.compose.ui.res.painterResource(id = com.zonik.app.R.drawable.ic_logo_z),
             contentDescription = "Zonik",
             tint = ZonikColors.gold,
             modifier = Modifier.size(32.dp)
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "Zonik",
-            style = MaterialTheme.typography.headlineMedium,
-            color = Color.White,
-            fontWeight = FontWeight.Bold
-        )
 
-        Spacer(modifier = Modifier.width(48.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
-        // Tab items
+        // Nav items
         TvTab.entries.forEach { tab ->
             val isSelected = tab == selectedTab
-            Text(
-                text = tab.label,
-                style = MaterialTheme.typography.titleLarge,
-                color = if (isSelected) ZonikColors.gold else Color.White.copy(alpha = 0.6f),
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            val icon = sidebarIcons[tab] ?: Icons.Default.Home
+            Column(
                 modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(ZonikShapes.buttonShape)
-                    .tvFocusHighlight(ZonikShapes.buttonShape)
+                    .padding(vertical = 4.dp)
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (isSelected) ZonikColors.gold.copy(alpha = 0.15f)
+                        else Color.Transparent
+                    )
+                    .tvFocusHighlight(RoundedCornerShape(12.dp))
                     .clickable { onTabSelected(tab) }
-                    .focusable()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            )
+                    .focusable(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = tab.label,
+                    tint = if (isSelected) ZonikColors.gold else Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = tab.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) ZonikColors.gold else Color.White.copy(alpha = 0.5f)
+                )
+            }
         }
     }
 }
