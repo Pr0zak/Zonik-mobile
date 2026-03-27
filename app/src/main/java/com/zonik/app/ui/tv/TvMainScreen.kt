@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -274,9 +275,9 @@ fun TvMainScreen(
                         onAlbumClick = onNavigateToAlbum
                     )
                     TvTab.SEARCH -> TvSearchPlaceholder()
-                    TvTab.SETTINGS -> com.zonik.app.ui.screens.settings.SettingsScreen(
-                        onDisconnected = onDisconnected,
-                        onNavigateToStats = {}
+                    TvTab.SETTINGS -> TvSettingsContent(
+                        viewModel = viewModel,
+                        onDisconnected = onDisconnected
                     )
                 }
             }
@@ -458,30 +459,6 @@ private fun TvHomeContent(
             }
         }
 
-        // Recent Tracks
-        if (recentTracks.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(32.dp))
-            Text(
-                text = "Recent Tracks",
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(end = 48.dp)
-            ) {
-                items(recentTracks, key = { it.id }) { track ->
-                    TvTrackCard(
-                        track = track,
-                        onClick = { viewModel.playTrack(track) },
-                        modifier = Modifier.width(160.dp)
-                    )
-                }
-            }
-        }
-
         // Bottom spacing for playback bar clearance
         Spacer(modifier = Modifier.height(80.dp))
     }
@@ -623,16 +600,101 @@ private fun TvSearchPlaceholder() {
 }
 
 @Composable
-private fun TvSettingsPlaceholder() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+private fun TvSettingsContent(
+    viewModel: TvViewModel,
+    onDisconnected: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val syncState by viewModel.syncState.collectAsState()
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "Settings coming soon",
+            text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
-            color = Color.White.copy(alpha = 0.5f)
+            color = Color.White,
+            fontWeight = FontWeight.Bold
         )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Sync
+        TvSettingsButton(
+            icon = Icons.Default.Sync,
+            title = if (syncState.isSyncing) "Syncing..." else "Sync Library",
+            subtitle = "Sync tracks, albums, and artists from server",
+            onClick = { viewModel.syncNow() },
+            enabled = !syncState.isSyncing,
+            isLoading = syncState.isSyncing
+        )
+
+        // Upload Logs
+        TvSettingsButton(
+            icon = Icons.Default.Upload,
+            title = "Upload Logs",
+            subtitle = "Send debug logs to server for troubleshooting",
+            onClick = { viewModel.uploadLogs() }
+        )
+
+        // Check Update
+        TvSettingsButton(
+            icon = Icons.Default.SystemUpdate,
+            title = "Check for Update",
+            subtitle = "Open GitHub releases page",
+            onClick = { viewModel.checkForUpdate(context) }
+        )
+
+        // Disconnect
+        TvSettingsButton(
+            icon = Icons.Default.Logout,
+            title = "Disconnect",
+            subtitle = "Log out from server",
+            onClick = onDisconnected,
+            tint = MaterialTheme.colorScheme.error
+        )
+
+        Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+@Composable
+private fun TvSettingsButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    isLoading: Boolean = false,
+    tint: Color = Color.White
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(TvCardBackground, ZonikShapes.cardShape)
+            .tvFocusHighlight(ZonikShapes.cardShape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = ZonikColors.gold
+            )
+        } else {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = tint)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f))
+        }
     }
 }
 
