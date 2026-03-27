@@ -663,6 +663,7 @@ private fun TvPlaybackBar(
         modifier = modifier
             .fillMaxWidth()
             .background(ZonikColors.glassBg)
+            .padding(bottom = 8.dp)
     ) {
         // Thin progress bar at top of playback bar
         val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs) else 0f

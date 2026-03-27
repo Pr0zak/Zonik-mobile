@@ -137,11 +137,12 @@ fun ZonikApp(
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     var showNowPlaying by remember { mutableStateOf(false) }
 
-    // Auto-show Now Playing when a track starts playing
+    // Auto-show Now Playing when a track starts playing (not on TV — TV has playback bar)
     val syncState by viewModel.syncState.collectAsState()
+    val isTvDevice = isTv()
     LaunchedEffect(Unit) {
         viewModel.playbackStarted.collect {
-            showNowPlaying = true
+            if (!isTvDevice) showNowPlaying = true
         }
     }
 
@@ -218,18 +219,20 @@ fun ZonikApp(
             }
         }
 
-        AnimatedVisibility(
-            visible = showNowPlaying,
-            enter = slideInVertically(
-                initialOffsetY = { it },
-                animationSpec = tween(250)
-            ),
-            exit = slideOutVertically(
-                targetOffsetY = { it },
-                animationSpec = tween(200)
-            )
-        ) {
-            NowPlayingScreen(onBack = { showNowPlaying = false })
+        if (!isTvDevice) {
+            AnimatedVisibility(
+                visible = showNowPlaying,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(250)
+                ),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(200)
+                )
+            ) {
+                NowPlayingScreen(onBack = { showNowPlaying = false })
+            }
         }
     }
 }
