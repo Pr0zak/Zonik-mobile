@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -172,6 +173,18 @@ class TvViewModel @Inject constructor(
     fun uploadLogs() {
         viewModelScope.launch {
             logUploader.uploadLogsToServer()
+        }
+    }
+
+    fun checkForUpdate(context: android.content.Context) {
+        try {
+            val intent = android.content.Intent(
+                android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse("https://github.com/Pr0zak/Zonik-mobile/releases/latest")
+            )
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("TvVM", "Check update failed: ${e.message}")
         }
     }
 }
@@ -328,6 +341,7 @@ private fun TvHomeContent(
     viewModel: TvViewModel,
     onAlbumClick: (String) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val recentTracks by viewModel.recentTracks.collectAsState()
@@ -401,6 +415,14 @@ private fun TvHomeContent(
                 Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Upload Logs")
+            }
+            OutlinedButton(
+                onClick = { viewModel.checkForUpdate(context) },
+                modifier = Modifier.tvFocusHighlight(RoundedCornerShape(20.dp))
+            ) {
+                Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Check Update")
             }
         }
 

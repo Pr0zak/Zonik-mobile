@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Zonik Android App
 
 ## Project Overview
-A native Android music player app that streams music from a self-hosted [Zonik](https://github.com/Pr0zak/Zonik) server. Single-user sideloaded APK with Android Auto and Chromecast support. Self-updates from GitHub releases.
+A native Android music player app that streams music from a self-hosted [Zonik](https://github.com/Pr0zak/Zonik) server. Single-user sideloaded APK with Android Auto, Chromecast, and Google TV support. Self-updates from GitHub releases.
 
 **Repo:** https://github.com/Pr0zak/Zonik-mobile
 
@@ -14,7 +14,7 @@ A native Android music player app that streams music from a self-hosted [Zonik](
 - **UI:** Jetpack Compose + Material 3 + custom dark theme (glass morphism, gradient buttons, gold format badges, floating MiniPlayer)
 - **Playback:** AndroidX Media3 (ExoPlayer) + MediaLibraryService + Google Cast + SimpleCache
 - **Networking:** Retrofit + OkHttp + Kotlinx Serialization
-- **Local DB:** Room (v2) + Paging 3
+- **Local DB:** Room (v3) + Paging 3
 - **DI:** Hilt (KSP)
 - **Image Loading:** Coil + AndroidX Palette (album art color extraction)
 - **Background:** WorkManager
@@ -68,6 +68,7 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 - **Gradient buttons**: `Brush.horizontalGradient` with `containerColor = Color.Transparent` wrapping a `Box` with gradient background
 - **Format badges**: gold (`ZonikColors.gold`) for lossless (FLAC/ALAC), gray for lossy (MP3/AAC/OGG/OPUS)
 - **MainScreen layout**: `Box` instead of `Scaffold` — floating MiniPlayer above glass nav bar
+- **Settings editable server details**: Server URL, username, API key editable via tap-to-edit dialogs. Test Connection button (pings server). GitHub link with proper icon in About section.
 - **Screens use custom top bars** (Row with headlineMedium bold title) instead of M3 TopAppBar, with `statusBarsPadding()`
 
 ## Project Structure
@@ -75,7 +76,7 @@ APK output: `app/build/outputs/apk/debug/app-debug.apk`
 app/src/main/java/com/zonik/app/
   data/
     api/          # SubsonicApi, SubsonicAuthInterceptor, ZonikApi, UpdateChecker, LogUploader
-    db/           # Room entities, DAOs, ZonikDatabase (v2)
+    db/           # Room entities, DAOs, ZonikDatabase (v3)
     repository/   # LibraryRepository, SettingsRepository, SyncManager
     DebugLog.kt   # In-memory debug log buffer (500 entries)
   di/             # AppModule (Hilt — OkHttpClient, Retrofit, Room, SimpleCache, dynamic base URL)
@@ -84,6 +85,8 @@ app/src/main/java/com/zonik/app/
     PlaybackManager.kt    # MediaController wrapper, queue, playback state, smart bitrate
     CastManager.kt        # Google Cast session management, remote media playback, queue transfer
     CastOptionsProvider.kt # Cast Framework config, receiver app ID (B621DA15)
+    OfflineCacheManager.kt # Offline track download manager (persistent, never evicted)
+    WaveformManager.kt    # Track waveform extraction and caching (server API + client fallback)
   model/          # Domain models (Track, Album, Artist, etc), SubsonicResponse wrappers
   ui/
     components/
@@ -91,19 +94,24 @@ app/src/main/java/com/zonik/app/
     CoverArtProvider.kt # ContentProvider for Android Auto cover art (disk cache, network check, log throttle)
       MiniPlayer.kt     # Floating glass mini player with skip prev/next, circular play/pause, progress bar at bottom
       TrackListItem.kt  # Unified track row with gold/gray format badge, left accent border for playing track, context menu
+      AudioVisualizerBars.kt # WaveformBars — static waveform seek bar background (200 bars)
     navigation/   # Screen/MainTab route definitions
     screens/
       home/       # HomeScreen — custom top bar, gradient shuffle button, recently played cards (176dp), recent tracks
-      library/    # LibraryScreen (7 tabs: Tracks/Albums/Artists/Favorites/Genres/Playlists/Flagged), AlbumDetail, ArtistDetail — gradient Play All, alpha scroll sidebar
+      library/    # LibraryScreen (8 tabs: Tracks/Albums/Artists/Favorites/Genres/Playlists/Flagged/Offline), AlbumDetail, ArtistDetail — gradient Play All, alpha scroll sidebar
       search/     # SearchScreen — debounced search across library
       downloads/  # DownloadsScreen — Soulseek search/active transfers/job history (real Zonik API)
       playlists/  # PlaylistsScreen
       nowplaying/ # NowPlayingScreen — glass info card, glass control bar, album art glow, swipe-to-dismiss, gradient play button, zebra-stripe queue
       login/      # LoginScreen — connection test (ping + auth verification)
       stats/      # StatsScreen — library overview, format/bitrate/genre/decade distributions, most played, top artists
-      settings/   # SettingsScreen — uppercase section headers, rounded cards, cache progress bar, rounded icon containers
+      settings/   # SettingsScreen — uppercase section headers, rounded cards, cache progress bar, rounded icon containers, editable server details
     theme/        # ZonikTheme — ZonikColors (gold, glass, gradients), ZonikShapes (cards, nav, cover art), custom Typography
-    util/         # FormatUtils (duration, file size formatting)
+    tv/
+      TvMainScreen.kt # TV-specific interface with TvViewModel, Spotify TV-style layout
+    util/
+      FormatUtils.kt  # Duration, file size formatting
+      TvUtils.kt      # isTvDevice(), isTv(), tvFocusHighlight() modifier
   MainActivity.kt     # Main activity, nav host, glass bottom nav bar, floating MiniPlayer, Now Playing overlay with slide animation
   ZonikApplication.kt # Hilt app, notification channels, WorkManager, Coil ImageLoader
 ```
@@ -122,6 +130,8 @@ app/src/main/java/com/zonik/app/
 - **Track transition dedup**: PLAYLIST_CHANGED transitions for the same track are skipped to prevent UI flicker and duplicate scrobbles.
 - **Audio caching**: `SimpleCache` (Hilt singleton) with `LeastRecentlyUsedCacheEvictor`, custom `CacheKeyFactory` uses track ID (not full URL with auth salt). Configurable size (off/250MB–10GB, default 500MB).
 - **Read-ahead pre-caching**: on track transition (AUTO/SEEK) and on queue load (`PLAY_TRACKS`), next N tracks are pre-cached via `CacheWriter` on IO thread. Configurable count (0–5, default 5). Pre-caching pauses when player is buffering to yield bandwidth. Deduplicates via `ConcurrentHashMap.newKeySet` to prevent redundant downloads.
+- **Offline caching**: `OfflineCacheManager` singleton downloads tracks to `filesDir/offline_tracks/` — separate from streaming LRU cache, never evicted. Auto-cache queue on `playTracks` (if enabled). Auto-cache favorites after sync (if enabled). Settings: master toggle, auto-cache queue/favorites, storage limit (2–50GB or no limit). Library "Offline" tab shows cached tracks. Green cloud icon on cached tracks in `TrackListItem`. Queue sheet has download button with per-track status (cached/downloading/queued) and cancel support. ExoPlayer checks offline dir first, then streaming cache, then network. `offlineCached` field in `TrackEntity` (DB v3), preserved during sync upsert.
+- **Waveform seek bar**: static track waveform rendered as seek bar background. `WaveformManager` tries server API first (`/api/tracks/{id}/waveform`), falls back to client-side `MediaExtractor`/`MediaCodec`. Persistent file cache (`filesDir/waveforms/{trackId}.wfm`, 800 bytes each). 200 bars, played/unplayed portions colored differently. Toggle in Settings: "Waveform Seek Bar". Files: `media/WaveformManager.kt`, `ui/components/AudioVisualizerBars.kt` (contains `WaveformBars`).
 - **Buffering UI**: Now Playing shows spinner on play button when buffering, error banner for connection issues. Android Auto gets buffering state automatically via MediaSession.
 - **Equalizer**: 5-band EQ (60Hz/230Hz/910Hz/3.6kHz/14kHz) via `android.media.audiofx.Equalizer` bound to ExoPlayer's audio session ID. 10 presets + custom band levels. Settings persisted in DataStore, restored on service startup. System EQ launch button for OEM equalizers. EQ commands sent via `SET_EQ` SessionCommand (must be on main thread).
 - **Keep screen on**: optional setting prevents display sleep while Now Playing is visible and playing (uses `FLAG_KEEP_SCREEN_ON`)
@@ -130,6 +140,7 @@ app/src/main/java/com/zonik/app/
 - `currentTrack` set immediately in `playTracks()` for instant UI update
 - Slide animation: 250ms up / 200ms down
 - Seek bar polling: 100ms (Now Playing), 200ms (MiniPlayer)
+- **Queue restore from idle**: after process kill, queue restored from DataStore (`lastQueueTrackIds`, `lastQueueIndex`, `lastQueuePositionMs`). Calls `playTracks` with `startPaused=true`, then `seekTo` saved position. `playWhenReady` must be set `false` explicitly before `prepare()` when `startPaused`.
 - Play All / Shuffle capped to 500 tracks to avoid Binder `TransactionTooLargeException`
 
 ## Track Management
@@ -168,6 +179,19 @@ app/src/main/java/com/zonik/app/
 - Receiver CSS hosted via jsdelivr CDN: `https://cdn.jsdelivr.net/gh/Pr0zak/Zonik-mobile@main/cast/style.css`
 - Cast receiver assets in `cast/` directory (icon.png, icon.svg, style.css)
 
+## Google TV
+- Dedicated TV interface (`TvMainScreen`) with Spotify TV-style layout
+- Top nav bar (Home / Library / Search / Settings), no bottom nav
+- D-pad navigation with gold focus highlights (`tvFocusHighlight` modifier)
+- Shuffle Mix button prominently displayed on Home
+- Playback bar pinned at bottom with playback controls
+- No gesture detectors on TV (swipe-to-dismiss, alpha scroll sidebar disabled via `isTv()` checks)
+- **Pairing code login**: TV shows 6-digit code, user enters on server `/pair` page
+- **Install via Downloader app**: `zonik:3000/app`
+- **TV detection**: `FEATURE_LEANBACK`, `FEATURE_TELEVISION`, `UI_MODE_TYPE_TELEVISION` — checked via `isTvDevice()` / `isTv()`
+- `HorizontalPager` causes flash on D-pad — use direct tab rendering on TV instead
+- Files: `ui/tv/TvMainScreen.kt`, `ui/util/TvUtils.kt`
+
 ## API Notes
 - Subsonic API at `{server}/rest/{endpoint}.view`
 - Auth params: `u`, `t` (md5(apiKey+salt)), `s` (random salt), `v=1.16.1`, `c=ZonikApp`, `f=json`
@@ -177,6 +201,8 @@ app/src/main/java/com/zonik/app/
 - Track metadata: `search3` response includes `transcodedSuffix` and `transcodedContentType` for lossless files (server will transcode to MP3).
 - Library sync: `search3` with empty query, 500 items per page (Symfonium approach) + `getStarred2` for starred status + `userRating` for flagged-for-deletion status
 - Zonik native API: `POST /api/download/search`, `/api/download/trigger`, `GET /api/jobs` (`Accept: application/json` header required, response wrapped in `{"items": [...]}`), `POST /api/tracks/bulk-delete` (request: `{"track_ids": [...]}`, response: `{"deleted": N}`)
+- Zonik waveform API: `GET /api/tracks/{id}/waveform` — returns pre-computed waveform data; client falls back to local `MediaExtractor`/`MediaCodec` extraction if unavailable
+- Zonik pairing API: TV shows 6-digit code, user enters on server `/pair` page to authenticate TV device
 - Zonik log API: `POST /api/logs` (Subsonic auth via query params, request: `{device, app_version, timestamp, logs}`), `GET /api/logs/app` (list, unauthenticated), `GET /api/logs/app/{id}` (detail, unauthenticated)
 
 ## Debugging
@@ -236,3 +262,9 @@ app/src/main/java/com/zonik/app/
 - **Cast track change collector must run on `Dispatchers.Main`** — it calls `setCurrentTrack` → `persistPlaybackState` → `controller.currentPosition` which requires main thread
 - **`PlaybackManager._queue` is NOT populated by playback resumption or Android Auto** — only `playTracks()` from UI sets it. `syncQueueFromPlayer()` auto-rebuilds queue from player's media items via Room DB lookup when queue is out of sync (triggered on connect and on track transitions with empty queue).
 - **Downloads polling uses adaptive intervals** — 5s when active transfers, 30s when idle, stops after 3 consecutive idle checks. Restarts via `DisposableEffect` when screen re-enters composition.
+- **`_ignoreNextAutoTransition` must be cleared on any real track change** — not just AUTO transitions; otherwise subsequent manual track changes can be incorrectly suppressed
+- **Cast track change**: use `castManager.getCurrentPosition()` instead of `controller.currentPosition` — thread-safe and avoids main-thread requirement
+- **Sync upsertAll overwrites `offlineCached`** — must preserve value from existing DB rows during sync upsert
+- **TV: `HorizontalPager` causes flash on D-pad** — use direct tab rendering on TV instead of pager
+- **TV: `playTracks` must be called on main thread** — `controller.sendCustomCommand` requirement applies; use `Dispatchers.Main`
+- **Queue restore: `playWhenReady` must be set `false` before `prepare()`** when `startPaused` — setting it after `prepare()` may cause a brief audio blip
