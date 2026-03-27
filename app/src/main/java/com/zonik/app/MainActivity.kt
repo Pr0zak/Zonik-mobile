@@ -249,55 +249,74 @@ fun MainScreen(
     val miniPlayerHeight = 72.dp
     val miniPlayerBottomPadding = 8.dp
 
-    // Sync pager swipes → nav bar selection
-    val currentPage = pagerState.currentPage
+    // TV uses simple tab index, phone uses pager
+    var tvSelectedTab by remember { mutableIntStateOf(0) }
+    val currentPage = if (isTv) tvSelectedTab else pagerState.currentPage
+
+    // Screen content lambda (shared between TV and phone)
+    @Composable
+    fun TabContent(page: Int) {
+        when (page) {
+            0 -> HomeScreen(
+                onNavigateToLibraryTracks = {
+                    if (isTv) tvSelectedTab = 1
+                    else coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                },
+                onNavigateToAlbum = { albumId ->
+                    rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                }
+            )
+            1 -> LibraryScreen(
+                onNavigateToAlbum = { albumId ->
+                    rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                },
+                onNavigateToArtist = { artistId ->
+                    rootNavController.navigate(Screen.ArtistDetail.createRoute(artistId))
+                }
+            )
+            2 -> SearchScreen(
+                onNavigateToAlbum = { albumId ->
+                    rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                },
+                onNavigateToArtist = { artistId ->
+                    rootNavController.navigate(Screen.ArtistDetail.createRoute(artistId))
+                }
+            )
+            3 -> DownloadsScreen()
+            4 -> SettingsScreen(
+                onDisconnected = {
+                    rootNavController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onNavigateToStats = {
+                    rootNavController.navigate(Screen.Stats.route)
+                }
+            )
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Content area with swipeable pages
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = navBarHeight + miniPlayerHeight + miniPlayerBottomPadding),
-            beyondViewportPageCount = 1,
-            userScrollEnabled = !isTv
-        ) { page ->
-            when (page) {
-                0 -> HomeScreen(
-                    onNavigateToLibraryTracks = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
-                    },
-                    onNavigateToAlbum = { albumId ->
-                        rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
-                    }
-                )
-                1 -> LibraryScreen(
-                    onNavigateToAlbum = { albumId ->
-                        rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
-                    },
-                    onNavigateToArtist = { artistId ->
-                        rootNavController.navigate(Screen.ArtistDetail.createRoute(artistId))
-                    }
-                )
-                2 -> SearchScreen(
-                    onNavigateToAlbum = { albumId ->
-                        rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
-                    },
-                    onNavigateToArtist = { artistId ->
-                        rootNavController.navigate(Screen.ArtistDetail.createRoute(artistId))
-                    }
-                )
-                3 -> DownloadsScreen()
-                4 -> SettingsScreen(
-                    onDisconnected = {
-                        rootNavController.navigate(Screen.Login.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    },
-                    onNavigateToStats = {
-                        rootNavController.navigate(Screen.Stats.route)
-                    }
-                )
+        // Content area
+        if (isTv) {
+            // TV: direct rendering, no pager animation
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = navBarHeight + miniPlayerHeight + miniPlayerBottomPadding)
+            ) {
+                TabContent(tvSelectedTab)
+            }
+        } else {
+            // Phone: swipeable HorizontalPager
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = navBarHeight + miniPlayerHeight + miniPlayerBottomPadding),
+                beyondViewportPageCount = 1
+            ) { page ->
+                TabContent(page)
             }
         }
 
@@ -341,7 +360,8 @@ fun MainScreen(
                             },
                             selected = currentPage == index,
                             onClick = {
-                                coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                                if (isTv) tvSelectedTab = index
+                                else coroutineScope.launch { pagerState.animateScrollToPage(index) }
                             },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.primary,
