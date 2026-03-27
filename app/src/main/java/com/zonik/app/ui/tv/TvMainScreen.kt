@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -236,6 +237,18 @@ fun TvMainScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(TvBackground)
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { viewModel.togglePlayPause(); true }
+                        android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> { if (!isPlaying) viewModel.togglePlayPause(); true }
+                        android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> { if (isPlaying) viewModel.togglePlayPause(); true }
+                        android.view.KeyEvent.KEYCODE_MEDIA_NEXT -> { viewModel.skipNext(); true }
+                        android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { viewModel.skipPrevious(); true }
+                        else -> false
+                    }
+                } else false
+            }
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top navigation bar
@@ -268,12 +281,13 @@ fun TvMainScreen(
                 }
             }
 
-            // Playback bar
+            // Playback bar with bottom padding for TV overscan
             if (currentTrack != null) {
                 TvPlaybackBar(
                     track = currentTrack!!,
                     isPlaying = isPlaying,
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(bottom = 27.dp)
                 )
             }
         }
@@ -439,30 +453,6 @@ private fun TvHomeContent(
                         color = Color.White.copy(alpha = 0.5f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-
-        // Recently Played Albums
-        if (recentAlbums.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(32.dp))
-            Text(
-                text = "Recently Played",
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(end = 48.dp)
-            ) {
-                items(recentAlbums, key = { it.id }) { album ->
-                    TvAlbumCard(
-                        album = album,
-                        onClick = { onAlbumClick(album.id) },
-                        modifier = Modifier.width(160.dp)
                     )
                 }
             }
@@ -654,7 +644,8 @@ private fun TvSettingsPlaceholder() {
 private fun TvPlaybackBar(
     track: Track,
     isPlaying: Boolean,
-    viewModel: TvViewModel
+    viewModel: TvViewModel,
+    modifier: Modifier = Modifier
 ) {
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
@@ -669,7 +660,7 @@ private fun TvPlaybackBar(
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(ZonikColors.glassBg)
     ) {
