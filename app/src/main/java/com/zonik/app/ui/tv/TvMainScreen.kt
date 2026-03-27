@@ -65,10 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.DrawerValue
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.NavigationDrawer
-import androidx.tv.material3.NavigationDrawerItem
+// TV navigation uses regular Compose (no tv-material dependency)
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Album
@@ -222,7 +219,6 @@ private val TvCardBackground = Color(0xFF1E1C2A)
 // Main Screen — NavigationDrawer layout
 // ──────────────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun TvMainScreen(
     onNavigateToAlbum: (String) -> Unit = {},
@@ -261,73 +257,53 @@ fun TvMainScreen(
                 .fillMaxSize()
                 .padding(start = 48.dp, end = 48.dp, top = 27.dp, bottom = 27.dp)
         ) {
-            NavigationDrawer(
-                drawerContent = { drawerValue ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .padding(vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        // Logo at top of drawer
+            Row(modifier = Modifier.fillMaxSize()) {
+                // Left sidebar
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(72.dp)
+                        .background(Color(0xFF1A1824))
+                        .padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Logo
+                    Icon(
+                        painter = androidx.compose.ui.res.painterResource(
+                            id = com.zonik.app.R.drawable.ic_logo_z
+                        ),
+                        contentDescription = "Zonik",
+                        tint = ZonikColors.gold,
+                        modifier = Modifier.size(28.dp).padding(bottom = 8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Nav items
+                    TvTab.entries.forEach { tab ->
+                        val isSelected = tab == selectedTab
                         Box(
                             modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 20.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    painter = androidx.compose.ui.res.painterResource(
-                                        id = com.zonik.app.R.drawable.ic_logo_z
-                                    ),
-                                    contentDescription = "Zonik",
-                                    tint = ZonikColors.gold,
-                                    modifier = Modifier.size(28.dp)
+                                .size(56.dp)
+                                .background(
+                                    if (isSelected) ZonikColors.gold.copy(alpha = 0.15f) else Color.Transparent,
+                                    RoundedCornerShape(12.dp)
                                 )
-                                if (drawerValue == DrawerValue.Open) {
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = "Zonik",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Navigation items
-                        TvTab.entries.forEach { tab ->
-                            val isSelected = tab == selectedTab
-                            NavigationDrawerItem(
-                                selected = isSelected,
-                                onClick = { selectedTab = tab },
-                                leadingContent = {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = tab.label,
-                                        tint = if (isSelected) ZonikColors.gold
-                                            else Color.White.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                },
-                                content = {
-                                    Text(
-                                        text = tab.label,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = if (isSelected) ZonikColors.gold
-                                            else Color.White.copy(alpha = 0.7f),
-                                        fontWeight = if (isSelected) FontWeight.Bold
-                                            else FontWeight.Normal
-                                    )
-                                }
+                                .tvFocusHighlight(RoundedCornerShape(12.dp))
+                                .clickable { selectedTab = tab }
+                                .focusable(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.label,
+                                tint = if (isSelected) ZonikColors.gold else Color.White.copy(alpha = 0.5f),
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
                 }
-            ) {
+
                 // Content area
                 Box(
                     modifier = Modifier

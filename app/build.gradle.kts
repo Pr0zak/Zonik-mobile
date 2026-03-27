@@ -15,8 +15,8 @@ android {
         applicationId = "com.zonik.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 147
-        versionName = "0.6.3"
+        versionCode = 148
+        versionName = "0.6.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -62,8 +62,7 @@ dependencies {
     implementation(libs.compose.material.icons)
     debugImplementation(libs.compose.ui.tooling)
 
-    // TV Compose
-    implementation(libs.tv.material)
+
 
     // Navigation
     implementation(libs.navigation.compose)
