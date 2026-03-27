@@ -288,15 +288,7 @@ fun TvMainScreen(
                     }
                 }
 
-                // Playback bar at bottom
-                if (currentTrack != null) {
-                    TvPlaybackBar(
-                        track = currentTrack!!,
-                        isPlaying = isPlaying,
-                        viewModel = viewModel,
-                        modifier = Modifier.padding(bottom = 27.dp, end = 48.dp)
-                    )
-                }
+                // (Playback bar removed — Now Playing card has controls + progress)
             }
         }
     }
