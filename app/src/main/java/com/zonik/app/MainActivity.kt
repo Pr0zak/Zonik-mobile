@@ -102,7 +102,6 @@ class MainActivity : AppCompatActivity() {
     internal val showNowPlayingFromIntent = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleNowPlayingIntent(intent)
@@ -139,8 +138,23 @@ fun ZonikApp(
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     var showNowPlaying by remember { mutableStateOf(false) }
 
-    // Wait until login state is determined from DataStore
-    if (isLoggedIn == null) return
+    // Show splash logo while login state loads from DataStore
+    if (isLoggedIn == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF151320)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo_z),
+                contentDescription = "Zonik",
+                tint = com.zonik.app.ui.theme.ZonikColors.gold,
+                modifier = Modifier.size(120.dp)
+            )
+        }
+        return
+    }
 
     // Auto-show Now Playing when a track starts playing (not on TV — TV has playback bar)
     val syncState by viewModel.syncState.collectAsState()
