@@ -416,75 +416,59 @@ private fun TvHomeContent(
             .verticalScroll(scrollState)
             .padding(vertical = 16.dp)
     ) {
-        // Shuffle Mix button — prominent, first focusable item
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clip(ZonikShapes.buttonShape)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)
-                    ),
-                    ZonikShapes.buttonShape
-                )
-                .tvFocusHighlight(ZonikShapes.buttonShape)
-                .clickable { viewModel.shuffleMix() }
-                .focusable(),
-            contentAlignment = Alignment.Center
+        // Shuffle buttons side by side
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+            // Shuffle Mix
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .clip(ZonikShapes.buttonShape)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)
+                        ),
+                        ZonikShapes.buttonShape
+                    )
+                    .tvFocusHighlight(ZonikShapes.buttonShape)
+                    .clickable { viewModel.shuffleMix() }
+                    .focusable(),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Shuffle,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Shuffle Mix",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.Shuffle, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Shuffle Mix", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Shuffle Favorites button
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clip(ZonikShapes.buttonShape)
-                .background(TvCardBackground, ZonikShapes.buttonShape)
-                .border(1.dp, ZonikColors.gold.copy(alpha = 0.3f), ZonikShapes.buttonShape)
-                .tvFocusHighlight(ZonikShapes.buttonShape)
-                .clickable { viewModel.shuffleFavorites() }
-                .focusable(),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+            // Shuffle Favorites
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .clip(ZonikShapes.buttonShape)
+                    .background(TvCardBackground, ZonikShapes.buttonShape)
+                    .border(1.dp, ZonikColors.gold.copy(alpha = 0.3f), ZonikShapes.buttonShape)
+                    .tvFocusHighlight(ZonikShapes.buttonShape)
+                    .clickable { viewModel.shuffleFavorites() }
+                    .focusable(),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = ZonikColors.gold,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Shuffle Favorites",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = ZonikColors.gold,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.Favorite, null, tint = ZonikColors.gold, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Shuffle Favorites", style = MaterialTheme.typography.titleLarge, color = ZonikColors.gold, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
