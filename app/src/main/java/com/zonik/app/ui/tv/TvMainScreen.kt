@@ -46,6 +46,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -87,6 +88,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -477,6 +479,85 @@ private fun TvHomeContent(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    // Playback controls
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        IconButton(
+                            onClick = { viewModel.skipPrevious() },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .tvFocusHighlight(CircleShape)
+                        ) {
+                            Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(28.dp))
+                        }
+                        IconButton(
+                            onClick = { viewModel.togglePlayPause() },
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(
+                                    Brush.horizontalGradient(listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)),
+                                    CircleShape
+                                )
+                                .tvFocusHighlight(CircleShape)
+                        ) {
+                            Icon(
+                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                if (isPlaying) "Pause" else "Play",
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.skipNext() },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .tvFocusHighlight(CircleShape)
+                        ) {
+                            Icon(Icons.Default.SkipNext, "Next", tint = Color.White, modifier = Modifier.size(28.dp))
+                        }
+                    }
+
+                    // Progress bar
+                    Spacer(modifier = Modifier.height(12.dp))
+                    var positionMs by remember { mutableLongStateOf(0L) }
+                    var durationMs by remember { mutableLongStateOf(0L) }
+                    LaunchedEffect(isPlaying, currentTrack) {
+                        while (true) {
+                            positionMs = viewModel.getCurrentPosition()
+                            durationMs = viewModel.getDuration()
+                            delay(500L)
+                        }
+                    }
+                    val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs) else 0f
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = ZonikColors.gold,
+                        trackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = formatDurationMs(positionMs),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = formatDurationMs(durationMs),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
                 }
             }
         }
