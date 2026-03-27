@@ -50,13 +50,17 @@ data class LoginUiState(
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository,
-    private val zonikApi: com.zonik.app.data.api.ZonikApi
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
     private var pairingJob: kotlinx.coroutines.Job? = null
+    private val pairingClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+    private val json = Json { ignoreUnknownKeys = true }
 
     fun updateServerUrl(url: String) {
         _uiState.value = _uiState.value.copy(serverUrl = url, error = null)
@@ -165,27 +169,53 @@ class LoginViewModel @Inject constructor(
         }
 
     fun startPairing() {
+        val serverUrl = _uiState.value.serverUrl.trimEnd('/')
+        if (serverUrl.isBlank()) {
+            _uiState.value = _uiState.value.copy(error = "Enter server URL first")
+            return
+        }
         pairingJob?.cancel()
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(isPairingActive = true, error = null)
-                val response = zonikApi.createPairingCode()
-                _uiState.value = _uiState.value.copy(pairingCode = response.code)
-                DebugLog.d("Login", "Pairing code: ${response.code}")
+
+                // Create pairing code via raw OkHttp (Retrofit has no base URL before login)
+                val code = withContext(Dispatchers.IO) {
+                    val request = Request.Builder()
+                        .url("$serverUrl/api/pair")
+                        .post(okhttp3.RequestBody.create("application/json".toMediaType(), "{}"))
+                        .build()
+                    val response = pairingClient.newCall(request).execute()
+                    if (!response.isSuccessful) throw Exception("Server returned ${response.code}")
+                    val body = response.body?.string() ?: throw Exception("Empty response")
+                    val parsed = json.decodeFromString<com.zonik.app.data.api.PairingCodeResponse>(body)
+                    parsed.code
+                }
+
+                _uiState.value = _uiState.value.copy(pairingCode = code)
+                DebugLog.d("Login", "Pairing code: $code")
 
                 // Poll for config every 2 seconds
                 pairingJob = launch {
                     while (true) {
                         kotlinx.coroutines.delay(2000)
                         try {
-                            val config = zonikApi.checkPairingCode(response.code)
+                            val config = withContext(Dispatchers.IO) {
+                                val request = Request.Builder()
+                                    .url("$serverUrl/api/pair/$code")
+                                    .build()
+                                val response = pairingClient.newCall(request).execute()
+                                if (!response.isSuccessful) return@withContext null
+                                val body = response.body?.string() ?: return@withContext null
+                                json.decodeFromString<com.zonik.app.data.api.PairingConfigResponse>(body)
+                            } ?: continue
+
                             if (config.status == "ready" && config.url != null && config.username != null && config.apiKey != null) {
                                 val serverConfig = ServerConfig(
                                     url = config.url.trimEnd('/'),
                                     username = config.username,
                                     apiKey = config.apiKey
                                 )
-                                // Test connection before saving
                                 val testResult = testConnection(serverConfig)
                                 if (testResult != null) {
                                     _uiState.value = _uiState.value.copy(error = testResult, isPairingActive = false, pairingCode = null)
@@ -193,15 +223,13 @@ class LoginViewModel @Inject constructor(
                                 }
                                 settingsRepository.saveServerConfig(serverConfig)
                                 _uiState.value = _uiState.value.copy(isSuccess = true, isPairingActive = false)
-                                DebugLog.d("Login", "Paired successfully via code ${response.code}")
+                                DebugLog.d("Login", "Paired successfully via code $code")
                                 return@launch
                             } else if (config.status == "expired") {
                                 _uiState.value = _uiState.value.copy(error = "Pairing code expired", isPairingActive = false, pairingCode = null)
                                 return@launch
                             }
-                        } catch (_: Exception) {
-                            // Server not reachable or code not found — keep polling
-                        }
+                        } catch (_: Exception) { }
                     }
                 }
             } catch (e: Exception) {
