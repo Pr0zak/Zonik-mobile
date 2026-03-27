@@ -341,7 +341,6 @@ private fun TvHomeContent(
     viewModel: TvViewModel,
     onAlbumClick: (String) -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val recentTracks by viewModel.recentTracks.collectAsState()
@@ -388,41 +387,6 @@ private fun TvHomeContent(
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
-            }
-        }
-
-        // Quick actions row
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val syncState by viewModel.syncState.collectAsState()
-            OutlinedButton(
-                onClick = { viewModel.syncNow() },
-                enabled = !syncState.isSyncing,
-                modifier = Modifier.tvFocusHighlight(RoundedCornerShape(20.dp))
-            ) {
-                if (syncState.isSyncing) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(if (syncState.isSyncing) "Syncing..." else "Sync Library")
-            }
-            OutlinedButton(
-                onClick = { viewModel.uploadLogs() },
-                modifier = Modifier.tvFocusHighlight(RoundedCornerShape(20.dp))
-            ) {
-                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Upload Logs")
-            }
-            OutlinedButton(
-                onClick = { viewModel.checkForUpdate(context) },
-                modifier = Modifier.tvFocusHighlight(RoundedCornerShape(20.dp))
-            ) {
-                Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Check Update")
             }
         }
 
