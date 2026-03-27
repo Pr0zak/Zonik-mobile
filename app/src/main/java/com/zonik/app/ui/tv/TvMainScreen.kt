@@ -103,7 +103,8 @@ class TvViewModel @Inject constructor(
     private val playbackManager: PlaybackManager,
     private val libraryRepository: LibraryRepository,
     private val syncManager: com.zonik.app.data.repository.SyncManager,
-    private val logUploader: com.zonik.app.data.api.LogUploader
+    private val logUploader: com.zonik.app.data.api.LogUploader,
+    private val updateChecker: com.zonik.app.data.api.UpdateChecker
 ) : ViewModel() {
 
     // Playback state (delegated from PlaybackManager)
@@ -206,15 +207,30 @@ class TvViewModel @Inject constructor(
         }
     }
 
-    fun checkForUpdate(context: android.content.Context) {
-        try {
-            val intent = android.content.Intent(
-                android.content.Intent.ACTION_VIEW,
-                android.net.Uri.parse("https://github.com/Pr0zak/Zonik-mobile/releases/latest")
-            )
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            com.zonik.app.data.DebugLog.w("TvVM", "Check update failed: ${e.message}")
+    private val _updateStatus = MutableStateFlow<String?>(null)
+    val updateStatus: StateFlow<String?> = _updateStatus.asStateFlow()
+
+    private val _updateProgress = MutableStateFlow<Float?>(null)
+    val updateProgress: StateFlow<Float?> = _updateProgress.asStateFlow()
+
+    fun checkForUpdate() {
+        viewModelScope.launch {
+            _updateStatus.value = "Checking..."
+            try {
+                val update = updateChecker.checkForUpdate()
+                if (update != null) {
+                    _updateStatus.value = "Downloading v${update.version}..."
+                    val success = updateChecker.downloadAndInstall(update) { progress ->
+                        _updateProgress.value = progress
+                    }
+                    _updateStatus.value = if (success) "Installing..." else "Download failed"
+                    _updateProgress.value = null
+                } else {
+                    _updateStatus.value = "Up to date"
+                }
+            } catch (e: Exception) {
+                _updateStatus.value = "Failed: ${e.message?.take(30)}"
+            }
         }
     }
 }
@@ -794,11 +810,14 @@ private fun TvSettingsContent(
         )
 
         // Check Update
+        val updateStatus by viewModel.updateStatus.collectAsState()
+        val updateProgress by viewModel.updateProgress.collectAsState()
         TvSettingsButton(
             icon = Icons.Default.SystemUpdate,
             title = "Check for Update",
-            subtitle = "Open GitHub releases page",
-            onClick = { viewModel.checkForUpdate(context) }
+            subtitle = updateStatus ?: "Download and install latest version",
+            onClick = { viewModel.checkForUpdate() },
+            isLoading = updateStatus == "Checking..." || updateProgress != null
         )
 
         // Disconnect
