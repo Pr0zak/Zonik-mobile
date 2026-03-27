@@ -867,8 +867,8 @@ private fun TracksTab(
         }
     }
 
-    // Alpha scroll sidebar — draggable
-    if (letterIndex.isNotEmpty()) {
+    // Alpha scroll sidebar — draggable (hidden on TV, not usable with D-pad)
+    if (letterIndex.isNotEmpty() && !com.zonik.app.ui.util.isTv()) {
         val letters = letterIndex.keys.sorted()
         var isDragging by remember { mutableStateOf(false) }
         var activeLetter by remember { mutableStateOf<Char?>(null) }

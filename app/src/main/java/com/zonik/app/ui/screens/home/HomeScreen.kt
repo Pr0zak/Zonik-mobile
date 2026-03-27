@@ -42,6 +42,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.zonik.app.ui.util.tvFocusHighlight
 import javax.inject.Inject
 
 @HiltViewModel
@@ -188,6 +189,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
+                .tvFocusHighlight(ZonikShapes.buttonShape)
         ) {
             Box(
                 modifier = Modifier
@@ -384,6 +386,7 @@ private fun RecentlyPlayedCard(track: Track, onClick: () -> Unit, modifier: Modi
     Surface(
         modifier = modifier
             .width(176.dp)
+            .tvFocusHighlight(ZonikShapes.cardShape)
             .clickable(onClick = onClick),
         shape = ZonikShapes.cardShape,
         color = MaterialTheme.colorScheme.surfaceContainer
@@ -468,10 +471,12 @@ private fun TrackListItemWithMenu(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
-            modifier = Modifier.combinedClickable(
-                onClick = onPlay,
-                onLongClick = { showMenu = true }
-            )
+            modifier = Modifier
+                .tvFocusHighlight()
+                .combinedClickable(
+                    onClick = onPlay,
+                    onLongClick = { showMenu = true }
+                )
         )
 
         DropdownMenu(

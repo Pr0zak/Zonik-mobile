@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.zonik.app.model.Track
 import com.zonik.app.ui.util.formatDuration
 import com.zonik.app.ui.util.formatFileSize
+import com.zonik.app.ui.util.tvFocusHighlight
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -128,10 +129,12 @@ fun TrackListItem(
                     }
                 }
             },
-            modifier = Modifier.combinedClickable(
-                onClick = onClick,
-                onLongClick = { showMenu = true }
-            )
+            modifier = Modifier
+                .tvFocusHighlight()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { showMenu = true }
+                )
         )
 
         DropdownMenu(

@@ -22,6 +22,7 @@ import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Track
 import com.zonik.app.ui.theme.ZonikColors
 import com.zonik.app.ui.theme.ZonikShapes
+import com.zonik.app.ui.util.tvFocusHighlight
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -82,6 +83,7 @@ fun MiniPlayer(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .tvFocusHighlight(shape = ZonikShapes.miniPlayerShape)
             .clickable(onClick = onClick),
         color = ZonikColors.glassBg,
         shape = ZonikShapes.miniPlayerShape,

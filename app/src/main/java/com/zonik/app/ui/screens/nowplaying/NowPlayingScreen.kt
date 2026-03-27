@@ -331,41 +331,47 @@ fun NowPlayingScreen(
     val dismissThreshold = 300f
     val coroutineScope = rememberCoroutineScope()
 
+    val isTvDevice = com.zonik.app.ui.util.isTv()
+
     // Full screen with blurred background
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer {
-                val offset = dragOffset.value.coerceAtLeast(0f)
-                translationY = offset
-                alpha = 1f - (offset / (dismissThreshold * 3f))
-            }
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        coroutineScope.launch {
-                            if (dragOffset.value > dismissThreshold) {
-                                onBack()
-                            } else {
-                                dragOffset.animateTo(0f, androidx.compose.animation.core.spring(
-                                    dampingRatio = 0.7f,
-                                    stiffness = 400f
-                                ))
+            .then(
+                if (!isTvDevice) Modifier.graphicsLayer {
+                    val offset = dragOffset.value.coerceAtLeast(0f)
+                    translationY = offset
+                    alpha = 1f - (offset / (dismissThreshold * 3f))
+                } else Modifier
+            )
+            .then(
+                if (!isTvDevice) Modifier.pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragEnd = {
+                            coroutineScope.launch {
+                                if (dragOffset.value > dismissThreshold) {
+                                    onBack()
+                                } else {
+                                    dragOffset.animateTo(0f, androidx.compose.animation.core.spring(
+                                        dampingRatio = 0.7f,
+                                        stiffness = 400f
+                                    ))
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                dragOffset.animateTo(0f, androidx.compose.animation.core.spring())
+                            }
+                        },
+                        onVerticalDrag = { _, dragAmount ->
+                            coroutineScope.launch {
+                                dragOffset.snapTo((dragOffset.value + dragAmount).coerceAtLeast(0f))
                             }
                         }
-                    },
-                    onDragCancel = {
-                        coroutineScope.launch {
-                            dragOffset.animateTo(0f, androidx.compose.animation.core.spring())
-                        }
-                    },
-                    onVerticalDrag = { _, dragAmount ->
-                        coroutineScope.launch {
-                            dragOffset.snapTo((dragOffset.value + dragAmount).coerceAtLeast(0f))
-                        }
-                    }
-                )
-            }
+                    )
+                } else Modifier
+            )
             .background(Color.Black)
     ) {
         // Blurred album art background

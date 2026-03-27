@@ -50,8 +50,10 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import com.zonik.app.ui.theme.ZonikColors
 import com.zonik.app.ui.theme.ZonikShapes
+import com.zonik.app.ui.util.isTv
 import kotlinx.coroutines.launch
 import com.zonik.app.ui.theme.ZonikTheme
+import androidx.compose.foundation.focusGroup
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -240,6 +242,7 @@ fun MainScreen(
 ) {
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
+    val isTv = isTv()
 
     // Measure nav bar + mini player height for bottom padding
     val navBarHeight = 80.dp
@@ -256,7 +259,8 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = navBarHeight + miniPlayerHeight + miniPlayerBottomPadding),
-            beyondViewportPageCount = 1
+            beyondViewportPageCount = 1,
+            userScrollEnabled = !isTv
         ) { page ->
             when (page) {
                 0 -> HomeScreen(
@@ -316,7 +320,8 @@ fun MainScreen(
             ) {
                 NavigationBar(
                     containerColor = Color.Transparent,
-                    tonalElevation = 0.dp
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.focusGroup()
                 ) {
                     tabs.forEachIndexed { index, tabItem ->
                         NavigationBarItem(
