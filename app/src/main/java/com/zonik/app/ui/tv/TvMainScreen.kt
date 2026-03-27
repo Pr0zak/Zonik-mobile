@@ -198,7 +198,6 @@ class TvViewModel @Inject constructor(
 private enum class TvTab(val label: String) {
     HOME("Home"),
     LIBRARY("Library"),
-    SEARCH("Search"),
     SETTINGS("Settings")
 }
 
@@ -274,7 +273,6 @@ fun TvMainScreen(
                         viewModel = viewModel,
                         onAlbumClick = onNavigateToAlbum
                     )
-                    TvTab.SEARCH -> TvSearchPlaceholder()
                     TvTab.SETTINGS -> TvSettingsContent(
                         viewModel = viewModel,
                         onDisconnected = onDisconnected
