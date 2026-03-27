@@ -28,6 +28,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -143,6 +145,21 @@ class TvViewModel @Inject constructor(
         }
     }
 
+    fun shuffleFavorites() {
+        viewModelScope.launch {
+            try {
+                val starred = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    libraryRepository.getStarredTracks().shuffled().take(100)
+                }
+                if (starred.isNotEmpty()) {
+                    playbackManager.playTracks(starred)
+                }
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.e("TvVM", "Shuffle favorites failed", e)
+            }
+        }
+    }
+
     fun playTrack(track: Track) {
         val allTracks = tracks.value
         val index = allTracks.indexOfFirst { it.id == track.id }
@@ -203,7 +220,6 @@ class TvViewModel @Inject constructor(
 
 private enum class TvTab(val label: String) {
     HOME("Home"),
-    LIBRARY("Library"),
     SETTINGS("Settings")
 }
 
@@ -277,10 +293,6 @@ fun TvMainScreen(
                             viewModel = viewModel,
                             onAlbumClick = onNavigateToAlbum
                         )
-                        TvTab.LIBRARY -> TvLibraryContent(
-                            viewModel = viewModel,
-                            onAlbumClick = onNavigateToAlbum
-                        )
                         TvTab.SETTINGS -> TvSettingsContent(
                             viewModel = viewModel,
                             onDisconnected = onDisconnected
@@ -305,7 +317,6 @@ private fun TvSidebar(
 ) {
     val sidebarIcons = mapOf(
         TvTab.HOME to Icons.Default.Home,
-        TvTab.LIBRARY to Icons.Default.LibraryMusic,
         TvTab.SETTINGS to Icons.Default.Settings
     )
 
@@ -416,6 +427,41 @@ private fun TvHomeContent(
                     text = "Shuffle Mix",
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Shuffle Favorites button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(ZonikShapes.buttonShape)
+                .background(TvCardBackground, ZonikShapes.buttonShape)
+                .border(1.dp, ZonikColors.gold.copy(alpha = 0.3f), ZonikShapes.buttonShape)
+                .tvFocusHighlight(ZonikShapes.buttonShape)
+                .clickable { viewModel.shuffleFavorites() }
+                .focusable(),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = ZonikColors.gold,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Shuffle Favorites",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = ZonikColors.gold,
                     fontWeight = FontWeight.Bold
                 )
             }
