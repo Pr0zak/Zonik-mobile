@@ -312,7 +312,7 @@ fun LoginScreen(
         }
 
         // Show pairing button (for both TV and phone)
-        if (!isTv && !uiState.isPairingActive) {
+        if (!uiState.isPairingActive) {
             OutlinedButton(
                 onClick = { viewModel.startPairing() },
                 modifier = Modifier.fillMaxWidth()
