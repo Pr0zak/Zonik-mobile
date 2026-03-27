@@ -71,7 +71,7 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     val isLoggedIn = settingsRepository.isLoggedIn
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null as Boolean?)
 
     val syncState = syncManager.syncState
 
@@ -137,6 +137,9 @@ fun ZonikApp(
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     var showNowPlaying by remember { mutableStateOf(false) }
 
+    // Wait until login state is determined from DataStore
+    if (isLoggedIn == null) return
+
     // Auto-show Now Playing when a track starts playing (not on TV — TV has playback bar)
     val syncState by viewModel.syncState.collectAsState()
     val isTvDevice = isTv()
@@ -155,7 +158,7 @@ fun ZonikApp(
         }
     }
 
-    val startDestination = if (isLoggedIn) Screen.Main.route else Screen.Login.route
+    val startDestination = if (isLoggedIn == true) Screen.Main.route else Screen.Login.route
 
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
