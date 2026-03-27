@@ -171,10 +171,23 @@ fun ZonikApp(
                 )
             }
             composable(Screen.Main.route) {
-                MainScreen(
-                    rootNavController = rootNavController,
-                    onExpandNowPlaying = { showNowPlaying = true }
-                )
+                if (isTv()) {
+                    com.zonik.app.ui.tv.TvMainScreen(
+                        onNavigateToAlbum = { albumId ->
+                            rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                        },
+                        onDisconnected = {
+                            rootNavController.navigate(Screen.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
+                } else {
+                    MainScreen(
+                        rootNavController = rootNavController,
+                        onExpandNowPlaying = { showNowPlaying = true }
+                    )
+                }
             }
             composable(
                 route = Screen.AlbumDetail.route,
