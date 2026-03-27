@@ -23,19 +23,24 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -85,7 +90,9 @@ import javax.inject.Inject
 @HiltViewModel
 class TvViewModel @Inject constructor(
     private val playbackManager: PlaybackManager,
-    private val libraryRepository: LibraryRepository
+    private val libraryRepository: LibraryRepository,
+    private val syncManager: com.zonik.app.data.repository.SyncManager,
+    private val logUploader: com.zonik.app.data.api.LogUploader
 ) : ViewModel() {
 
     // Playback state (delegated from PlaybackManager)
@@ -113,10 +120,16 @@ class TvViewModel @Inject constructor(
     }
 
     fun shuffleMix() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val songs = libraryRepository.getRandomSongs(100)
-            if (songs.isNotEmpty()) {
-                playbackManager.playTracks(songs)
+        viewModelScope.launch {
+            try {
+                val songs = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    libraryRepository.getRandomSongs(100)
+                }
+                if (songs.isNotEmpty()) {
+                    playbackManager.playTracks(songs)
+                }
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.e("TvVM", "Shuffle mix failed", e)
             }
         }
     }
@@ -132,15 +145,15 @@ class TvViewModel @Inject constructor(
     }
 
     fun playAlbum(albumId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
-                val (_, albumTracks) = libraryRepository.getAlbumDetail(albumId)
+                val (_, albumTracks) = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    libraryRepository.getAlbumDetail(albumId)
+                }
                 if (albumTracks.isNotEmpty()) {
                     playbackManager.playTracks(albumTracks)
                 }
-            } catch (_: Exception) {
-                // Album detail fetch failed silently
-            }
+            } catch (_: Exception) {}
         }
     }
 
@@ -149,6 +162,18 @@ class TvViewModel @Inject constructor(
     fun skipPrevious() = playbackManager.skipPrevious()
     fun getCurrentPosition(): Long = playbackManager.getCurrentPosition()
     fun getDuration(): Long = playbackManager.getDuration()
+
+    val syncState = syncManager.syncState
+
+    fun syncNow() {
+        viewModelScope.launch { syncManager.fullSync() }
+    }
+
+    fun uploadLogs() {
+        viewModelScope.launch {
+            logUploader.uploadLogsToServer()
+        }
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -223,7 +248,10 @@ fun TvMainScreen(
                         onAlbumClick = onNavigateToAlbum
                     )
                     TvTab.SEARCH -> TvSearchPlaceholder()
-                    TvTab.SETTINGS -> TvSettingsPlaceholder()
+                    TvTab.SETTINGS -> com.zonik.app.ui.screens.settings.SettingsScreen(
+                        onDisconnected = onDisconnected,
+                        onNavigateToStats = {}
+                    )
                 }
             }
 
@@ -256,7 +284,7 @@ private fun TvTopNav(
     ) {
         // Logo
         Icon(
-            imageVector = Icons.Default.MusicNote,
+            painter = androidx.compose.ui.res.painterResource(id = com.zonik.app.R.drawable.ic_logo_z),
             contentDescription = "Zonik",
             tint = ZonikColors.gold,
             modifier = Modifier.size(32.dp)
@@ -346,6 +374,33 @@ private fun TvHomeContent(
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        }
+
+        // Quick actions row
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val syncState by viewModel.syncState.collectAsState()
+            OutlinedButton(
+                onClick = { viewModel.syncNow() },
+                enabled = !syncState.isSyncing,
+                modifier = Modifier.tvFocusHighlight(RoundedCornerShape(20.dp))
+            ) {
+                if (syncState.isSyncing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (syncState.isSyncing) "Syncing..." else "Sync Library")
+            }
+            OutlinedButton(
+                onClick = { viewModel.uploadLogs() },
+                modifier = Modifier.tvFocusHighlight(RoundedCornerShape(20.dp))
+            ) {
+                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Upload Logs")
             }
         }
 
