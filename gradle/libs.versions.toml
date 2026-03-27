@@ -24,6 +24,7 @@ mediarouter = "1.7.0"
 core-ktx = "1.15.0"
 core-splashscreen = "1.0.1"
 appcompat = "1.7.0"
+tv-material = "1.0.0"
 wear-compose = "1.4.0"
 horologist = "0.6.20"
 wear-tiles = "1.4.1"
@@ -44,6 +45,9 @@ compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended" }
+
+# TV Compose
+tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tv-material" }
 
 # Navigation
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation-compose" }

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,29 +29,26 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,12 +58,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.tv.material3.DrawerValue
+import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.NavigationDrawer
+import androidx.tv.material3.NavigationDrawerItem
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Album
@@ -192,14 +196,13 @@ class TvViewModel @Inject constructor(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Tab definitions
+// Navigation definitions
 // ──────────────────────────────────────────────────────────────────────────────
 
-private enum class TvTab(val label: String) {
-    HOME("Home"),
-    LIBRARY("Library"),
-    SEARCH("Search"),
-    SETTINGS("Settings")
+private enum class TvTab(val label: String, val icon: ImageVector) {
+    HOME("Home", Icons.Default.Home),
+    LIBRARY("Library", Icons.Default.VideoLibrary),
+    SETTINGS("Settings", Icons.Default.Settings)
 }
 
 private enum class LibrarySubTab(val label: String) {
@@ -216,9 +219,10 @@ private val TvBackground = Color(0xFF151320)
 private val TvCardBackground = Color(0xFF1E1C2A)
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Main Screen
+// Main Screen — NavigationDrawer layout
 // ──────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun TvMainScreen(
     onNavigateToAlbum: (String) -> Unit = {},
@@ -251,104 +255,107 @@ fun TvMainScreen(
                 } else false
             }
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Top navigation bar
-            TvTopNav(
-                selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
-            )
+        // TV safe area padding: 48dp horizontal, 27dp vertical
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 48.dp, end = 48.dp, top = 27.dp, bottom = 27.dp)
+        ) {
+            NavigationDrawer(
+                drawerContent = { drawerValue ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // Logo at top of drawer
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 20.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = androidx.compose.ui.res.painterResource(
+                                        id = com.zonik.app.R.drawable.ic_logo_z
+                                    ),
+                                    contentDescription = "Zonik",
+                                    tint = ZonikColors.gold,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                if (drawerValue == DrawerValue.Open) {
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Zonik",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
 
-            // Content area — fills available space above playback bar
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 48.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Navigation items
+                        TvTab.entries.forEach { tab ->
+                            val isSelected = tab == selectedTab
+                            NavigationDrawerItem(
+                                selected = isSelected,
+                                onClick = { selectedTab = tab },
+                                leadingContent = {
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = tab.label,
+                                        tint = if (isSelected) ZonikColors.gold
+                                            else Color.White.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                },
+                                content = {
+                                    Text(
+                                        text = tab.label,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (isSelected) ZonikColors.gold
+                                            else Color.White.copy(alpha = 0.7f),
+                                        fontWeight = if (isSelected) FontWeight.Bold
+                                            else FontWeight.Normal
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
             ) {
-                when (selectedTab) {
-                    TvTab.HOME -> TvHomeContent(
-                        viewModel = viewModel,
-                        onAlbumClick = onNavigateToAlbum
-                    )
-                    TvTab.LIBRARY -> TvLibraryContent(
-                        viewModel = viewModel,
-                        onAlbumClick = onNavigateToAlbum
-                    )
-                    TvTab.SEARCH -> TvSearchPlaceholder()
-                    TvTab.SETTINGS -> TvSettingsContent(
-                        viewModel = viewModel,
-                        onDisconnected = onDisconnected
-                    )
+                // Content area
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 16.dp)
+                ) {
+                    when (selectedTab) {
+                        TvTab.HOME -> TvHomeContent(
+                            viewModel = viewModel,
+                            onAlbumClick = onNavigateToAlbum
+                        )
+                        TvTab.LIBRARY -> TvLibraryContent(
+                            viewModel = viewModel,
+                            onAlbumClick = onNavigateToAlbum
+                        )
+                        TvTab.SETTINGS -> TvSettingsContent(
+                            viewModel = viewModel,
+                            onDisconnected = onDisconnected
+                        )
+                    }
                 }
             }
-
-            // Playback bar with bottom padding for TV overscan
-            if (currentTrack != null) {
-                TvPlaybackBar(
-                    track = currentTrack!!,
-                    isPlaying = isPlaying,
-                    viewModel = viewModel,
-                    modifier = Modifier.padding(bottom = 27.dp)
-                )
-            }
         }
     }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Top Navigation
-// ──────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun TvTopNav(
-    selectedTab: TvTab,
-    onTabSelected: (TvTab) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 48.dp, vertical = 27.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Logo
-        Icon(
-            painter = androidx.compose.ui.res.painterResource(id = com.zonik.app.R.drawable.ic_logo_z),
-            contentDescription = "Zonik",
-            tint = ZonikColors.gold,
-            modifier = Modifier.size(32.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "Zonik",
-            style = MaterialTheme.typography.headlineMedium,
-            color = Color.White,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.width(48.dp))
-
-        // Tab items
-        TvTab.entries.forEach { tab ->
-            val isSelected = tab == selectedTab
-            Text(
-                text = tab.label,
-                style = MaterialTheme.typography.titleLarge,
-                color = if (isSelected) ZonikColors.gold else Color.White.copy(alpha = 0.6f),
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(ZonikShapes.buttonShape)
-                    .tvFocusHighlight(ZonikShapes.buttonShape)
-                    .clickable { onTabSelected(tab) }
-                    .focusable()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            )
-        }
-    }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Home Tab
+// Home Tab — Shuffle + Now Playing card with integrated controls
 // ──────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -358,7 +365,6 @@ private fun TvHomeContent(
 ) {
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
-    val recentTracks by viewModel.recentTracks.collectAsState()
     val recentAlbums by viewModel.recentAlbums.collectAsState()
     val scrollState = rememberScrollState()
 
@@ -366,13 +372,12 @@ private fun TvHomeContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(vertical = 16.dp)
     ) {
-        // Shuffle Mix button — prominent, first focusable item
+        // ── Shuffle Mix button ──────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(64.dp)
                 .clip(ZonikShapes.buttonShape)
                 .background(
                     Brush.horizontalGradient(
@@ -393,7 +398,7 @@ private fun TvHomeContent(
                     imageVector = Icons.Default.Shuffle,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(28.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
@@ -405,62 +410,252 @@ private fun TvHomeContent(
             }
         }
 
-        // Now Playing section
+        // ── Now Playing card ────────────────────────────────────────────
         if (currentTrack != null) {
             Spacer(modifier = Modifier.height(32.dp))
             Text(
-                text = "Now Playing",
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
+                text = "NOW PLAYING",
+                style = MaterialTheme.typography.titleMedium,
+                color = ZonikColors.gold,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = MaterialTheme.typography.titleMedium.letterSpacing * 1.5f
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(TvCardBackground, ZonikShapes.cardShape)
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TvNowPlayingCard(
+                track = currentTrack!!,
+                isPlaying = isPlaying,
+                viewModel = viewModel
+            )
+        }
+
+        // ── Recent Albums row ───────────────────────────────────────────
+        if (recentAlbums.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = "RECENT ALBUMS",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.7f),
+                fontWeight = FontWeight.Bold,
+                letterSpacing = MaterialTheme.typography.titleMedium.letterSpacing * 1.5f
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(end = 16.dp)
             ) {
-                CoverArt(
-                    coverArtId = currentTrack!!.coverArt,
-                    contentDescription = currentTrack!!.title,
-                    modifier = Modifier
-                        .size(200.dp)
-                        .clip(ZonikShapes.coverArtLargeShape),
-                    size = 600
-                )
-                Spacer(modifier = Modifier.width(24.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = currentTrack!!.title,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = currentTrack!!.artist,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = currentTrack!!.album,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.5f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                items(recentAlbums, key = { it.id }) { album ->
+                    TvAlbumCard(
+                        album = album,
+                        onClick = { onAlbumClick(album.id) },
+                        modifier = Modifier.width(160.dp)
                     )
                 }
             }
         }
 
-        // Bottom spacing for playback bar clearance
-        Spacer(modifier = Modifier.height(80.dp))
+        // Bottom spacing
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Now Playing card — album art + info + controls + progress, all in one card
+// ──────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun TvNowPlayingCard(
+    track: Track,
+    isPlaying: Boolean,
+    viewModel: TvViewModel
+) {
+    var positionMs by remember { mutableLongStateOf(0L) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+
+    // Poll playback position
+    LaunchedEffect(isPlaying, track.id) {
+        while (true) {
+            positionMs = viewModel.getCurrentPosition()
+            durationMs = viewModel.getDuration()
+            delay(200L)
+        }
+    }
+
+    val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs) else 0f
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(TvCardBackground, ZonikShapes.cardShape)
+            .clip(ZonikShapes.cardShape)
+            .padding(24.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Album art
+            CoverArt(
+                coverArtId = track.coverArt,
+                contentDescription = track.title,
+                modifier = Modifier
+                    .size(150.dp)
+                    .clip(ZonikShapes.coverArtLargeShape),
+                size = 600
+            )
+
+            Spacer(modifier = Modifier.width(24.dp))
+
+            // Track info + controls
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                // Title
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Artist
+                Text(
+                    text = track.artist,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // Album
+                Text(
+                    text = track.album,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.5f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Transport controls
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Skip Previous
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                Color.White.copy(alpha = 0.1f),
+                                CircleShape
+                            )
+                            .clip(CircleShape)
+                            .tvFocusHighlight(CircleShape)
+                            .clickable { viewModel.skipPrevious() }
+                            .focusable(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SkipPrevious,
+                            contentDescription = "Previous",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    // Play/Pause — gradient circle
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)
+                                ),
+                                CircleShape
+                            )
+                            .clip(CircleShape)
+                            .tvFocusHighlight(CircleShape)
+                            .clickable { viewModel.togglePlayPause() }
+                            .focusable(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    // Skip Next
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                Color.White.copy(alpha = 0.1f),
+                                CircleShape
+                            )
+                            .clip(CircleShape)
+                            .tvFocusHighlight(CircleShape)
+                            .clickable { viewModel.skipNext() }
+                            .focusable(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SkipNext,
+                            contentDescription = "Next",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Progress bar ────────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.1f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(ZonikColors.gold)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Time labels
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = formatDurationMs(positionMs),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+            Text(
+                text = formatDurationMs(durationMs),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+        }
     }
 }
 
@@ -478,49 +673,52 @@ private fun TvLibraryContent(
     var subTab by remember { mutableStateOf(LibrarySubTab.ALBUMS) }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(vertical = 16.dp)
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Sub-tab filter chips
+        // Sub-tab row
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             LibrarySubTab.entries.forEach { tab ->
                 val isSelected = tab == subTab
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { subTab = tab },
-                    label = {
-                        Text(
-                            text = tab.label,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = ZonikColors.gradientStart,
-                        selectedLabelColor = Color.White,
-                        containerColor = TvCardBackground,
-                        labelColor = Color.White.copy(alpha = 0.7f)
-                    ),
+                Box(
                     modifier = Modifier
+                        .clip(ZonikShapes.buttonShape)
+                        .background(
+                            if (isSelected) Brush.horizontalGradient(
+                                listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)
+                            ) else Brush.horizontalGradient(
+                                listOf(TvCardBackground, TvCardBackground)
+                            ),
+                            ZonikShapes.buttonShape
+                        )
                         .tvFocusHighlight(ZonikShapes.buttonShape)
+                        .clickable { subTab = tab }
                         .focusable()
-                )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = tab.label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.7f),
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Grid content based on sub-tab
+        // Grid content
         when (subTab) {
             LibrarySubTab.ALBUMS -> {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(5),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(albums, key = { it.id }) { album ->
@@ -536,7 +734,7 @@ private fun TvLibraryContent(
                     columns = GridCells.Fixed(5),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(tracks, key = { it.id }) { track ->
@@ -565,7 +763,7 @@ private fun TvLibraryContent(
                         columns = GridCells.Fixed(5),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(bottom = 80.dp),
+                        contentPadding = PaddingValues(bottom = 32.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(favorites, key = { it.id }) { track ->
@@ -582,22 +780,8 @@ private fun TvLibraryContent(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Placeholder tabs
+// Settings Tab
 // ──────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun TvSearchPlaceholder() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Search coming soon",
-            style = MaterialTheme.typography.headlineMedium,
-            color = Color.White.copy(alpha = 0.5f)
-        )
-    }
-}
 
 @Composable
 private fun TvSettingsContent(
@@ -611,8 +795,7 @@ private fun TvSettingsContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(vertical = 16.dp),
+            .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
@@ -658,13 +841,13 @@ private fun TvSettingsContent(
             tint = MaterialTheme.colorScheme.error
         )
 
-        Spacer(modifier = Modifier.height(80.dp))
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
 @Composable
 private fun TvSettingsButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     onClick: () -> Unit,
@@ -676,8 +859,10 @@ private fun TvSettingsButton(
         modifier = Modifier
             .fillMaxWidth()
             .background(TvCardBackground, ZonikShapes.cardShape)
+            .clip(ZonikShapes.cardShape)
             .tvFocusHighlight(ZonikShapes.cardShape)
             .clickable(enabled = enabled, onClick = onClick)
+            .focusable()
             .padding(20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -694,157 +879,6 @@ private fun TvSettingsButton(
         Column {
             Text(title, style = MaterialTheme.typography.titleMedium, color = tint)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f))
-        }
-    }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Playback Bar
-// ──────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun TvPlaybackBar(
-    track: Track,
-    isPlaying: Boolean,
-    viewModel: TvViewModel,
-    modifier: Modifier = Modifier
-) {
-    var positionMs by remember { mutableLongStateOf(0L) }
-    var durationMs by remember { mutableLongStateOf(0L) }
-
-    // Poll playback position
-    LaunchedEffect(isPlaying) {
-        while (true) {
-            positionMs = viewModel.getCurrentPosition()
-            durationMs = viewModel.getDuration()
-            delay(200L)
-        }
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(ZonikColors.glassBg)
-            .padding(bottom = 8.dp)
-    ) {
-        // Thin progress bar at top of playback bar
-        val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs) else 0f
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .background(Color.White.copy(alpha = 0.1f))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progress)
-                    .height(2.dp)
-                    .background(ZonikColors.gold)
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 48.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Cover art
-            CoverArt(
-                coverArtId = track.coverArt,
-                contentDescription = track.title,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(ZonikShapes.coverArtShape),
-                size = 100
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Track info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = track.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.6f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.width(24.dp))
-
-            // Transport controls
-            IconButton(
-                onClick = { viewModel.skipPrevious() },
-                modifier = Modifier
-                    .size(40.dp)
-                    .tvFocusHighlight(CircleShape)
-                    .focusable()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipPrevious,
-                    contentDescription = "Previous",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            IconButton(
-                onClick = { viewModel.togglePlayPause() },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)
-                        ),
-                        CircleShape
-                    )
-                    .tvFocusHighlight(CircleShape)
-                    .focusable()
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            IconButton(
-                onClick = { viewModel.skipNext() },
-                modifier = Modifier
-                    .size(40.dp)
-                    .tvFocusHighlight(CircleShape)
-                    .focusable()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = "Next",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(24.dp))
-
-            // Position / Duration
-            Text(
-                text = "${formatDurationMs(positionMs)} / ${formatDurationMs(durationMs)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.6f)
-            )
         }
     }
 }
@@ -873,21 +907,21 @@ private fun TvAlbumCard(
             contentDescription = album.name,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(144.dp)
+                .aspectRatio(1f)
                 .clip(ZonikShapes.coverArtShape),
             size = 300
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = album.name,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = album.artist,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = Color.White.copy(alpha = 0.6f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -915,21 +949,21 @@ private fun TvTrackCard(
             contentDescription = track.title,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(144.dp)
+                .aspectRatio(1f)
                 .clip(ZonikShapes.coverArtShape),
             size = 300
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = track.title,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = track.artist,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = Color.White.copy(alpha = 0.6f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -956,7 +990,7 @@ private fun TvAlbumGridCard(
             contentDescription = album.name,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp)
+                .aspectRatio(1f)
                 .clip(ZonikShapes.coverArtShape),
             size = 300
         )
@@ -1004,7 +1038,7 @@ private fun TvTrackGridCard(
             contentDescription = track.title,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp)
+                .aspectRatio(1f)
                 .clip(ZonikShapes.coverArtShape),
             size = 300
         )

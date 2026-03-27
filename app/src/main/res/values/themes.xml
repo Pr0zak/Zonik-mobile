@@ -5,4 +5,11 @@
         <item name="colorPrimary">@android:color/black</item>
         <item name="android:colorBackground">@android:color/black</item>
     </style>
+
+    <style name="Theme.Zonik.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#151320</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_logo_z</item>
+        <item name="windowSplashScreenIconBackgroundColor">#151320</item>
+        <item name="postSplashScreenTheme">@style/Theme.Zonik</item>
+    </style>
 </resources>
