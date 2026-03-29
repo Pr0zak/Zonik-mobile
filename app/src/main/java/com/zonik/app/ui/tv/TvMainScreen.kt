@@ -1,6 +1,15 @@
 package com.zonik.app.ui.tv
 
+import android.graphics.drawable.BitmapDrawable
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -69,7 +78,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.palette.graphics.Palette
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -294,9 +309,24 @@ fun TvMainScreen(
     val isPlaying by viewModel.isPlaying.collectAsState()
 
     var selectedTab by remember { mutableStateOf(TvTab.HOME) }
+    var isScreensaver by remember { mutableStateOf(false) }
+    var lastInteraction by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    BackHandler(enabled = selectedTab != TvTab.HOME) {
-        selectedTab = TvTab.HOME
+    // Screensaver timer: activate after 30s idle when playing
+    LaunchedEffect(lastInteraction, isPlaying, selectedTab) {
+        if (isPlaying && selectedTab == TvTab.HOME && !isScreensaver) {
+            delay(30_000)
+            isScreensaver = true
+        }
+    }
+
+    BackHandler(enabled = isScreensaver || selectedTab != TvTab.HOME) {
+        if (isScreensaver) {
+            isScreensaver = false
+            lastInteraction = System.currentTimeMillis()
+        } else {
+            selectedTab = TvTab.HOME
+        }
     }
 
     Box(
@@ -305,6 +335,13 @@ fun TvMainScreen(
             .background(TvBackground)
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
+                    // Exit screensaver on any key
+                    if (isScreensaver) {
+                        isScreensaver = false
+                        lastInteraction = System.currentTimeMillis()
+                        return@onPreviewKeyEvent true
+                    }
+                    lastInteraction = System.currentTimeMillis()
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { viewModel.togglePlayPause(); true }
                         android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> { if (!isPlaying) viewModel.togglePlayPause(); true }
@@ -347,11 +384,175 @@ fun TvMainScreen(
                 // (Playback bar removed — Now Playing card has controls + progress)
             }
         }
+
+        // Screensaver overlay
+        if (isScreensaver && currentTrack != null) {
+            TvScreensaver(
+                track = currentTrack!!,
+                isPlaying = isPlaying,
+                viewModel = viewModel
+            )
+        }
     }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Top Navigation
+// Screensaver
+// ──────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun TvScreensaver(
+    track: Track,
+    isPlaying: Boolean,
+    viewModel: TvViewModel
+) {
+    // Palette extraction
+    var dominantColor by remember { mutableStateOf(Color(0xFF151320)) }
+    var accentColor by remember { mutableStateOf(Color(0xFF534AB7)) }
+    val animatedDom by animateColorAsState(dominantColor, tween(1200), label = "ssDom")
+    val animatedAcc by animateColorAsState(accentColor, tween(1200), label = "ssAcc")
+    val context = LocalContext.current
+
+    LaunchedEffect(track.coverArt) {
+        try {
+            val request = ImageRequest.Builder(context)
+                .data("http://localhost/rest/getCoverArt.view?id=${track.coverArt}&size=300")
+                .allowHardware(false)
+                .build()
+            val result = context.imageLoader.execute(request)
+            if (result is SuccessResult) {
+                val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@LaunchedEffect
+                val palette = Palette.from(bitmap).generate()
+                dominantColor = Color(palette.getDarkMutedColor(0xFF151320.toInt()))
+                accentColor = Color(palette.getVibrantColor(0xFF534AB7.toInt()))
+            }
+        } catch (_: Exception) {}
+    }
+
+    // Slow album art scale animation
+    val infiniteTransition = rememberInfiniteTransition(label = "ssAnim")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ssScale"
+    )
+
+    // Position polling
+    var positionMs by remember { mutableLongStateOf(0L) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(isPlaying, track) {
+        while (true) {
+            positionMs = viewModel.getCurrentPosition()
+            durationMs = viewModel.getDuration()
+            delay(1000L)
+        }
+    }
+
+    // Floating particles
+    val particles = remember {
+        List(20) {
+            FloatArray(4).apply { // x, y, dx, dy (normalized 0-1)
+                this[0] = Math.random().toFloat()
+                this[1] = Math.random().toFloat()
+                this[2] = (Math.random().toFloat() - 0.5f) * 0.002f
+                this[3] = (Math.random().toFloat() - 0.5f) * 0.002f
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        animatedDom.copy(alpha = 0.9f),
+                        Color(0xFF0A0910)
+                    )
+                )
+            )
+    ) {
+        // Floating particles
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            particles.forEach { p ->
+                p[0] = (p[0] + p[2]).let { if (it < 0f || it > 1f) { p[2] = -p[2]; it.coerceIn(0f, 1f) } else it }
+                p[1] = (p[1] + p[3]).let { if (it < 0f || it > 1f) { p[3] = -p[3]; it.coerceIn(0f, 1f) } else it }
+                drawCircle(
+                    color = animatedAcc.copy(alpha = 0.15f),
+                    radius = 8f + p[0] * 16f,
+                    center = androidx.compose.ui.geometry.Offset(p[0] * size.width, p[1] * size.height)
+                )
+            }
+        }
+
+        // Centered content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 48.dp, vertical = 27.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Album art with slow breathing scale
+            CoverArt(
+                coverArtId = track.coverArt,
+                contentDescription = track.title,
+                modifier = Modifier
+                    .size(300.dp)
+                    .graphicsLayer(scaleX = scale, scaleY = scale)
+                    .clip(ZonikShapes.coverArtLargeShape),
+                size = 600
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Track info
+            Text(
+                text = track.title,
+                style = MaterialTheme.typography.headlineLarge,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = track.artist,
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Progress bar
+            Spacer(modifier = Modifier.height(24.dp))
+            val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs) else 0f
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth(0.5f)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)),
+                color = animatedAcc,
+                trackColor = Color.White.copy(alpha = 0.1f)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(0.5f),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(formatDurationMs(positionMs), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
+                Text(formatDurationMs(durationMs), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Sidebar Navigation
 // ──────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -495,6 +696,29 @@ private fun TvHomeContent(
             }
         }
 
+        // Palette extraction for ambient glow
+        var dominantColor by remember { mutableStateOf(Color(0xFF151320)) }
+        var accentColor by remember { mutableStateOf(Color(0xFF7C4DFF)) }
+        val animatedDominant by animateColorAsState(dominantColor, tween(800), label = "dom")
+        val animatedAccent by animateColorAsState(accentColor, tween(800), label = "acc")
+        val paletteContext = LocalContext.current
+        LaunchedEffect(currentTrack?.coverArt) {
+            val coverArtId = currentTrack?.coverArt ?: return@LaunchedEffect
+            try {
+                val request = ImageRequest.Builder(paletteContext)
+                    .data("http://localhost/rest/getCoverArt.view?id=$coverArtId&size=300")
+                    .allowHardware(false)
+                    .build()
+                val result = paletteContext.imageLoader.execute(request)
+                if (result is SuccessResult) {
+                    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@LaunchedEffect
+                    val palette = Palette.from(bitmap).generate()
+                    dominantColor = Color(palette.getDarkMutedColor(0xFF151320.toInt()))
+                    accentColor = Color(palette.getVibrantColor(0xFF7C4DFF.toInt()))
+                }
+            } catch (_: Exception) {}
+        }
+
         // Now Playing section
         if (currentTrack != null) {
             Spacer(modifier = Modifier.height(32.dp))
@@ -508,7 +732,15 @@ private fun TvHomeContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TvCardBackground, ZonikShapes.cardShape)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                animatedDominant.copy(alpha = 0.8f),
+                                TvCardBackground
+                            )
+                        ),
+                        ZonikShapes.cardShape
+                    )
                     .padding(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
