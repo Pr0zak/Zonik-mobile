@@ -1,6 +1,7 @@
 package com.zonik.app
 
 import android.app.Application
+import com.zonik.app.ui.util.isTvDevice
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.hilt.work.HiltWorkerFactory
@@ -42,10 +43,13 @@ class ZonikApplication : Application(), Configuration.Provider, ImageLoaderFacto
         com.zonik.app.data.DebugLog.init(this)
         setupUncaughtExceptionHandler()
         createNotificationChannels()
-        try {
-            castManager.initialize()
-        } catch (e: Exception) {
-            com.zonik.app.data.DebugLog.w("App", "Cast SDK init failed (no Play Services?): ${e.message}")
+        // Skip Cast SDK on TV (not available, wastes startup time)
+        if (!isTvDevice()) {
+            try {
+                castManager.initialize()
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.w("App", "Cast SDK init failed (no Play Services?): ${e.message}")
+            }
         }
     }
 
