@@ -315,7 +315,7 @@ fun TvMainScreen(
     // Screensaver timer: activate after 30s idle when playing
     LaunchedEffect(lastInteraction, isPlaying, selectedTab) {
         if (isPlaying && selectedTab == TvTab.HOME && !isScreensaver) {
-            delay(30_000)
+            delay(10_000)
             isScreensaver = true
         }
     }
@@ -329,17 +329,73 @@ fun TvMainScreen(
         }
     }
 
+    // Ambient colors from album art palette
+    var ambientDominant by remember { mutableStateOf(TvBackground) }
+    var ambientAccent by remember { mutableStateOf(Color(0xFF7C4DFF)) }
+    val animatedBg by animateColorAsState(ambientDominant, tween(1200), label = "bg")
+    val animatedAccent by animateColorAsState(ambientAccent, tween(1200), label = "bgAcc")
+    val paletteCtx = LocalContext.current
+    LaunchedEffect(currentTrack?.coverArt) {
+        val coverArtId = currentTrack?.coverArt ?: return@LaunchedEffect
+        try {
+            val request = ImageRequest.Builder(paletteCtx)
+                .data("http://localhost/rest/getCoverArt.view?id=$coverArtId&size=300")
+                .allowHardware(false)
+                .build()
+            val result = paletteCtx.imageLoader.execute(request)
+            if (result is SuccessResult) {
+                val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@LaunchedEffect
+                val palette = Palette.from(bitmap).generate()
+                ambientDominant = Color(palette.getDarkMutedColor(0xFF151320.toInt()))
+                ambientAccent = Color(palette.getVibrantColor(0xFF7C4DFF.toInt()))
+            }
+        } catch (_: Exception) {}
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(TvBackground)
+            .background(
+                if (currentTrack != null)
+                    Brush.radialGradient(listOf(animatedBg.copy(alpha = 0.6f), TvBackground))
+                else TvBackground.let { Brush.verticalGradient(listOf(it, it)) }
+            )
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
-                    // Exit screensaver on any key
+                    // Screensaver: only back exits, D-pad left/right/center control playback
                     if (isScreensaver) {
-                        isScreensaver = false
-                        lastInteraction = System.currentTimeMillis()
-                        return@onPreviewKeyEvent true
+                        when (keyEvent.nativeKeyEvent.keyCode) {
+                            android.view.KeyEvent.KEYCODE_BACK -> {
+                                isScreensaver = false
+                                lastInteraction = System.currentTimeMillis()
+                                return@onPreviewKeyEvent true
+                            }
+                            android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+                            android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                                viewModel.skipPrevious()
+                                return@onPreviewKeyEvent true
+                            }
+                            android.view.KeyEvent.KEYCODE_DPAD_RIGHT,
+                            android.view.KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                                viewModel.skipNext()
+                                return@onPreviewKeyEvent true
+                            }
+                            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                            android.view.KeyEvent.KEYCODE_ENTER,
+                            android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                viewModel.togglePlayPause()
+                                return@onPreviewKeyEvent true
+                            }
+                            android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                                if (!isPlaying) viewModel.togglePlayPause()
+                                return@onPreviewKeyEvent true
+                            }
+                            android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                                if (isPlaying) viewModel.togglePlayPause()
+                                return@onPreviewKeyEvent true
+                            }
+                            else -> return@onPreviewKeyEvent true // consume all other keys in screensaver
+                        }
                     }
                     lastInteraction = System.currentTimeMillis()
                     when (keyEvent.nativeKeyEvent.keyCode) {
@@ -372,7 +428,8 @@ fun TvMainScreen(
                     when (selectedTab) {
                         TvTab.HOME -> TvHomeContent(
                             viewModel = viewModel,
-                            onAlbumClick = onNavigateToAlbum
+                            onAlbumClick = onNavigateToAlbum,
+                            ambientColor = animatedBg
                         )
                         TvTab.SETTINGS -> TvSettingsContent(
                             viewModel = viewModel,
@@ -390,7 +447,9 @@ fun TvMainScreen(
             TvScreensaver(
                 track = currentTrack!!,
                 isPlaying = isPlaying,
-                viewModel = viewModel
+                viewModel = viewModel,
+                dominantColor = animatedBg,
+                accentColor = animatedAccent
             )
         }
     }
@@ -404,30 +463,10 @@ fun TvMainScreen(
 private fun TvScreensaver(
     track: Track,
     isPlaying: Boolean,
-    viewModel: TvViewModel
+    viewModel: TvViewModel,
+    dominantColor: Color,
+    accentColor: Color
 ) {
-    // Palette extraction
-    var dominantColor by remember { mutableStateOf(Color(0xFF151320)) }
-    var accentColor by remember { mutableStateOf(Color(0xFF534AB7)) }
-    val animatedDom by animateColorAsState(dominantColor, tween(1200), label = "ssDom")
-    val animatedAcc by animateColorAsState(accentColor, tween(1200), label = "ssAcc")
-    val context = LocalContext.current
-
-    LaunchedEffect(track.coverArt) {
-        try {
-            val request = ImageRequest.Builder(context)
-                .data("http://localhost/rest/getCoverArt.view?id=${track.coverArt}&size=300")
-                .allowHardware(false)
-                .build()
-            val result = context.imageLoader.execute(request)
-            if (result is SuccessResult) {
-                val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@LaunchedEffect
-                val palette = Palette.from(bitmap).generate()
-                dominantColor = Color(palette.getDarkMutedColor(0xFF151320.toInt()))
-                accentColor = Color(palette.getVibrantColor(0xFF534AB7.toInt()))
-            }
-        } catch (_: Exception) {}
-    }
 
     // Slow album art scale animation
     val infiniteTransition = rememberInfiniteTransition(label = "ssAnim")
@@ -452,16 +491,23 @@ private fun TvScreensaver(
         }
     }
 
-    // Floating particles
-    val particles = remember {
-        List(20) {
-            FloatArray(4).apply { // x, y, dx, dy (normalized 0-1)
-                this[0] = Math.random().toFloat()
-                this[1] = Math.random().toFloat()
-                this[2] = (Math.random().toFloat() - 0.5f) * 0.002f
-                this[3] = (Math.random().toFloat() - 0.5f) * 0.002f
-            }
-        }
+    // Animated particle time (drives continuous recomposition)
+    val particleTransition = rememberInfiniteTransition(label = "particles")
+    val particleTime by particleTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(100_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pTime"
+    )
+    val particleSeeds = remember {
+        List(25) { floatArrayOf(
+            Math.random().toFloat(), Math.random().toFloat(), // start x, y
+            (Math.random().toFloat() - 0.5f) * 0.4f, (Math.random().toFloat() - 0.5f) * 0.4f, // speed x, y
+            8f + Math.random().toFloat() * 20f // radius
+        ) }
     }
 
     Box(
@@ -470,7 +516,7 @@ private fun TvScreensaver(
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        animatedDom.copy(alpha = 0.9f),
+                        dominantColor.copy(alpha = 0.9f),
                         Color(0xFF0A0910)
                     )
                 )
@@ -478,13 +524,13 @@ private fun TvScreensaver(
     ) {
         // Floating particles
         Canvas(modifier = Modifier.fillMaxSize()) {
-            particles.forEach { p ->
-                p[0] = (p[0] + p[2]).let { if (it < 0f || it > 1f) { p[2] = -p[2]; it.coerceIn(0f, 1f) } else it }
-                p[1] = (p[1] + p[3]).let { if (it < 0f || it > 1f) { p[3] = -p[3]; it.coerceIn(0f, 1f) } else it }
+            particleSeeds.forEach { seed ->
+                val x = ((seed[0] + particleTime * seed[2]) % 1f).let { if (it < 0f) it + 1f else it }
+                val y = ((seed[1] + particleTime * seed[3]) % 1f).let { if (it < 0f) it + 1f else it }
                 drawCircle(
-                    color = animatedAcc.copy(alpha = 0.15f),
-                    radius = 8f + p[0] * 16f,
-                    center = androidx.compose.ui.geometry.Offset(p[0] * size.width, p[1] * size.height)
+                    color = accentColor.copy(alpha = 0.12f),
+                    radius = seed[4],
+                    center = androidx.compose.ui.geometry.Offset(x * size.width, y * size.height)
                 )
             }
         }
@@ -536,7 +582,7 @@ private fun TvScreensaver(
                     .fillMaxWidth(0.5f)
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp)),
-                color = animatedAcc,
+                color = accentColor,
                 trackColor = Color.White.copy(alpha = 0.1f)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -626,7 +672,8 @@ private fun TvSidebar(
 @Composable
 private fun TvHomeContent(
     viewModel: TvViewModel,
-    onAlbumClick: (String) -> Unit
+    onAlbumClick: (String) -> Unit,
+    ambientColor: Color = TvCardBackground
 ) {
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
@@ -696,29 +743,6 @@ private fun TvHomeContent(
             }
         }
 
-        // Palette extraction for ambient glow
-        var dominantColor by remember { mutableStateOf(Color(0xFF151320)) }
-        var accentColor by remember { mutableStateOf(Color(0xFF7C4DFF)) }
-        val animatedDominant by animateColorAsState(dominantColor, tween(800), label = "dom")
-        val animatedAccent by animateColorAsState(accentColor, tween(800), label = "acc")
-        val paletteContext = LocalContext.current
-        LaunchedEffect(currentTrack?.coverArt) {
-            val coverArtId = currentTrack?.coverArt ?: return@LaunchedEffect
-            try {
-                val request = ImageRequest.Builder(paletteContext)
-                    .data("http://localhost/rest/getCoverArt.view?id=$coverArtId&size=300")
-                    .allowHardware(false)
-                    .build()
-                val result = paletteContext.imageLoader.execute(request)
-                if (result is SuccessResult) {
-                    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@LaunchedEffect
-                    val palette = Palette.from(bitmap).generate()
-                    dominantColor = Color(palette.getDarkMutedColor(0xFF151320.toInt()))
-                    accentColor = Color(palette.getVibrantColor(0xFF7C4DFF.toInt()))
-                }
-            } catch (_: Exception) {}
-        }
-
         // Now Playing section
         if (currentTrack != null) {
             Spacer(modifier = Modifier.height(32.dp))
@@ -735,7 +759,7 @@ private fun TvHomeContent(
                     .background(
                         Brush.horizontalGradient(
                             listOf(
-                                animatedDominant.copy(alpha = 0.8f),
+                                ambientColor.copy(alpha = 0.8f),
                                 TvCardBackground
                             )
                         ),
