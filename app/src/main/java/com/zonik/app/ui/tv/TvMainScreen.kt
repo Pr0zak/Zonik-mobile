@@ -255,7 +255,6 @@ class TvViewModel @Inject constructor(
                             _bassLevel.value = combined
                             // Extract 32 frequency magnitudes for spectrum
                             val mags = FloatArray(32)
-                            val n = fft.size / 2
                             for (bin in 0 until 32) {
                                 val idx = 1 + bin * (n - 1) / 32
                                 val re = fft[2 * idx].toFloat()
