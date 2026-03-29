@@ -75,6 +75,7 @@ class ZonikMediaService : MediaLibraryService() {
     private val toggleDeleteCommand = SessionCommand(ACTION_TOGGLE_DELETE, Bundle.EMPTY)
     private val playTracksCommand = SessionCommand(ACTION_PLAY_TRACKS, Bundle.EMPTY)
     private val setEqCommand = SessionCommand(ACTION_SET_EQ, Bundle.EMPTY)
+    private val getAudioSessionCommand = SessionCommand(ACTION_GET_AUDIO_SESSION, Bundle.EMPTY)
     private val toggleShuffleCommand = SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY)
     private val startRadioCommand = SessionCommand(ACTION_START_RADIO, Bundle.EMPTY)
 
@@ -98,6 +99,7 @@ class ZonikMediaService : MediaLibraryService() {
         private const val ACTION_TOGGLE_DELETE = "com.zonik.app.TOGGLE_DELETE"
         private const val ACTION_PLAY_TRACKS = "com.zonik.app.PLAY_TRACKS"
         private const val ACTION_SET_EQ = "com.zonik.app.SET_EQ"
+        private const val ACTION_GET_AUDIO_SESSION = "com.zonik.app.GET_AUDIO_SESSION"
         private const val ACTION_TOGGLE_SHUFFLE = "com.zonik.app.TOGGLE_SHUFFLE"
         private const val ACTION_START_RADIO = "com.zonik.app.START_RADIO"
         private const val EXTRA_TRACK_IDS = "track_ids"
@@ -1037,6 +1039,7 @@ class ZonikMediaService : MediaLibraryService() {
                 .add(setEqCommand)
                 .add(toggleShuffleCommand)
                 .add(startRadioCommand)
+                .add(getAudioSessionCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
@@ -1066,6 +1069,12 @@ class ZonikMediaService : MediaLibraryService() {
                 val audioSessionId = (session.player as? ExoPlayer)?.audioSessionId ?: 0
                 applyEqualizer(audioSessionId, enabled, preset, bandLevels)
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+
+            if (customCommand.customAction == ACTION_GET_AUDIO_SESSION) {
+                val audioSessionId = (session.player as? ExoPlayer)?.audioSessionId ?: 0
+                val result = Bundle().apply { putInt("audio_session_id", audioSessionId) }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS, result))
             }
 
             if (customCommand.customAction == ACTION_START_RADIO) {

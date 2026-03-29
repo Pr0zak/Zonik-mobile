@@ -755,6 +755,21 @@ class PlaybackManager @Inject constructor(
         }
     }
 
+    suspend fun getAudioSessionId(): Int {
+        return withContext(Dispatchers.Main) {
+            try {
+                val result = controller?.sendCustomCommand(
+                    androidx.media3.session.SessionCommand("com.zonik.app.GET_AUDIO_SESSION", android.os.Bundle.EMPTY),
+                    android.os.Bundle.EMPTY
+                )?.get()
+                result?.extras?.getInt("audio_session_id", 0) ?: 0
+            } catch (e: Exception) {
+                DebugLog.w("Playback", "Failed to get audio session ID: ${e.message}")
+                0
+            }
+        }
+    }
+
     fun applyEqualizerSettings(enabled: Boolean, preset: Int, bandLevels: String?) {
         val args = android.os.Bundle().apply {
             putBoolean("eq_enabled", enabled)

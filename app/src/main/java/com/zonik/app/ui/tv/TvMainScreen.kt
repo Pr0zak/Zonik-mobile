@@ -214,6 +214,53 @@ class TvViewModel @Inject constructor(
         _isStarred.value = track.starred
     }
 
+    // Beat detection via Visualizer
+    private val _bassLevel = MutableStateFlow(0f)
+    val bassLevel: StateFlow<Float> = _bassLevel.asStateFlow()
+    private var visualizer: android.media.audiofx.Visualizer? = null
+
+    fun startVisualizer() {
+        if (visualizer != null) return
+        viewModelScope.launch {
+            try {
+                val sessionId = playbackManager.getAudioSessionId()
+                if (sessionId == 0) return@launch
+                val viz = android.media.audiofx.Visualizer(sessionId)
+                viz.captureSize = 128
+                viz.setDataCaptureListener(object : android.media.audiofx.Visualizer.OnDataCaptureListener {
+                    override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, rate: Int) {}
+                    override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, rate: Int) {
+                        fft ?: return
+                        // Extract bass from first few FFT bins
+                        var bass = 0f
+                        for (i in 1..4) {
+                            val re = fft[2 * i].toFloat()
+                            val im = if (2 * i + 1 < fft.size) fft[2 * i + 1].toFloat() else 0f
+                            bass += kotlin.math.sqrt(re * re + im * im)
+                        }
+                        _bassLevel.value = (bass / 512f).coerceIn(0f, 1f)
+                    }
+                }, android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, false, true)
+                viz.enabled = true
+                visualizer = viz
+                com.zonik.app.data.DebugLog.d("TvVM", "Visualizer started (session=$sessionId)")
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.w("TvVM", "Visualizer failed: ${e.message}")
+            }
+        }
+    }
+
+    fun stopVisualizer() {
+        visualizer?.release()
+        visualizer = null
+        _bassLevel.value = 0f
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopVisualizer()
+    }
+
     fun toggleStar() {
         val track = currentTrack.value ?: return
         viewModelScope.launch {
@@ -457,13 +504,22 @@ fun TvMainScreen(
 
         // Screensaver — replaces all content (prevents input leaking to buttons behind)
         if (isScreensaver && currentTrack != null) {
+            // Start/stop visualizer with screensaver
+            LaunchedEffect(Unit) {
+                viewModel.startVisualizer()
+            }
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                onDispose { viewModel.stopVisualizer() }
+            }
+            val bassLevel by viewModel.bassLevel.collectAsState()
             TvScreensaver(
                 track = currentTrack!!,
                 isPlaying = isPlaying,
                 viewModel = viewModel,
                 dominantColor = animatedBg,
                 accentColor = animatedAccent,
-                mutedColor = animatedMuted
+                mutedColor = animatedMuted,
+                bassLevel = bassLevel
             )
         }
     }
@@ -480,7 +536,8 @@ private fun TvScreensaver(
     viewModel: TvViewModel,
     dominantColor: Color,
     accentColor: Color,
-    mutedColor: Color = Color(0xFF534AB7)
+    mutedColor: Color = Color(0xFF534AB7),
+    bassLevel: Float = 0f
 ) {
     val particleColors = listOf(accentColor, mutedColor, dominantColor)
 
@@ -507,24 +564,7 @@ private fun TvScreensaver(
         }
     }
 
-    // Animated particle time — slow gentle drift
-    val particleTransition = rememberInfiniteTransition(label = "particles")
-    val particleTime by particleTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 100f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(120_000, easing = LinearEasing), // 2 minutes for full cycle
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pTime"
-    )
-    val particleSeeds = remember {
-        List(20) { floatArrayOf(
-            Math.random().toFloat(), Math.random().toFloat(), // start x, y
-            (Math.random().toFloat() - 0.5f) * 0.12f, (Math.random().toFloat() - 0.5f) * 0.12f, // gentle drift
-            10f + Math.random().toFloat() * 25f // radius
-        ) }
-    }
+    // (Particle system composable handles all particle logic)
 
     Box(
         modifier = Modifier
@@ -539,19 +579,14 @@ private fun TvScreensaver(
                 )
             )
     ) {
-        // Floating particles
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            particleSeeds.forEachIndexed { idx, seed ->
-                val x = ((seed[0] + particleTime * seed[2]) % 1f).let { if (it < 0f) it + 1f else it }
-                val y = ((seed[1] + particleTime * seed[3]) % 1f).let { if (it < 0f) it + 1f else it }
-                val color = particleColors[idx % particleColors.size]
-                drawCircle(
-                    color = color.copy(alpha = 0.15f),
-                    radius = seed[4],
-                    center = androidx.compose.ui.geometry.Offset(x * size.width, y * size.height)
-                )
-            }
-        }
+        // Advanced particle system with beat reactivity
+        ParticleSystem(
+            bassLevel = bassLevel,
+            colors = particleColors,
+            modifier = Modifier.fillMaxSize(),
+            centerX = 0.5f,
+            centerY = 0.35f
+        )
 
         // Centered content
         Column(
