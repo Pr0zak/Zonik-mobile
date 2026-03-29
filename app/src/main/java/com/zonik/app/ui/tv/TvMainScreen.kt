@@ -252,18 +252,8 @@ class TvViewModel @Inject constructor(
             } catch (e: Exception) {
                 com.zonik.app.data.DebugLog.w("TvVM", "Visualizer failed: ${e.message}")
             }
-            // Fallback: simulate beat with random pulses (~120 BPM)
-            com.zonik.app.data.DebugLog.d("TvVM", "Using simulated beat (Visualizer unavailable)")
-            beatJob = viewModelScope.launch {
-                while (true) {
-                    if (isPlaying.value) {
-                        _bassLevel.value = 0.4f + (Math.random().toFloat() * 0.4f)
-                        kotlinx.coroutines.delay(50)
-                        _bassLevel.value = 0f
-                    }
-                    kotlinx.coroutines.delay(450 + (Math.random() * 100).toLong()) // ~120 BPM
-                }
-            }
+            // Visualizer unavailable — particles drift without beat reactivity
+            com.zonik.app.data.DebugLog.d("TvVM", "Visualizer unavailable, no beat reactivity")
         }
     }
 
@@ -430,16 +420,18 @@ fun TvMainScreen(
                 else TvBackground.let { Brush.verticalGradient(listOf(it, it)) }
             )
             .onPreviewKeyEvent { keyEvent ->
+                // Consume all key events in screensaver (both DOWN and UP)
+                if (isScreensaver && keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                    if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
+                        isScreensaver = false
+                        lastInteraction = System.currentTimeMillis()
+                    }
+                    return@onPreviewKeyEvent true // consume both DOWN and UP
+                }
                 if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
-                    // Screensaver: only back exits, D-pad left/right/center control playback
                     if (isScreensaver) {
                         com.zonik.app.data.DebugLog.d("TV-Key", "Screensaver key: code=${keyEvent.nativeKeyEvent.keyCode} name=${android.view.KeyEvent.keyCodeToString(keyEvent.nativeKeyEvent.keyCode)}")
                         when (keyEvent.nativeKeyEvent.keyCode) {
-                            android.view.KeyEvent.KEYCODE_BACK -> {
-                                isScreensaver = false
-                                lastInteraction = System.currentTimeMillis()
-                                return@onPreviewKeyEvent true
-                            }
                             android.view.KeyEvent.KEYCODE_DPAD_LEFT,
                             android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
                                 viewModel.skipPrevious()
@@ -523,9 +515,22 @@ fun TvMainScreen(
 
         // Screensaver — replaces all content (prevents input leaking to buttons behind)
         if (isScreensaver && currentTrack != null) {
-            // Start/stop visualizer with screensaver
+            // Request RECORD_AUDIO permission for Visualizer
+            val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                if (granted) viewModel.startVisualizer()
+            }
             LaunchedEffect(Unit) {
-                viewModel.startVisualizer()
+                val ctx = paletteCtx
+                val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                    ctx, android.Manifest.permission.RECORD_AUDIO
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (hasPermission) {
+                    viewModel.startVisualizer()
+                } else {
+                    permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                }
             }
             androidx.compose.runtime.DisposableEffect(Unit) {
                 onDispose { viewModel.stopVisualizer() }
