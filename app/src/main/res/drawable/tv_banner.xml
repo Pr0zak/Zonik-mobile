@@ -1,24 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Dark background -->
+    <!-- Dark background matching launcher icon -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#151320" />
+            <solid android:color="#07060f" />
         </shape>
     </item>
-    <!-- Gradient overlay -->
-    <item>
-        <shape android:shape="rectangle">
-            <gradient
-                android:startColor="#1A7C4DFF"
-                android:endColor="#1AB388FF"
-                android:angle="45" />
-        </shape>
-    </item>
-    <!-- Z logo centered -->
+    <!-- Launcher foreground (Z letterform) centered -->
     <item
         android:gravity="center"
-        android:width="80dp"
-        android:height="80dp"
-        android:drawable="@drawable/ic_logo_z" />
+        android:width="108dp"
+        android:height="108dp"
+        android:drawable="@drawable/ic_launcher_foreground" />
 </layer-list>
