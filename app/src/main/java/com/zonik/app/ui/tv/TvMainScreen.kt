@@ -219,39 +219,50 @@ class TvViewModel @Inject constructor(
     val bassLevel: StateFlow<Float> = _bassLevel.asStateFlow()
     private var visualizer: android.media.audiofx.Visualizer? = null
 
+    private var beatJob: kotlinx.coroutines.Job? = null
+
     fun startVisualizer() {
-        if (visualizer != null) return
+        if (visualizer != null || beatJob?.isActive == true) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // Small delay to let playback stabilize
                 kotlinx.coroutines.delay(2000)
                 val sessionId = playbackManager.getAudioSessionId()
                 com.zonik.app.data.DebugLog.d("TvVM", "Got audio session ID: $sessionId")
-                if (sessionId == 0) {
-                    com.zonik.app.data.DebugLog.w("TvVM", "Audio session ID is 0, skipping visualizer")
+                if (sessionId != 0) {
+                    val viz = android.media.audiofx.Visualizer(sessionId)
+                    viz.captureSize = 128
+                    viz.setDataCaptureListener(object : android.media.audiofx.Visualizer.OnDataCaptureListener {
+                        override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, rate: Int) {}
+                        override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, rate: Int) {
+                            fft ?: return
+                            var bass = 0f
+                            for (i in 1..4) {
+                                val re = fft[2 * i].toFloat()
+                                val im = if (2 * i + 1 < fft.size) fft[2 * i + 1].toFloat() else 0f
+                                bass += kotlin.math.sqrt(re * re + im * im)
+                            }
+                            _bassLevel.value = (bass / 512f).coerceIn(0f, 1f)
+                        }
+                    }, android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, false, true)
+                    viz.enabled = true
+                    visualizer = viz
+                    com.zonik.app.data.DebugLog.d("TvVM", "Visualizer started (session=$sessionId)")
                     return@launch
                 }
-                val viz = android.media.audiofx.Visualizer(sessionId)
-                viz.captureSize = 128
-                viz.setDataCaptureListener(object : android.media.audiofx.Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, rate: Int) {}
-                    override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, rate: Int) {
-                        fft ?: return
-                        var bass = 0f
-                        for (i in 1..4) {
-                            val re = fft[2 * i].toFloat()
-                            val im = if (2 * i + 1 < fft.size) fft[2 * i + 1].toFloat() else 0f
-                            bass += kotlin.math.sqrt(re * re + im * im)
-                        }
-                        _bassLevel.value = (bass / 512f).coerceIn(0f, 1f)
-                    }
-                }, android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, false, true)
-                viz.enabled = true
-                visualizer = viz
-                com.zonik.app.data.DebugLog.d("TvVM", "Visualizer started (session=$sessionId)")
             } catch (e: Exception) {
                 com.zonik.app.data.DebugLog.w("TvVM", "Visualizer failed: ${e.message}")
-                // Non-fatal — particles still work without beat reactivity
+            }
+            // Fallback: simulate beat with random pulses (~120 BPM)
+            com.zonik.app.data.DebugLog.d("TvVM", "Using simulated beat (Visualizer unavailable)")
+            beatJob = viewModelScope.launch {
+                while (true) {
+                    if (isPlaying.value) {
+                        _bassLevel.value = 0.4f + (Math.random().toFloat() * 0.4f)
+                        kotlinx.coroutines.delay(50)
+                        _bassLevel.value = 0f
+                    }
+                    kotlinx.coroutines.delay(450 + (Math.random() * 100).toLong()) // ~120 BPM
+                }
             }
         }
     }
@@ -259,6 +270,8 @@ class TvViewModel @Inject constructor(
     fun stopVisualizer() {
         visualizer?.release()
         visualizer = null
+        beatJob?.cancel()
+        beatJob = null
         _bassLevel.value = 0f
     }
 
