@@ -329,11 +329,22 @@ class ZonikMediaService : MediaLibraryService() {
         )
 
         // Pre-populate starred and marked-for-deletion track IDs from DB
-        runBlocking {
-            database.trackDao().getStarred().forEach { starredTrackIds.add(it.id) }
-            database.trackDao().getMarkedForDeletionIds().forEach { markedForDeletionIds.add(it) }
+        // On TV, defer to background to speed up startup (only needed for Android Auto custom buttons)
+        val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+            || packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)
+        if (isTv) {
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                database.trackDao().getStarred().forEach { starredTrackIds.add(it.id) }
+                database.trackDao().getMarkedForDeletionIds().forEach { markedForDeletionIds.add(it) }
+                com.zonik.app.data.DebugLog.d("MediaService", "Loaded ${starredTrackIds.size} starred, ${markedForDeletionIds.size} marked for deletion (deferred)")
+            }
+        } else {
+            runBlocking {
+                database.trackDao().getStarred().forEach { starredTrackIds.add(it.id) }
+                database.trackDao().getMarkedForDeletionIds().forEach { markedForDeletionIds.add(it) }
+            }
+            com.zonik.app.data.DebugLog.d("MediaService", "Loaded ${starredTrackIds.size} starred, ${markedForDeletionIds.size} marked for deletion")
         }
-        com.zonik.app.data.DebugLog.d("MediaService", "Loaded ${starredTrackIds.size} starred, ${markedForDeletionIds.size} marked for deletion")
 
         // Restore equalizer settings
         try {

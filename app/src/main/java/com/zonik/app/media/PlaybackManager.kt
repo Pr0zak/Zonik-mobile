@@ -2,6 +2,7 @@ package com.zonik.app.media
 
 import android.content.ComponentName
 import android.content.Context
+import com.zonik.app.ui.util.isTvDevice
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -141,7 +142,9 @@ class PlaybackManager @Inject constructor(
         }
 
         // If player is empty after process kill, restore saved queue from DataStore
-        if (_queue.value.isEmpty() && (controller?.mediaItemCount ?: 0) == 0) {
+        // Skip on TV — user just shuffles, no need to restore old queue
+        val isTv = context.isTvDevice()
+        if (!isTv && _queue.value.isEmpty() && (controller?.mediaItemCount ?: 0) == 0) {
             scope.launch {
                 try {
                     val savedTrackIds = settingsRepository.lastQueueTrackIds.first()

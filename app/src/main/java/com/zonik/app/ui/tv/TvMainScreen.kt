@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -189,6 +190,28 @@ class TvViewModel @Inject constructor(
     fun skipPrevious() = playbackManager.skipPrevious()
     fun getCurrentPosition(): Long = playbackManager.getCurrentPosition()
     fun getDuration(): Long = playbackManager.getDuration()
+
+    private val _isStarred = MutableStateFlow(false)
+    val isStarred: StateFlow<Boolean> = _isStarred.asStateFlow()
+
+    fun refreshStarred() {
+        val track = currentTrack.value ?: return
+        _isStarred.value = track.starred
+    }
+
+    fun toggleStar() {
+        val track = currentTrack.value ?: return
+        viewModelScope.launch {
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                if (_isStarred.value) {
+                    libraryRepository.unstar(track.id)
+                } else {
+                    libraryRepository.star(track.id)
+                }
+            }
+            _isStarred.value = !_isStarred.value
+        }
+    }
 
     val syncState = syncManager.syncState
 
@@ -525,10 +548,27 @@ private fun TvHomeContent(
 
                     // Playback controls
                     Spacer(modifier = Modifier.height(16.dp))
+                    val isStarred by viewModel.isStarred.collectAsState()
+                    LaunchedEffect(currentTrack) { viewModel.refreshStarred() }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        // Star/unstar
+                        IconButton(
+                            onClick = { viewModel.toggleStar() },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .tvFocusHighlight(CircleShape)
+                        ) {
+                            Icon(
+                                if (isStarred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                if (isStarred) "Unstar" else "Star",
+                                tint = if (isStarred) ZonikColors.gold else Color.White.copy(alpha = 0.5f),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
                             onClick = { viewModel.skipPrevious() },
                             modifier = Modifier
