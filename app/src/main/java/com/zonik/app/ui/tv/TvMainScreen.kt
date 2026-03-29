@@ -237,13 +237,22 @@ class TvViewModel @Inject constructor(
                         override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, rate: Int) {}
                         override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, rate: Int) {
                             fft ?: return
+                            val n = fft.size / 2
+                            // Bass (bins 1-4) + Highs (bins 20-30), skip mids
                             var bass = 0f
                             for (i in 1..4) {
                                 val re = fft[2 * i].toFloat()
                                 val im = if (2 * i + 1 < fft.size) fft[2 * i + 1].toFloat() else 0f
                                 bass += kotlin.math.sqrt(re * re + im * im)
                             }
-                            _bassLevel.value = (bass / 512f).coerceIn(0f, 1f)
+                            var highs = 0f
+                            for (i in (n * 2 / 3)..(n - 1).coerceAtLeast(1)) {
+                                val re = fft[2 * i].toFloat()
+                                val im = if (2 * i + 1 < fft.size) fft[2 * i + 1].toFloat() else 0f
+                                highs += kotlin.math.sqrt(re * re + im * im)
+                            }
+                            val combined = (bass / 400f + highs / 600f).coerceIn(0f, 1f)
+                            _bassLevel.value = combined
                             // Extract 32 frequency magnitudes for spectrum
                             val mags = FloatArray(32)
                             val n = fft.size / 2
