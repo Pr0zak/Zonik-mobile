@@ -15,3 +15,5 @@ package.json
 package-lock.json
 docs/backend-streaming-improvements.md
 .kotlin/
+CLAUDE.md
+.claude/
