@@ -180,20 +180,29 @@ fun ParticleSystem(
 private fun DrawScope.drawParticle(p: Particle, pos: Offset, alpha: Float) {
     when (p.shape) {
         ParticleShape.ORB -> {
+            // Soft blurred glow — 4 layers from outer (faint) to inner (brighter)
+            drawCircle(p.color.copy(alpha = alpha * 0.08f), p.radius * 3.5f, pos)
+            drawCircle(p.color.copy(alpha = alpha * 0.15f), p.radius * 2.5f, pos)
+            drawCircle(p.color.copy(alpha = alpha * 0.3f), p.radius * 1.6f, pos)
             drawCircle(p.color.copy(alpha = alpha), p.radius, pos)
-            drawCircle(p.color.copy(alpha = alpha * 0.3f), p.radius * 1.8f, pos) // glow
         }
         ParticleShape.RING -> {
+            // Blurred ring — multiple strokes
+            drawCircle(p.color.copy(alpha = alpha * 0.1f), p.radius * 1.6f, pos, style = Stroke(6f))
+            drawCircle(p.color.copy(alpha = alpha * 0.3f), p.radius * 1.2f, pos, style = Stroke(4f))
             drawCircle(p.color.copy(alpha = alpha), p.radius, pos, style = Stroke(2f))
         }
         ParticleShape.SPARKLE -> {
-            drawCircle(p.color.copy(alpha = (alpha * 2f).coerceAtMost(1f)), p.radius, pos)
-            val rayLen = p.radius * 3f
+            // Blurred sparkle — soft glow + rays
+            drawCircle(p.color.copy(alpha = alpha * 0.15f), p.radius * 4f, pos)
+            drawCircle(p.color.copy(alpha = alpha * 0.4f), p.radius * 2f, pos)
+            drawCircle(p.color.copy(alpha = (alpha * 1.5f).coerceAtMost(1f)), p.radius, pos)
+            val rayLen = p.radius * 4f
             for (a in 0 until 4) {
                 val rad = a * (PI / 2f).toFloat()
                 drawLine(
-                    p.color.copy(alpha = alpha * 0.6f), pos,
-                    Offset(pos.x + cos(rad) * rayLen, pos.y + sin(rad) * rayLen), 1f
+                    p.color.copy(alpha = alpha * 0.3f), pos,
+                    Offset(pos.x + cos(rad) * rayLen, pos.y + sin(rad) * rayLen), 2f
                 )
             }
         }
