@@ -367,6 +367,7 @@ fun TvMainScreen(
                 if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
                     // Screensaver: only back exits, D-pad left/right/center control playback
                     if (isScreensaver) {
+                        com.zonik.app.data.DebugLog.d("TV-Key", "Screensaver key: code=${keyEvent.nativeKeyEvent.keyCode} name=${android.view.KeyEvent.keyCodeToString(keyEvent.nativeKeyEvent.keyCode)}")
                         when (keyEvent.nativeKeyEvent.keyCode) {
                             android.view.KeyEvent.KEYCODE_BACK -> {
                                 isScreensaver = false
@@ -385,8 +386,15 @@ fun TvMainScreen(
                             }
                             android.view.KeyEvent.KEYCODE_DPAD_CENTER,
                             android.view.KeyEvent.KEYCODE_ENTER,
+                            android.view.KeyEvent.KEYCODE_NUMPAD_ENTER,
+                            android.view.KeyEvent.KEYCODE_BUTTON_SELECT,
                             android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                                 viewModel.togglePlayPause()
+                                return@onPreviewKeyEvent true
+                            }
+                            android.view.KeyEvent.KEYCODE_DPAD_UP,
+                            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                                // Ignore up/down in screensaver
                                 return@onPreviewKeyEvent true
                             }
                             android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> {
