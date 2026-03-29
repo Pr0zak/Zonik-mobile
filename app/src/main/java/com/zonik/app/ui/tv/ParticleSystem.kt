@@ -118,7 +118,7 @@ fun ParticleSystem(
             lastBassHit = now
             val ring = glowRings.minByOrNull { it.alpha } ?: glowRings[0]
             ring.radius = 280f // start just inside album art edge, expand outward
-            ring.alpha = 0.5f + bassLevel * 0.3f
+            ring.alpha = 0.15f + bassLevel * 0.1f // subtle start
             ring.color = colors[(frameCounter % colors.size).toInt()]
         }
         glowRings.forEach { ring ->
@@ -130,34 +130,6 @@ fun ParticleSystem(
                     radius = ring.radius,
                     center = Offset(cx, cy),
                     style = Stroke(width = 3f)
-                )
-            }
-        }
-
-        // ═══════════════════════════════════════════
-        // 3. Frequency spectrum circle around center
-        // ═══════════════════════════════════════════
-        val spectrumBins = fftMagnitudes.size.coerceAtMost(32)
-        if (spectrumBins > 0) {
-            val baseSpectrumRadius = 320f // outside album art (300dp = ~300px radius)
-            for (i in 0 until spectrumBins) {
-                val angle = (i.toFloat() / spectrumBins) * 2f * PI.toFloat()
-                val magnitude = fftMagnitudes.getOrElse(i) { 0f }
-                val barLen = magnitude * 80f + 5f
-                val innerR = baseSpectrumRadius
-                val outerR = baseSpectrumRadius + barLen
-
-                val x1 = cx + cos(angle) * innerR
-                val y1 = cy + sin(angle) * innerR
-                val x2 = cx + cos(angle) * outerR
-                val y2 = cy + sin(angle) * outerR
-
-                val barColor = colors[i % colors.size]
-                drawLine(
-                    color = barColor.copy(alpha = 0.3f + magnitude * 0.4f),
-                    start = Offset(x1, y1),
-                    end = Offset(x2, y2),
-                    strokeWidth = 4f
                 )
             }
         }
