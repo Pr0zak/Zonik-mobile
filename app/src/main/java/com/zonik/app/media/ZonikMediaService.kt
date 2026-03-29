@@ -380,7 +380,11 @@ class ZonikMediaService : MediaLibraryService() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = mediaLibrarySession?.player
         savePlaybackState(player)
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
+        // On TV, always stop when app exits (no background playback)
+        val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+            || packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)
+        if (isTv || player == null || !player.playWhenReady || player.mediaItemCount == 0) {
+            player?.stop()
             stopSelf()
         }
     }
