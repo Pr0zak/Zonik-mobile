@@ -527,6 +527,8 @@ private fun TvScreensaver(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusable() // Capture focus so keys don't reach content behind
+            .clickable { } // Block click-through
             .background(
                 Brush.radialGradient(
                     colors = listOf(
