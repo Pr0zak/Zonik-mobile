@@ -141,20 +141,9 @@ fun ParticleSystem(
             if (p.trail.size >= 8) p.trail.removeAt(0)
             p.trail.add(Offset(p.x * w, p.y * h))
 
-            // Beat pulse
-            if (bassLevel > 0.3f) p.pulseDecay = bassLevel * 1.5f
-            if (p.pulseDecay > 0f) {
-                p.radius = p.baseRadius * (1f + p.pulseDecay)
-                p.pulseDecay *= 0.92f
-                if (p.pulseDecay < 0.01f) p.pulseDecay = 0f
-            } else {
-                p.radius = p.baseRadius
-            }
-
-            // Move with bass speed boost
-            val speed = 1f + bassLevel * 3f
-            p.x += p.dx * dt * 60f * speed
-            p.y += p.dy * dt * 60f * speed
+            // Steady drift, no pulsing
+            p.x += p.dx * dt * 60f
+            p.y += p.dy * dt * 60f
 
             // Wrap
             if (p.x < -0.05f) p.x += 1.1f
