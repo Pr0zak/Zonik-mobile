@@ -6,26 +6,50 @@
 
 <p align="center">
   A native Android music player for <a href="https://github.com/Pr0zak/Zonik">Zonik</a> self-hosted music servers.<br>
-  Streams your library over OpenSubsonic with Android Auto and Chromecast support.
+  Streams your library over OpenSubsonic with Android Auto, Chromecast, and Google TV support.
 </p>
 
 ## Features
 
-- **Streaming playback** with smart bitrate (Wi-Fi/cellular), adaptive degradation on slow connections
+### Playback
+- **Streaming** with smart bitrate (Wi-Fi/cellular), adaptive degradation on slow connections
 - **5-band equalizer** with 10 presets, custom band levels, and system EQ launch
-- **Android Auto** with configurable browse tabs (Mix, Recent, Library, Playlists), star/delete buttons, voice search
-- **Chromecast** support via Google Cast SDK (Styled Media Receiver)
-- **Wear OS** companion app — remote control from your Pixel Watch (Now Playing, browse, queue, tile, complication)
-- **Audio caching** with configurable size and read-ahead pre-caching for offline-like playback
-- **Connection resilience** — automatic retry with exponential backoff, network reconnect recovery, larger buffers
-- **Library sync** via OpenSubsonic `search3` API with starred track sync via `getStarred2` and flagged-for-deletion sync via `userRating`
-- **Mark for deletion** synced with Zonik server (rating=1 = flagged) — tracks appear in server's "Flagged" view for review/bulk delete
-- **Premium dark UI** — glass morphism, gradient buttons, gold lossless badges, floating mini player, swipe-to-dismiss Now Playing
-- **Now Playing** with album art glow, glass info card, glass control bar, Palette colors, queue with zebra-stripe, star/delete actions, keep-screen-on
-- **Stats page** — format/bitrate/genre/decade distributions, most played albums, top artists
-- **Scrobbling** via Subsonic API (server forwards to Last.fm)
+- **Waveform seek bar** — static track waveform from server API, cached locally
+- **Connection resilience** — automatic retry with exponential backoff, network reconnect recovery
+- **Queue restore** — resumes last queue and position after app restart
+
+### Multi-Device
+- **Android Auto** — configurable browse tabs, star/delete buttons, voice search
+- **Chromecast** — Google Cast SDK with styled media receiver
+- **Google TV** — dedicated TV interface with D-pad navigation, visual screensaver
+- **Wear OS** — remote control from Pixel Watch (Now Playing, browse, queue, tile)
+
+### Google TV
+- **Left sidebar navigation** (Home / Settings)
+- **Shuffle Mix + Shuffle Favorites** — one-tap playback
+- **Now Playing card** with ambient color glow from album art, playback controls, star, progress bar
+- **Visual screensaver** (10s idle) — large album art with breathing animation, floating particles (orbs/rings/sparkles with blur trails), pulsing glow rings on bass, aurora color bands
+- **Beat detection** via Visualizer API — glow rings and aurora react to bass + highs
+- **Pairing code login** — type server URL, get 6-digit code, enter on server `/pair` page
+- **Install via Downloader** — enter `zonik:3000/app`
+- **Self-update** — Check Update downloads + installs APK directly
+
+### Library & Offline
+- **Library sync** via OpenSubsonic `search3` API with starred + flagged sync
+- **Offline caching** — auto-cache queue and favorites, separate pinned storage (never evicted)
+- **Mark for deletion** — synced with server, bulk delete from Flagged tab
+- **8 Library tabs** — Tracks, Albums, Artists, Favorites, Genres, Playlists, Flagged, Offline
+
+### UI
+- **Premium dark theme** — glass morphism, gradient buttons, gold lossless badges, floating mini player
+- **Now Playing** — album art glow, glass controls, Palette colors, queue with zebra-stripe, swipe-to-dismiss
+- **Stats page** — format/bitrate/genre/decade distributions, most played, top artists
+- **Editable server settings** — tap to edit URL, username, API key with test connection
+
+### Other
+- **Scrobbling** via Subsonic API
 - **Self-update** from GitHub releases
-- **Debug logging** with upload to private GitHub Gists
+- **Debug logging** with upload to server or private GitHub Gists
 
 ## Screenshots
 
@@ -43,6 +67,14 @@
 Download the latest `zonik-v*-debug.apk` from [Releases](https://github.com/Pr0zak/Zonik-mobile/releases) and sideload it.
 
 For **Android Auto**: enable Developer Mode (tap version 10x in Android Auto settings), then enable "Unknown sources" in developer settings.
+
+### Google TV
+
+1. Install the **Downloader** app from Play Store
+2. Open Downloader, enter: `zonik:3000/app`
+3. Install the APK
+4. Open Zonik → enter server URL → tap **"Pair with code"**
+5. Go to `zonik:3000/pair` on your phone and enter the 6-digit code
 
 ### Wear OS (Pixel Watch)
 

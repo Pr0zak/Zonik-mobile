@@ -1,6 +1,7 @@
 package com.zonik.app
 
 import android.content.Intent
+import com.zonik.app.ui.util.isTvDevice
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
@@ -123,7 +124,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         // On TV, stop playback when activity is destroyed (no background playback)
-        if (com.zonik.app.ui.util.isTvDevice()) {
+        if (isTvDevice()) {
             val intent = android.content.Intent(this, com.zonik.app.media.ZonikMediaService::class.java)
             stopService(intent)
         }
