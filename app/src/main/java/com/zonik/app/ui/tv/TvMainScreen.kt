@@ -217,6 +217,8 @@ class TvViewModel @Inject constructor(
     // Beat detection via Visualizer
     private val _bassLevel = MutableStateFlow(0f)
     val bassLevel: StateFlow<Float> = _bassLevel.asStateFlow()
+    private val _fftMagnitudes = MutableStateFlow(FloatArray(32))
+    val fftMagnitudes: StateFlow<FloatArray> = _fftMagnitudes.asStateFlow()
     private var visualizer: android.media.audiofx.Visualizer? = null
 
     private var beatJob: kotlinx.coroutines.Job? = null
@@ -242,6 +244,16 @@ class TvViewModel @Inject constructor(
                                 bass += kotlin.math.sqrt(re * re + im * im)
                             }
                             _bassLevel.value = (bass / 512f).coerceIn(0f, 1f)
+                            // Extract 32 frequency magnitudes for spectrum
+                            val mags = FloatArray(32)
+                            val n = fft.size / 2
+                            for (bin in 0 until 32) {
+                                val idx = 1 + bin * (n - 1) / 32
+                                val re = fft[2 * idx].toFloat()
+                                val im = if (2 * idx + 1 < fft.size) fft[2 * idx + 1].toFloat() else 0f
+                                mags[bin] = (kotlin.math.sqrt(re * re + im * im) / 128f).coerceIn(0f, 1f)
+                            }
+                            _fftMagnitudes.value = mags
                         }
                     }, android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, false, true)
                     viz.enabled = true
@@ -536,6 +548,7 @@ fun TvMainScreen(
                 onDispose { viewModel.stopVisualizer() }
             }
             val bassLevel by viewModel.bassLevel.collectAsState()
+            val fftMagnitudes by viewModel.fftMagnitudes.collectAsState()
             TvScreensaver(
                 track = currentTrack!!,
                 isPlaying = isPlaying,
@@ -543,7 +556,8 @@ fun TvMainScreen(
                 dominantColor = animatedBg,
                 accentColor = animatedAccent,
                 mutedColor = animatedMuted,
-                bassLevel = bassLevel
+                bassLevel = bassLevel,
+                fftMagnitudes = fftMagnitudes
             )
         }
     }
@@ -561,7 +575,8 @@ private fun TvScreensaver(
     dominantColor: Color,
     accentColor: Color,
     mutedColor: Color = Color(0xFF534AB7),
-    bassLevel: Float = 0f
+    bassLevel: Float = 0f,
+    fftMagnitudes: FloatArray = FloatArray(32)
 ) {
     val particleColors = listOf(accentColor, mutedColor, dominantColor)
 
@@ -603,9 +618,10 @@ private fun TvScreensaver(
                 )
             )
     ) {
-        // Advanced particle system with beat reactivity
+        // Advanced particle system with beat reactivity + visual effects
         ParticleSystem(
             bassLevel = bassLevel,
+            fftMagnitudes = fftMagnitudes,
             colors = particleColors,
             modifier = Modifier.fillMaxSize(),
             centerX = 0.5f,
