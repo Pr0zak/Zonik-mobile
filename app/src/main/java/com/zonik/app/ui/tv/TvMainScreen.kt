@@ -219,13 +219,16 @@ class TvViewModel @Inject constructor(
     val bassLevel: StateFlow<Float> = _bassLevel.asStateFlow()
     private var visualizer: android.media.audiofx.Visualizer? = null
 
+    @androidx.media3.common.util.UnstableApi
     fun startVisualizer() {
         if (visualizer != null) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 // Small delay to let playback stabilize
                 kotlinx.coroutines.delay(2000)
-                val sessionId = playbackManager.getAudioSessionId()
+                val sessionId = kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    playbackManager.getAudioSessionId()
+                }
                 com.zonik.app.data.DebugLog.d("TvVM", "Got audio session ID: $sessionId")
                 if (sessionId == 0) {
                     com.zonik.app.data.DebugLog.w("TvVM", "Audio session ID is 0, skipping visualizer")

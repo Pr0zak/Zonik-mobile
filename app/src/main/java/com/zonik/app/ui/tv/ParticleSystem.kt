@@ -105,19 +105,6 @@ fun ParticleSystem(
             if (p.trail.size >= 8) p.trail.removeAt(0)
             p.trail.add(Offset(p.x * w, p.y * h))
 
-            // Gravity toward center
-            val toX = centerX - p.x
-            val toY = centerY - p.y
-            val dist = sqrt(toX * toX + toY * toY).coerceAtLeast(0.05f)
-            val gravityStrength = 0.00002f / (dist * dist).coerceAtLeast(0.01f)
-            val angle = atan2(toY, toX)
-            p.dx += cos(angle) * gravityStrength * dt * 60f
-            p.dy += sin(angle) * gravityStrength * dt * 60f
-
-            // Damping
-            p.dx *= 0.998f
-            p.dy *= 0.998f
-
             // Beat pulse: expand on bass
             if (bassLevel > 0.3f) {
                 p.pulseDecay = bassLevel * 1.5f

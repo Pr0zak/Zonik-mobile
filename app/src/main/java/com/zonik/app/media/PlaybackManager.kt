@@ -755,16 +755,15 @@ class PlaybackManager @Inject constructor(
         }
     }
 
-    suspend fun getAudioSessionId(): Int {
+    @androidx.media3.common.util.UnstableApi
+    fun getAudioSessionId(): Int {
         return try {
-            withContext(Dispatchers.Main) {
-                val future = controller?.sendCustomCommand(
-                    androidx.media3.session.SessionCommand("com.zonik.app.GET_AUDIO_SESSION", android.os.Bundle.EMPTY),
-                    android.os.Bundle.EMPTY
-                ) ?: return@withContext 0
-                val result = future.get(5, java.util.concurrent.TimeUnit.SECONDS)
-                result?.extras?.getInt("audio_session_id", 0) ?: 0
-            }
+            // Access ExoPlayer's audio session directly via MediaController
+            // (SessionExtras or player property)
+            val ctrl = controller ?: return 0
+            // MediaController doesn't expose audioSessionId directly,
+            // but we can get it from the player's session extras set by the service
+            ctrl.sessionExtras.getInt("audio_session_id", 0)
         } catch (e: Exception) {
             DebugLog.w("Playback", "Failed to get audio session ID: ${e.message}")
             0

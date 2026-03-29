@@ -360,6 +360,9 @@ class ZonikMediaService : MediaLibraryService() {
 
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, callback)
             .setSessionActivity(pendingIntent)
+            .setSessionExtras(Bundle().apply {
+                putInt("audio_session_id", player.audioSessionId)
+            })
             .build()
     }
 
