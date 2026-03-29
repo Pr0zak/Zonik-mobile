@@ -221,17 +221,22 @@ class TvViewModel @Inject constructor(
 
     fun startVisualizer() {
         if (visualizer != null) return
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Small delay to let playback stabilize
+                kotlinx.coroutines.delay(2000)
                 val sessionId = playbackManager.getAudioSessionId()
-                if (sessionId == 0) return@launch
+                com.zonik.app.data.DebugLog.d("TvVM", "Got audio session ID: $sessionId")
+                if (sessionId == 0) {
+                    com.zonik.app.data.DebugLog.w("TvVM", "Audio session ID is 0, skipping visualizer")
+                    return@launch
+                }
                 val viz = android.media.audiofx.Visualizer(sessionId)
                 viz.captureSize = 128
                 viz.setDataCaptureListener(object : android.media.audiofx.Visualizer.OnDataCaptureListener {
                     override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, rate: Int) {}
                     override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, rate: Int) {
                         fft ?: return
-                        // Extract bass from first few FFT bins
                         var bass = 0f
                         for (i in 1..4) {
                             val re = fft[2 * i].toFloat()
@@ -246,6 +251,7 @@ class TvViewModel @Inject constructor(
                 com.zonik.app.data.DebugLog.d("TvVM", "Visualizer started (session=$sessionId)")
             } catch (e: Exception) {
                 com.zonik.app.data.DebugLog.w("TvVM", "Visualizer failed: ${e.message}")
+                // Non-fatal — particles still work without beat reactivity
             }
         }
     }

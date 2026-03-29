@@ -756,17 +756,18 @@ class PlaybackManager @Inject constructor(
     }
 
     suspend fun getAudioSessionId(): Int {
-        return withContext(Dispatchers.Main) {
-            try {
-                val result = controller?.sendCustomCommand(
+        return try {
+            withContext(Dispatchers.Main) {
+                val future = controller?.sendCustomCommand(
                     androidx.media3.session.SessionCommand("com.zonik.app.GET_AUDIO_SESSION", android.os.Bundle.EMPTY),
                     android.os.Bundle.EMPTY
-                )?.get()
+                ) ?: return@withContext 0
+                val result = future.get(5, java.util.concurrent.TimeUnit.SECONDS)
                 result?.extras?.getInt("audio_session_id", 0) ?: 0
-            } catch (e: Exception) {
-                DebugLog.w("Playback", "Failed to get audio session ID: ${e.message}")
-                0
             }
+        } catch (e: Exception) {
+            DebugLog.w("Playback", "Failed to get audio session ID: ${e.message}")
+            0
         }
     }
 
