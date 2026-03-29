@@ -80,6 +80,9 @@ class ZonikMediaService : MediaLibraryService() {
     private val startRadioCommand = SessionCommand(ACTION_START_RADIO, Bundle.EMPTY)
 
     companion object {
+        // Shared audio session ID (same process, no IPC needed)
+        @Volatile var sharedAudioSessionId: Int = 0
+
         // Browse tree node IDs
         private const val ROOT_ID = "root"
         private const val RECENT_ID = "recent"
@@ -250,6 +253,10 @@ class ZonikMediaService : MediaLibraryService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .build()
+
+        // Share audio session ID for Visualizer (same process)
+        sharedAudioSessionId = player.audioSessionId
+        com.zonik.app.data.DebugLog.d("MediaService", "Audio session ID: ${player.audioSessionId}")
 
         // Network connectivity callback for auto-resume after connection loss
         val cm = getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager

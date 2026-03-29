@@ -755,19 +755,8 @@ class PlaybackManager @Inject constructor(
         }
     }
 
-    @androidx.media3.common.util.UnstableApi
     fun getAudioSessionId(): Int {
-        return try {
-            // Access ExoPlayer's audio session directly via MediaController
-            // (SessionExtras or player property)
-            val ctrl = controller ?: return 0
-            // MediaController doesn't expose audioSessionId directly,
-            // but we can get it from the player's session extras set by the service
-            ctrl.sessionExtras.getInt("audio_session_id", 0)
-        } catch (e: Exception) {
-            DebugLog.w("Playback", "Failed to get audio session ID: ${e.message}")
-            0
-        }
+        return ZonikMediaService.sharedAudioSessionId
     }
 
     fun applyEqualizerSettings(enabled: Boolean, preset: Int, bandLevels: String?) {
