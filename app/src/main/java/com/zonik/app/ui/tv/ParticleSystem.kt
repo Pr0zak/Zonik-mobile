@@ -117,7 +117,7 @@ fun ParticleSystem(
         if (bassLevel > 0.4f && now - lastBassHit > 200_000_000L) {
             lastBassHit = now
             val ring = glowRings.minByOrNull { it.alpha } ?: glowRings[0]
-            ring.radius = 10f
+            ring.radius = 280f // start just inside album art edge, expand outward
             ring.alpha = 0.5f + bassLevel * 0.3f
             ring.color = colors[(frameCounter % colors.size).toInt()]
         }
@@ -139,7 +139,7 @@ fun ParticleSystem(
         // ═══════════════════════════════════════════
         val spectrumBins = fftMagnitudes.size.coerceAtMost(32)
         if (spectrumBins > 0) {
-            val baseSpectrumRadius = 180f
+            val baseSpectrumRadius = 320f // outside album art (300dp = ~300px radius)
             for (i in 0 until spectrumBins) {
                 val angle = (i.toFloat() / spectrumBins) * 2f * PI.toFloat()
                 val magnitude = fftMagnitudes.getOrElse(i) { 0f }
