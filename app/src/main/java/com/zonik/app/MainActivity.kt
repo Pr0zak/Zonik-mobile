@@ -121,6 +121,15 @@ class MainActivity : AppCompatActivity() {
         handleNowPlayingIntent(intent)
     }
 
+    override fun onDestroy() {
+        // On TV, stop playback when activity is destroyed (no background playback)
+        if (com.zonik.app.ui.util.isTvDevice()) {
+            val intent = android.content.Intent(this, com.zonik.app.media.ZonikMediaService::class.java)
+            stopService(intent)
+        }
+        super.onDestroy()
+    }
+
     private fun handleNowPlayingIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_SHOW_NOW_PLAYING, false) == true) {
             showNowPlayingFromIntent.value = true

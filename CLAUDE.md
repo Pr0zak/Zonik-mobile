@@ -108,7 +108,8 @@ app/src/main/java/com/zonik/app/
       settings/   # SettingsScreen — uppercase section headers, rounded cards, cache progress bar, rounded icon containers, editable server details
     theme/        # ZonikTheme — ZonikColors (gold, glass, gradients), ZonikShapes (cards, nav, cover art), custom Typography
     tv/
-      TvMainScreen.kt # TV-specific interface with TvViewModel, Spotify TV-style layout
+      TvMainScreen.kt    # TV-specific interface with TvViewModel, sidebar nav, now playing card, screensaver
+      ParticleSystem.kt  # Screensaver particle system (ORB/RING/SPARKLE shapes, blur glow, trails)
     util/
       FormatUtils.kt  # Duration, file size formatting
       TvUtils.kt      # isTvDevice(), isTv(), tvFocusHighlight() modifier
@@ -180,17 +181,27 @@ app/src/main/java/com/zonik/app/
 - Cast receiver assets in `cast/` directory (icon.png, icon.svg, style.css)
 
 ## Google TV
-- Dedicated TV interface (`TvMainScreen`) with Spotify TV-style layout
-- Top nav bar (Home / Library / Search / Settings), no bottom nav
+- Dedicated TV interface (`TvMainScreen`) with left sidebar navigation (Home / Settings), no Library tab on TV
 - D-pad navigation with gold focus highlights (`tvFocusHighlight` modifier)
-- Shuffle Mix button prominently displayed on Home
-- Playback bar pinned at bottom with playback controls
+- Shuffle Mix + Shuffle Favorites buttons side by side on Home
+- Now Playing card with ambient color glow (palette extraction), controls, star, progress bar
 - No gesture detectors on TV (swipe-to-dismiss, alpha scroll sidebar disabled via `isTv()` checks)
-- **Pairing code login**: TV shows 6-digit code, user enters on server `/pair` page
+- **Full-screen screensaver** (activates after 10s idle): album art with breathing animation, floating particles, pulsing glow rings, aurora color bands
+  - Particles: multi-shape (ORB/RING/SPARKLE), multi-layer blur glow, album art palette colors, no pulsing (calm floating), trails
+  - Glow rings expand from album art edge on bass hits
+  - Aurora: flowing vertical color bands, bass-reactive intensity
+  - Beat detection via Visualizer API (`RECORD_AUDIO` permission, runtime request)
+  - Bass + highs reactivity (mids ignored) for glow rings and aurora
+  - Screensaver controls: D-pad left/right = skip, center = play/pause, Back = exit screensaver only
+  - Main content hidden during screensaver (prevents input leak to focused buttons behind overlay)
+- **Music stops on app exit on TV** (`onTaskRemoved` stops player)
+- **Faster TV startup**: skip Cast SDK init, skip queue restore, defer starred loading
+- **Pairing code login**: enter server URL → "Pair with code" → TV shows 6-digit code → user enters on server `/pair` page to authenticate
 - **Install via Downloader app**: `zonik:3000/app`
 - **TV detection**: `FEATURE_LEANBACK`, `FEATURE_TELEVISION`, `UI_MODE_TYPE_TELEVISION` — checked via `isTvDevice()` / `isTv()`
+- **Settings tab** (TV): Sync Library, Upload Logs, Check Update (downloads + installs APK), Disconnect
 - `HorizontalPager` causes flash on D-pad — use direct tab rendering on TV instead
-- Files: `ui/tv/TvMainScreen.kt`, `ui/util/TvUtils.kt`
+- Files: `ui/tv/TvMainScreen.kt`, `ui/tv/ParticleSystem.kt`, `ui/util/TvUtils.kt`
 
 ## API Notes
 - Subsonic API at `{server}/rest/{endpoint}.view`
@@ -268,3 +279,8 @@ app/src/main/java/com/zonik/app/
 - **TV: `HorizontalPager` causes flash on D-pad** — use direct tab rendering on TV instead of pager
 - **TV: `playTracks` must be called on main thread** — `controller.sendCustomCommand` requirement applies; use `Dispatchers.Main`
 - **Queue restore: `playWhenReady` must be set `false` before `prepare()`** when `startPaused` — setting it after `prepare()` may cause a brief audio blip
+- **TV: Visualizer API error -3** on some devices (RECORD_AUDIO granted but API not supported) — glow rings/aurora still react, particles just float
+- **TV: `sharedAudioSessionId` via companion object** — `sendCustomCommand` deadlocks, `sessionExtras` doesn't sync in time; use static field instead
+- **TV: screensaver must hide main content entirely** (not overlay) — Compose focus system delivers clicks to focused buttons behind overlay
+- **TV: Back key in `onPreviewKeyEvent`** must consume both ACTION_DOWN and ACTION_UP to prevent BackHandler from also firing
+- **TV: build failures don't prevent `git commit`** if APK exists from previous build — always verify BUILD SUCCESSFUL before releasing
