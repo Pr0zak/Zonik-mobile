@@ -491,22 +491,22 @@ private fun TvScreensaver(
         }
     }
 
-    // Animated particle time (drives continuous recomposition)
+    // Animated particle time — slow gentle drift
     val particleTransition = rememberInfiniteTransition(label = "particles")
     val particleTime by particleTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 1000f,
+        targetValue = 100f,
         animationSpec = infiniteRepeatable(
-            animation = tween(100_000, easing = LinearEasing),
+            animation = tween(600_000, easing = LinearEasing), // 10 minutes for full cycle
             repeatMode = RepeatMode.Restart
         ),
         label = "pTime"
     )
     val particleSeeds = remember {
-        List(25) { floatArrayOf(
+        List(20) { floatArrayOf(
             Math.random().toFloat(), Math.random().toFloat(), // start x, y
-            (Math.random().toFloat() - 0.5f) * 0.4f, (Math.random().toFloat() - 0.5f) * 0.4f, // speed x, y
-            8f + Math.random().toFloat() * 20f // radius
+            (Math.random().toFloat() - 0.5f) * 0.03f, (Math.random().toFloat() - 0.5f) * 0.03f, // very slow drift
+            10f + Math.random().toFloat() * 25f // radius
         ) }
     }
 
