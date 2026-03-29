@@ -420,6 +420,7 @@ fun TvMainScreen(
                 } else false
             }
     ) {
+        if (!isScreensaver) {
         Row(modifier = Modifier.fillMaxSize()) {
             // Left sidebar navigation
             TvSidebar(
@@ -452,8 +453,9 @@ fun TvMainScreen(
                 // (Playback bar removed — Now Playing card has controls + progress)
             }
         }
+        } // end if (!isScreensaver)
 
-        // Screensaver overlay
+        // Screensaver — replaces all content (prevents input leaking to buttons behind)
         if (isScreensaver && currentTrack != null) {
             TvScreensaver(
                 track = currentTrack!!,
@@ -527,8 +529,7 @@ private fun TvScreensaver(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusable() // Capture focus so keys don't reach content behind
-            .clickable { } // Block click-through
+            .focusable()
             .background(
                 Brush.radialGradient(
                     colors = listOf(
