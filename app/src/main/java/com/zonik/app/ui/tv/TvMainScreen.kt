@@ -332,8 +332,10 @@ fun TvMainScreen(
     // Ambient colors from album art palette
     var ambientDominant by remember { mutableStateOf(TvBackground) }
     var ambientAccent by remember { mutableStateOf(Color(0xFF7C4DFF)) }
+    var ambientMuted by remember { mutableStateOf(Color(0xFF534AB7)) }
     val animatedBg by animateColorAsState(ambientDominant, tween(1200), label = "bg")
     val animatedAccent by animateColorAsState(ambientAccent, tween(1200), label = "bgAcc")
+    val animatedMuted by animateColorAsState(ambientMuted, tween(1200), label = "bgMut")
     val paletteCtx = LocalContext.current
     LaunchedEffect(currentTrack?.coverArt) {
         val coverArtId = currentTrack?.coverArt ?: return@LaunchedEffect
@@ -348,6 +350,7 @@ fun TvMainScreen(
                 val palette = Palette.from(bitmap).generate()
                 ambientDominant = Color(palette.getDarkMutedColor(0xFF151320.toInt()))
                 ambientAccent = Color(palette.getVibrantColor(0xFF7C4DFF.toInt()))
+                ambientMuted = Color(palette.getLightMutedColor(palette.getMutedColor(0xFF534AB7.toInt())))
             }
         } catch (_: Exception) {}
     }
@@ -449,7 +452,8 @@ fun TvMainScreen(
                 isPlaying = isPlaying,
                 viewModel = viewModel,
                 dominantColor = animatedBg,
-                accentColor = animatedAccent
+                accentColor = animatedAccent,
+                mutedColor = animatedMuted
             )
         }
     }
@@ -465,8 +469,10 @@ private fun TvScreensaver(
     isPlaying: Boolean,
     viewModel: TvViewModel,
     dominantColor: Color,
-    accentColor: Color
+    accentColor: Color,
+    mutedColor: Color = Color(0xFF534AB7)
 ) {
+    val particleColors = listOf(accentColor, mutedColor, dominantColor)
 
     // Slow album art scale animation
     val infiniteTransition = rememberInfiniteTransition(label = "ssAnim")
@@ -524,11 +530,12 @@ private fun TvScreensaver(
     ) {
         // Floating particles
         Canvas(modifier = Modifier.fillMaxSize()) {
-            particleSeeds.forEach { seed ->
+            particleSeeds.forEachIndexed { idx, seed ->
                 val x = ((seed[0] + particleTime * seed[2]) % 1f).let { if (it < 0f) it + 1f else it }
                 val y = ((seed[1] + particleTime * seed[3]) % 1f).let { if (it < 0f) it + 1f else it }
+                val color = particleColors[idx % particleColors.size]
                 drawCircle(
-                    color = accentColor.copy(alpha = 0.12f),
+                    color = color.copy(alpha = 0.15f),
                     radius = seed[4],
                     center = androidx.compose.ui.geometry.Offset(x * size.width, y * size.height)
                 )
