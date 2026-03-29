@@ -503,7 +503,7 @@ private fun TvScreensaver(
         initialValue = 0f,
         targetValue = 100f,
         animationSpec = infiniteRepeatable(
-            animation = tween(600_000, easing = LinearEasing), // 10 minutes for full cycle
+            animation = tween(120_000, easing = LinearEasing), // 2 minutes for full cycle
             repeatMode = RepeatMode.Restart
         ),
         label = "pTime"
@@ -511,7 +511,7 @@ private fun TvScreensaver(
     val particleSeeds = remember {
         List(20) { floatArrayOf(
             Math.random().toFloat(), Math.random().toFloat(), // start x, y
-            (Math.random().toFloat() - 0.5f) * 0.03f, (Math.random().toFloat() - 0.5f) * 0.03f, // very slow drift
+            (Math.random().toFloat() - 0.5f) * 0.12f, (Math.random().toFloat() - 0.5f) * 0.12f, // gentle drift
             10f + Math.random().toFloat() * 25f // radius
         ) }
     }
