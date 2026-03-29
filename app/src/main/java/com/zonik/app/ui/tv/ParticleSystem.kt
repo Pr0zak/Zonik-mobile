@@ -105,7 +105,7 @@ fun ParticleSystem(
             if (p.trail.size >= 8) p.trail.removeAt(0)
             p.trail.add(Offset(p.x * w, p.y * h))
 
-            // Beat pulse: expand on bass
+            // Beat pulse: expand on bass + speed boost
             if (bassLevel > 0.3f) {
                 p.pulseDecay = bassLevel * 1.5f
             }
@@ -117,9 +117,10 @@ fun ParticleSystem(
                 p.radius = p.baseRadius
             }
 
-            // Move
-            p.x += p.dx * dt * 60f
-            p.y += p.dy * dt * 60f
+            // Move — speed scales with bass level
+            val speedMultiplier = 1f + bassLevel * 3f // up to 4x faster on heavy bass
+            p.x += p.dx * dt * 60f * speedMultiplier
+            p.y += p.dy * dt * 60f * speedMultiplier
 
             // Wrap
             if (p.x < -0.05f) p.x += 1.1f
