@@ -122,11 +122,22 @@ class MainActivity : AppCompatActivity() {
         handleNowPlayingIntent(intent)
     }
 
+    @javax.inject.Inject lateinit var playbackManager: com.zonik.app.media.PlaybackManager
+
+    override fun onStop() {
+        super.onStop()
+        // On TV, stop playback when app goes to background (no background music on TV)
+        if (isTvDevice() && !isChangingConfigurations) {
+            if (playbackManager.isPlaying.value) {
+                playbackManager.togglePlayPause()
+            }
+        }
+    }
+
     override fun onDestroy() {
-        // On TV, stop playback when activity is destroyed (no background playback)
+        // On TV, fully stop service
         if (isTvDevice()) {
-            val intent = android.content.Intent(this, com.zonik.app.media.ZonikMediaService::class.java)
-            stopService(intent)
+            stopService(android.content.Intent(this, com.zonik.app.media.ZonikMediaService::class.java))
         }
         super.onDestroy()
     }
