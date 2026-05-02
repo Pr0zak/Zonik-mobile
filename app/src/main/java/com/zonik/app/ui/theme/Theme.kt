@@ -6,10 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 // Semantic colors beyond M3 scheme
 object ZonikColors {
@@ -57,75 +54,6 @@ private val ZonikDarkColorScheme = darkColorScheme(
     onError = Color(0xFF1A0000),
     errorContainer = Color(0xFF3B1010),
     onErrorContainer = Color(0xFFFFDAD6),
-)
-
-private val ZonikTypography = Typography(
-    headlineLarge = TextStyle(
-        fontSize = 32.sp,
-        fontWeight = FontWeight.Bold,
-        lineHeight = 40.sp,
-        letterSpacing = (-0.5).sp
-    ),
-    headlineMedium = TextStyle(
-        fontSize = 26.sp,
-        fontWeight = FontWeight.Bold,
-        lineHeight = 32.sp,
-        letterSpacing = (-0.25).sp
-    ),
-    headlineSmall = TextStyle(
-        fontSize = 22.sp,
-        fontWeight = FontWeight.SemiBold,
-        lineHeight = 28.sp
-    ),
-    titleLarge = TextStyle(
-        fontSize = 20.sp,
-        fontWeight = FontWeight.SemiBold,
-        lineHeight = 26.sp
-    ),
-    titleMedium = TextStyle(
-        fontSize = 16.sp,
-        fontWeight = FontWeight.SemiBold,
-        lineHeight = 22.sp
-    ),
-    titleSmall = TextStyle(
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Medium,
-        lineHeight = 20.sp,
-        letterSpacing = 0.5.sp
-    ),
-    bodyLarge = TextStyle(
-        fontSize = 16.sp,
-        fontWeight = FontWeight.Normal,
-        lineHeight = 24.sp
-    ),
-    bodyMedium = TextStyle(
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Normal,
-        lineHeight = 20.sp
-    ),
-    bodySmall = TextStyle(
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Normal,
-        lineHeight = 16.sp
-    ),
-    labelLarge = TextStyle(
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Medium,
-        lineHeight = 20.sp,
-        letterSpacing = 0.1.sp
-    ),
-    labelMedium = TextStyle(
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
-    ),
-    labelSmall = TextStyle(
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Medium,
-        lineHeight = 14.sp,
-        letterSpacing = 0.5.sp
-    )
 )
 
 @Composable
