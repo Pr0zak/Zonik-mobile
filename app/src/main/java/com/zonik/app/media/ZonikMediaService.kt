@@ -152,7 +152,7 @@ class ZonikMediaService : MediaLibraryService() {
             .build()
         val upstreamFactory = OkHttpDataSource.Factory(streamClient)
         val cacheKeyFactory = androidx.media3.datasource.cache.CacheKeyFactory { dataSpec ->
-            dataSpec.uri.getQueryParameter("id") ?: dataSpec.key ?: dataSpec.uri.toString()
+            cacheKeyForUri(dataSpec.uri) ?: dataSpec.key ?: dataSpec.uri.toString()
         }
         val dataSourceFactory = CacheDataSource.Factory()
             .setCache(simpleCache)
@@ -307,10 +307,12 @@ class ZonikMediaService : MediaLibraryService() {
                 if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
                     val cause = error.cause
                     if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException && cause.responseCode == 416) {
-                        val trackId = player.currentMediaItem?.mediaId?.removePrefix(TRACK_PREFIX)
-                        if (!trackId.isNullOrEmpty()) {
-                            com.zonik.app.data.DebugLog.d("MediaService", "416 error — clearing cache for $trackId and retrying")
-                            simpleCache.removeResource(trackId)
+                        val streamUri = player.currentMediaItem?.requestMetadata?.mediaUri
+                            ?: player.currentMediaItem?.localConfiguration?.uri
+                        val cacheKey = cacheKeyForUri(streamUri)
+                        if (cacheKey != null) {
+                            com.zonik.app.data.DebugLog.d("MediaService", "416 error — clearing cache for $cacheKey and retrying")
+                            simpleCache.removeResource(cacheKey)
                         }
                         player.prepare()
                     }
@@ -455,6 +457,12 @@ class ZonikMediaService : MediaLibraryService() {
         // Use ContentProvider URI so Android Auto and other external processes
         // can fetch artwork without needing cleartext HTTP access
         return com.zonik.app.data.CoverArtProvider.buildUri(coverArtId)
+    }
+
+    private fun cacheKeyForUri(uri: Uri?): String? {
+        val id = uri?.getQueryParameter("id") ?: return null
+        val maxBitRate = uri.getQueryParameter("maxBitRate")
+        return "${id}_${maxBitRate ?: "raw"}"
     }
 
     private fun buildStreamUrlForTrack(trackId: String): String {
@@ -1174,18 +1182,20 @@ class ZonikMediaService : MediaLibraryService() {
                                 val idx = startIndex + i
                                 if (idx >= tracks.size) break
                                 val track = tracks[idx]
-                                if (simpleCache.getCachedBytes(track.id, 0, Long.MAX_VALUE) > 0) continue
-                                if (!preCachingInProgress.add(track.id)) continue
+                                val streamUrl = buildStreamUrlForTrack(track.id)
+                                val streamUri = android.net.Uri.parse(streamUrl)
+                                val cacheKey = cacheKeyForUri(streamUri) ?: track.id
+                                if (simpleCache.getCachedBytes(cacheKey, 0, Long.MAX_VALUE) > 0) continue
+                                if (!preCachingInProgress.add(cacheKey)) continue
                                 try {
-                                    com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: pre-caching track $i/$preCacheCount (${track.id})")
-                                    val streamUrl = buildStreamUrlForTrack(track.id)
-                                    val dataSpec = DataSpec(android.net.Uri.parse(streamUrl))
+                                    com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: pre-caching track $i/$preCacheCount ($cacheKey)")
+                                    val dataSpec = DataSpec(streamUri)
                                     val dataSource = factory.createDataSource()
                                     CacheWriter(dataSource, dataSpec, null, null).cache()
-                                    com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: cached ${track.id}")
-                                    preCachingInProgress.remove(track.id)
+                                    com.zonik.app.data.DebugLog.d("MediaService", "PLAY_TRACKS: cached $cacheKey")
+                                    preCachingInProgress.remove(cacheKey)
                                 } catch (e: Exception) {
-                                    preCachingInProgress.remove(track.id)
+                                    preCachingInProgress.remove(cacheKey)
                                     if (e is kotlinx.coroutines.CancellationException) throw e
                                     com.zonik.app.data.DebugLog.w("MediaService", "PLAY_TRACKS: pre-cache failed: ${e.message}")
                                 }
@@ -1302,20 +1312,19 @@ class ZonikMediaService : MediaLibraryService() {
             val upcoming = allUpcoming.take(readAhead)
             for (uri in upcoming) {
                 if (isPlayerBuffering) break // Yield to active playback
+                val cacheKey = cacheKeyForUri(uri) ?: continue
                 try {
-                    val trackId = uri.getQueryParameter("id") ?: continue
-                    if (simpleCache.getCachedBytes(trackId, 0, Long.MAX_VALUE) > 0) continue
-                    if (!preCachingInProgress.add(trackId)) continue // Already caching this track
-                    com.zonik.app.data.DebugLog.d("MediaService", "Pre-caching track: $trackId")
+                    if (simpleCache.getCachedBytes(cacheKey, 0, Long.MAX_VALUE) > 0) continue
+                    if (!preCachingInProgress.add(cacheKey)) continue // Already caching this track
+                    com.zonik.app.data.DebugLog.d("MediaService", "Pre-caching track: $cacheKey")
                     val dataSpec = DataSpec(uri)
                     val dataSource = factory.createDataSource()
                     val writer = CacheWriter(dataSource, dataSpec, null, null)
                     writer.cache()
-                    com.zonik.app.data.DebugLog.d("MediaService", "Pre-cached track: $trackId")
-                    preCachingInProgress.remove(trackId)
+                    com.zonik.app.data.DebugLog.d("MediaService", "Pre-cached track: $cacheKey")
+                    preCachingInProgress.remove(cacheKey)
                 } catch (e: Exception) {
-                    val trackId = uri.getQueryParameter("id")
-                    if (trackId != null) preCachingInProgress.remove(trackId)
+                    preCachingInProgress.remove(cacheKey)
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     com.zonik.app.data.DebugLog.w("MediaService", "Pre-cache failed: ${e.message}")
                 }
