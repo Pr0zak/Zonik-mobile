@@ -549,7 +549,10 @@ fun NowPlayingScreen(
                     )
 
                     Text(
-                        text = (track?.album ?: "").uppercase(),
+                        text = buildString {
+                            append((track?.album ?: "").uppercase())
+                            track?.year?.let { append(" · "); append(it) }
+                        },
                         style = MaterialTheme.typography.labelMedium.copy(
                             letterSpacing = 1.5.sp
                         ),
