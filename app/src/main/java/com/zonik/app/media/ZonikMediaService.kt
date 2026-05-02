@@ -67,6 +67,7 @@ class ZonikMediaService : MediaLibraryService() {
     private var cacheDataSourceFactory: CacheDataSource.Factory? = null
     private val preCachingInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     @Volatile private var isPlayerBuffering = false
+    @Volatile private var networkAvailable: Boolean = true
     private var connectivityManager: android.net.ConnectivityManager? = null
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
     private val starredTrackIds = mutableSetOf<String>()
@@ -270,9 +271,11 @@ class ZonikMediaService : MediaLibraryService() {
 
         // Network connectivity callback for auto-resume after connection loss
         val cm = getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        networkAvailable = cm.activeNetwork != null
         val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
         val cb = object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {
+                networkAvailable = true
                 mainHandler.post {
                     com.zonik.app.data.DebugLog.d("MediaService", "Network available — checking player state")
                     if (player.playbackState == androidx.media3.common.Player.STATE_IDLE && player.playerError != null) {
@@ -283,7 +286,8 @@ class ZonikMediaService : MediaLibraryService() {
             }
 
             override fun onLost(network: android.net.Network) {
-                com.zonik.app.data.DebugLog.d("MediaService", "Network lost")
+                networkAvailable = cm.activeNetwork != null
+                com.zonik.app.data.DebugLog.d("MediaService", "Network lost (available=$networkAvailable)")
             }
         }
         connectivityManager = cm
@@ -1173,7 +1177,7 @@ class ZonikMediaService : MediaLibraryService() {
 
                     // Pre-cache upcoming tracks in background after playback starts
                     val factory = cacheDataSourceFactory
-                    if (factory != null && connectivityManager?.activeNetwork != null) {
+                    if (factory != null && networkAvailable) {
                         preCacheJob?.cancel()
                         preCachingInProgress.clear()
                         preCacheJob = preCacheScope.launch {
@@ -1183,6 +1187,7 @@ class ZonikMediaService : MediaLibraryService() {
                             val preCacheCount = minOf(readAhead, tracks.size - startIndex - 1)
                             for (i in 1..preCacheCount) {
                                 if (isPlayerBuffering) break // Yield to active playback
+                                if (!networkAvailable) break // Don't burn retries during outage
                                 val idx = startIndex + i
                                 if (idx >= tracks.size) break
                                 val track = tracks[idx]
@@ -1289,7 +1294,7 @@ class ZonikMediaService : MediaLibraryService() {
     private fun preCacheUpcoming(player: androidx.media3.common.Player) {
         preCacheJob?.cancel()
         if (isPlayerBuffering) return // Don't pre-cache while player is buffering
-        if (connectivityManager?.activeNetwork == null) return // Don't pre-cache when offline
+        if (!networkAvailable) return // Don't pre-cache when offline
         val factory = cacheDataSourceFactory ?: return
         val allUpcoming = mutableListOf<Uri>()
         try {
@@ -1316,6 +1321,7 @@ class ZonikMediaService : MediaLibraryService() {
             val upcoming = allUpcoming.take(readAhead)
             for (uri in upcoming) {
                 if (isPlayerBuffering) break // Yield to active playback
+                if (!networkAvailable) break // Don't burn retries during outage
                 val cacheKey = cacheKeyForUri(uri) ?: continue
                 try {
                     if (simpleCache.getCachedBytes(cacheKey, 0, Long.MAX_VALUE) > 0) continue
