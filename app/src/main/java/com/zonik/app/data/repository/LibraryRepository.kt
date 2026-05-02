@@ -55,6 +55,12 @@ class LibraryRepository @Inject constructor(
             entities.map { it.toDomain() }
         }
 
+    suspend fun getRecentlyAddedTracks(limit: Int): List<Track> =
+        database.trackDao().getRecentList(limit).map { it.toDomain() }
+
+    suspend fun getNewestByYearTracks(limit: Int): List<Track> =
+        database.trackDao().getNewestByYear(limit).map { it.toDomain() }
+
     suspend fun getTrackById(id: String): Track? =
         database.trackDao().getById(id)?.toDomain()
 

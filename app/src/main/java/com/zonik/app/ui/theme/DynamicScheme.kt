@@ -26,7 +26,18 @@ private val OnSurface = Color(0xFFECE6F0)
 private val OnPrimary = Color(0xFF0D0A18)
 private val White = Color(0xFFFFFFFF)
 
-private fun container(opacity: Float) = White.copy(alpha = opacity)
+// Pre-composite a white-tint overlay onto Surface so the resulting token is opaque.
+// Visually identical to a translucent white over the dark surface, but won't read
+// as see-through when used as a popup/sheet/menu container.
+private fun container(opacity: Float): Color {
+    fun blend(s: Float, a: Float) = s + a * (1f - s)
+    return Color(
+        red = blend(Surface.red, opacity),
+        green = blend(Surface.green, opacity),
+        blue = blend(Surface.blue, opacity),
+        alpha = 1f,
+    )
+}
 
 fun buildSchemeFromPalette(palette: AlbumPalette): ColorScheme = darkColorScheme(
     primary = palette.vibrant,

@@ -79,6 +79,34 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun shuffleRecentlyAdded() {
+        viewModelScope.launch {
+            try {
+                val tracks = libraryRepository.getRecentlyAddedTracks(limit = 100).shuffled()
+                if (tracks.isNotEmpty()) {
+                    playbackManager.setShuffleEnabled(false)
+                    playbackManager.playTracks(tracks)
+                }
+            } catch (e: Exception) {
+                DebugLog.e("HomeViewModel", "Shuffle recently-added failed", e)
+            }
+        }
+    }
+
+    fun shuffleNewestByYear() {
+        viewModelScope.launch {
+            try {
+                val tracks = libraryRepository.getNewestByYearTracks(limit = 100).shuffled()
+                if (tracks.isNotEmpty()) {
+                    playbackManager.setShuffleEnabled(false)
+                    playbackManager.playTracks(tracks)
+                }
+            } catch (e: Exception) {
+                DebugLog.e("HomeViewModel", "Shuffle newest-by-year failed", e)
+            }
+        }
+    }
+
 
     fun playTrack(track: Track) {
         playbackManager.playTracks(listOf(track))
@@ -120,6 +148,7 @@ class HomeViewModel @Inject constructor(
 @Composable
 fun HomeScreen(
     onNavigateToLibraryTracks: (() -> Unit)? = null,
+    onNavigateToLibraryFavorites: (() -> Unit)? = null,
     onNavigateToAlbum: ((String) -> Unit)? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -144,8 +173,11 @@ fun HomeScreen(
                     recentTracks = recentTracks,
                     recentlyPlayed = recentlyPlayed,
                     onShuffleMix = viewModel::shuffleMix,
+                    onShuffleRecentlyAdded = viewModel::shuffleRecentlyAdded,
+                    onShuffleNewestByYear = viewModel::shuffleNewestByYear,
                     onSyncNow = viewModel::syncNow,
                     onNavigateToLibraryTracks = onNavigateToLibraryTracks,
+                    onNavigateToLibraryFavorites = onNavigateToLibraryFavorites,
                     onPlayTrack = viewModel::playTrack,
                     onPlayNext = viewModel::playNext,
                     onAddToQueue = viewModel::addToQueue,
@@ -174,8 +206,11 @@ private fun HomeContent(
     recentTracks: List<Track>,
     recentlyPlayed: List<Track>,
     onShuffleMix: () -> Unit,
+    onShuffleRecentlyAdded: () -> Unit,
+    onShuffleNewestByYear: () -> Unit,
     onSyncNow: () -> Unit,
     onNavigateToLibraryTracks: (() -> Unit)?,
+    onNavigateToLibraryFavorites: (() -> Unit)?,
     onPlayTrack: (Track) -> Unit,
     onPlayNext: (Track) -> Unit,
     onAddToQueue: (Track) -> Unit,
@@ -235,7 +270,7 @@ private fun HomeContent(
         ) {
             ShuffleTile(
                 title = "Shuffle Mix",
-                sub = "${recentTracks.size + recentlyPlayed.size} tracks",
+                sub = "100 random tracks",
                 icon = Icons.Default.Shuffle,
                 tonal = false,
                 onClick = onShuffleMix,
@@ -246,7 +281,31 @@ private fun HomeContent(
                 sub = "Starred tracks",
                 icon = Icons.Default.Favorite,
                 tonal = true,
-                onClick = onNavigateToLibraryTracks ?: {},
+                onClick = onNavigateToLibraryFavorites ?: onNavigateToLibraryTracks ?: {},
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ShuffleTile(
+                title = "Recently Added",
+                sub = "Shuffle 100 newest",
+                icon = Icons.Default.NewReleases,
+                tonal = true,
+                onClick = onShuffleRecentlyAdded,
+                modifier = Modifier.weight(1f)
+            )
+            ShuffleTile(
+                title = "By Release Date",
+                sub = "Shuffle 100 newest",
+                icon = Icons.Default.CalendarMonth,
+                tonal = true,
+                onClick = onShuffleNewestByYear,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -264,21 +323,6 @@ private fun HomeContent(
                         onClick = { onPlayTrack(track) }
                     )
                 }
-            }
-        }
-
-        // Jump back in
-        if (recentTracks.isNotEmpty()) {
-            SectionTitle(text = "Jump back in")
-            recentTracks.take(4).forEach { track ->
-                JumpBackInRow(
-                    track = track,
-                    onPlay = { onPlayTrack(track) },
-                    onPlayNext = { onPlayNext(track) },
-                    onAddToQueue = { onAddToQueue(track) },
-                    onToggleMarkForDeletion = { onToggleMarkForDeletion(track) },
-                    onStartRadio = { onStartRadio(track) }
-                )
             }
         }
 
@@ -389,117 +433,6 @@ private fun ShuffleTile(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun JumpBackInRow(
-    track: Track,
-    onPlay: () -> Unit,
-    onPlayNext: () -> Unit,
-    onAddToQueue: () -> Unit,
-    onToggleMarkForDeletion: () -> Unit,
-    onStartRadio: () -> Unit,
-) {
-    var showMenu by remember { mutableStateOf(false) }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .combinedClickable(
-                    onClick = onPlay,
-                    onLongClick = { showMenu = true }
-                )
-                .padding(8.dp)
-        ) {
-            CoverArt(
-                coverArtId = track.coverArt,
-                contentDescription = track.title,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(8.dp))
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (track.markedForDeletion) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${track.artist}${track.year?.let { " · $it" }.orEmpty()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            track.suffix?.let { com.zonik.app.ui.components.FormatBadge(it) }
-            Spacer(modifier = Modifier.width(4.dp))
-            Box {
-                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "More",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Play") },
-                        onClick = { showMenu = false; onPlay() },
-                        leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Play Next") },
-                        onClick = { showMenu = false; onPlayNext() },
-                        leadingIcon = { Icon(Icons.Default.QueuePlayNext, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Add to Queue") },
-                        onClick = { showMenu = false; onAddToQueue() },
-                        leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Start Radio") },
-                        onClick = { showMenu = false; onStartRadio() },
-                        leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                if (track.markedForDeletion) "Unmark for Deletion" else "Mark for Deletion",
-                                color = if (!track.markedForDeletion) MaterialTheme.colorScheme.error
-                                        else MaterialTheme.colorScheme.onSurface
-                            )
-                        },
-                        onClick = { showMenu = false; onToggleMarkForDeletion() },
-                        leadingIcon = {
-                            Icon(
-                                if (track.markedForDeletion) Icons.Default.RestoreFromTrash else Icons.Default.DeleteOutline,
-                                contentDescription = null,
-                                tint = if (!track.markedForDeletion) MaterialTheme.colorScheme.error
-                                       else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    )
-                }
-            }
         }
     }
 }

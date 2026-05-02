@@ -308,7 +308,7 @@ class LibraryViewModel @Inject constructor(
     }
 }
 
-private enum class LibraryTab(val label: String) {
+enum class LibraryTab(val label: String) {
     TRACKS("Tracks"),
     ALBUMS("Albums"),
     ARTISTS("Artists"),
@@ -324,6 +324,8 @@ private enum class LibraryTab(val label: String) {
 fun LibraryScreen(
     onNavigateToAlbum: (String) -> Unit,
     onNavigateToArtist: (String) -> Unit,
+    requestedTab: LibraryTab? = null,
+    onTabConsumed: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val artists by viewModel.artists.collectAsState()
@@ -344,6 +346,13 @@ fun LibraryScreen(
 
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = LibraryTab.entries
+
+    LaunchedEffect(requestedTab) {
+        if (requestedTab != null) {
+            selectedTab = requestedTab.ordinal
+            onTabConsumed()
+        }
+    }
 
     com.zonik.app.ui.theme.WithNeutralScheme {
     Column(

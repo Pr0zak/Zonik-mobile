@@ -89,6 +89,12 @@ interface TrackDao {
     @Query("SELECT * FROM tracks ORDER BY rowid DESC LIMIT :limit")
     fun getRecent(limit: Int = 20): Flow<List<TrackEntity>>
 
+    @Query("SELECT * FROM tracks ORDER BY rowid DESC LIMIT :limit")
+    suspend fun getRecentList(limit: Int): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE year IS NOT NULL ORDER BY year DESC, rowid DESC LIMIT :limit")
+    suspend fun getNewestByYear(limit: Int): List<TrackEntity>
+
     @Query("SELECT starred FROM tracks WHERE id = :id")
     suspend fun isStarred(id: String): Boolean?
 

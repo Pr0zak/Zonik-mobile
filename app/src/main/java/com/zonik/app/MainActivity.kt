@@ -38,6 +38,7 @@ import com.zonik.app.ui.screens.home.HomeScreen
 import com.zonik.app.ui.screens.library.AlbumDetailScreen
 import com.zonik.app.ui.screens.library.ArtistDetailScreen
 import com.zonik.app.ui.screens.library.LibraryScreen
+import com.zonik.app.ui.screens.library.LibraryTab
 import com.zonik.app.ui.screens.login.LoginScreen
 import com.zonik.app.ui.screens.nowplaying.NowPlayingScreen
 import com.zonik.app.ui.screens.playlists.PlaylistsScreen
@@ -292,15 +293,21 @@ fun MainScreen(
     var tvSelectedTab by remember { mutableIntStateOf(0) }
     val currentPage = if (isTv) tvSelectedTab else pagerState.currentPage
 
+    var requestedLibraryTab by remember { mutableStateOf<LibraryTab?>(null) }
+
+    fun goToLibrary(tab: LibraryTab? = null) {
+        requestedLibraryTab = tab
+        if (isTv) tvSelectedTab = 1
+        else coroutineScope.launch { pagerState.animateScrollToPage(1) }
+    }
+
     // Screen content lambda (shared between TV and phone)
     @Composable
     fun TabContent(page: Int) {
         when (page) {
             0 -> HomeScreen(
-                onNavigateToLibraryTracks = {
-                    if (isTv) tvSelectedTab = 1
-                    else coroutineScope.launch { pagerState.animateScrollToPage(1) }
-                },
+                onNavigateToLibraryTracks = { goToLibrary(LibraryTab.TRACKS) },
+                onNavigateToLibraryFavorites = { goToLibrary(LibraryTab.FAVORITES) },
                 onNavigateToAlbum = { albumId ->
                     rootNavController.navigate(Screen.AlbumDetail.createRoute(albumId))
                 }
@@ -311,7 +318,9 @@ fun MainScreen(
                 },
                 onNavigateToArtist = { artistId ->
                     rootNavController.navigate(Screen.ArtistDetail.createRoute(artistId))
-                }
+                },
+                requestedTab = requestedLibraryTab,
+                onTabConsumed = { requestedLibraryTab = null }
             )
             2 -> SearchScreen(
                 onNavigateToAlbum = { albumId ->
