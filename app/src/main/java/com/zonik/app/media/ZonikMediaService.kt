@@ -221,8 +221,14 @@ class ZonikMediaService : MediaLibraryService() {
         val resilientErrorPolicy = object : androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy() {
             override fun getRetryDelayMsFor(loadErrorInfo: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo): Long {
                 val error = loadErrorInfo.exception
-                // Give up on HTTP 4xx (auth, not found)
+                // Handle HTTP errors
                 if (error is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+                    // 416 Range Not Satisfiable — retry (ExoPlayer will restart from byte 0)
+                    if (error.responseCode == 416 && loadErrorInfo.errorCount <= 3) {
+                        com.zonik.app.data.DebugLog.d("MediaService", "416 Range error, retrying from start (attempt ${loadErrorInfo.errorCount})")
+                        return 500L
+                    }
+                    // Give up on other 4xx (auth, not found)
                     if (error.responseCode in 400..499) return C.TIME_UNSET
                 }
                 // Retry IO errors with exponential backoff up to 16s, max 10 retries
@@ -296,6 +302,18 @@ class ZonikMediaService : MediaLibraryService() {
                     || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED) {
                     com.zonik.app.data.DebugLog.d("MediaService", "Auto-recovering from IO error at index=${player.currentMediaItemIndex} pos=${player.currentPosition}")
                     player.prepare()
+                }
+                // 416 Range Not Satisfiable — clear stale cache for this track and retry
+                if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
+                    val cause = error.cause
+                    if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException && cause.responseCode == 416) {
+                        val trackId = player.currentMediaItem?.mediaId
+                        if (trackId != null) {
+                            com.zonik.app.data.DebugLog.d("MediaService", "416 error — clearing cache for $trackId and retrying")
+                            simpleCache.removeResource(trackId)
+                        }
+                        player.prepare()
+                    }
                 }
             }
 
