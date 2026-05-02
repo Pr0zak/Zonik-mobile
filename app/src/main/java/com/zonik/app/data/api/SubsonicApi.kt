@@ -91,5 +91,5 @@ interface SubsonicApi {
         @Query("genre") genre: String,
         @Query("count") count: Int = 50,
         @Query("offset") offset: Int = 0
-    ): RandomSongsResponse
+    ): SongsByGenreResponse
 }

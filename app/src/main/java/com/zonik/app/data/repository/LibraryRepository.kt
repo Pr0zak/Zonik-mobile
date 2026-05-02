@@ -295,7 +295,7 @@ class LibraryRepository @Inject constructor(
         // 2. If <10 results, add same-genre tracks from server
         if (result.size < 10 && !genre.isNullOrBlank()) {
             try {
-                val genreTracks = api.getSongsByGenre(genre, 50).response.randomSongs?.song?.map { it.toDomain() } ?: emptyList()
+                val genreTracks = api.getSongsByGenre(genre, 50).response.songsByGenre?.song?.map { it.toDomain() } ?: emptyList()
                 for (t in genreTracks) {
                     if (t.id !in seen) { seen.add(t.id); result.add(t) }
                 }

@@ -254,6 +254,24 @@ data class RandomSongsData(
 )
 
 @Serializable
+data class SongsByGenreResponse(
+    @SerialName("subsonic-response")
+    val response: SongsByGenreEnvelope
+)
+
+@Serializable
+data class SongsByGenreEnvelope(
+    val status: String,
+    val version: String,
+    val songsByGenre: SongsByGenreData? = null
+)
+
+@Serializable
+data class SongsByGenreData(
+    val song: List<SubsonicTrack> = emptyList()
+)
+
+@Serializable
 data class GenresResponse(
     @SerialName("subsonic-response")
     val response: GenresEnvelope
