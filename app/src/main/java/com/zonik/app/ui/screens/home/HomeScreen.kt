@@ -12,17 +12,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import com.zonik.app.ui.theme.ZonikColors
 import com.zonik.app.ui.theme.ZonikShapes
-import com.zonik.app.R
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -130,42 +127,78 @@ fun HomeScreen(
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
 
-    PullToRefreshBox(
-        isRefreshing = syncState.isSyncing,
-        onRefresh = viewModel::syncNow,
-        modifier = Modifier.fillMaxSize()
-    ) {
+    val featuredCoverArt = recentlyPlayed.firstOrNull()?.coverArt
+        ?: recentTracks.firstOrNull()?.coverArt
+
+    com.zonik.app.ui.theme.WithAlbumScheme(coverArtId = featuredCoverArt) {
+        PullToRefreshBox(
+            isRefreshing = syncState.isSyncing,
+            onRefresh = viewModel::syncNow,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                HomeContent(
+                    syncState = syncState,
+                    recentTracks = recentTracks,
+                    recentlyPlayed = recentlyPlayed,
+                    onShuffleMix = viewModel::shuffleMix,
+                    onSyncNow = viewModel::syncNow,
+                    onNavigateToLibraryTracks = onNavigateToLibraryTracks,
+                    onPlayTrack = viewModel::playTrack,
+                    onPlayNext = viewModel::playNext,
+                    onAddToQueue = viewModel::addToQueue,
+                    onToggleMarkForDeletion = viewModel::toggleMarkForDeletion,
+                    onStartRadio = viewModel::startRadio
+                )
+
+                ExtendedFloatingActionButton(
+                    onClick = viewModel::shuffleMix,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = Color.White,
+                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                    text = { Text("Play", style = MaterialTheme.typography.labelLarge) },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 158.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeContent(
+    syncState: SyncState,
+    recentTracks: List<Track>,
+    recentlyPlayed: List<Track>,
+    onShuffleMix: () -> Unit,
+    onSyncNow: () -> Unit,
+    onNavigateToLibraryTracks: (() -> Unit)?,
+    onPlayTrack: (Track) -> Unit,
+    onPlayNext: (Track) -> Unit,
+    onAddToQueue: (Track) -> Unit,
+    onToggleMarkForDeletion: (Track) -> Unit,
+    onStartRadio: (Track) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
     ) {
-        // Custom top bar
+        // Top app bar — titleLg + sync action
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .height(64.dp)
+                .padding(start = 16.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1A1A2E)),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_launcher_foreground),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(10.dp))
             Text(
-                "Zonik",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                text = "Zonik",
+                style = MaterialTheme.typography.titleLarge
             )
             Spacer(modifier = Modifier.weight(1f))
             if (syncState.isSyncing) {
@@ -176,52 +209,84 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.width(8.dp))
             }
             IconButton(
-                onClick = viewModel::syncNow,
+                onClick = onSyncNow,
                 enabled = !syncState.isSyncing
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = "Sync")
             }
         }
 
+        // Greeting
+        Text(
+            text = "Good evening",
+            style = MaterialTheme.typography.headlineLarge,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
+        )
+
         // Sync status banner
         SyncBanner(syncState = syncState, onDismiss = {})
 
-        // Shuffle Mix button
-        Button(
-            onClick = viewModel::shuffleMix,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-            contentPadding = PaddingValues(0.dp),
-            shape = ZonikShapes.buttonShape,
+        // Shuffle row — 2-up tile grid
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .tvFocusHighlight(ZonikShapes.buttonShape)
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(ZonikColors.gradientStart, ZonikColors.gradientEnd)
-                        ),
-                        shape = ZonikShapes.buttonShape
-                    )
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
+            ShuffleTile(
+                title = "Shuffle Mix",
+                sub = "${recentTracks.size + recentlyPlayed.size} tracks",
+                icon = Icons.Default.Shuffle,
+                tonal = false,
+                onClick = onShuffleMix,
+                modifier = Modifier.weight(1f)
+            )
+            ShuffleTile(
+                title = "Favorites",
+                sub = "Starred tracks",
+                icon = Icons.Default.Favorite,
+                tonal = true,
+                onClick = onNavigateToLibraryTracks ?: {},
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // Recently played
+        if (recentlyPlayed.isNotEmpty()) {
+            SectionTitle(text = "Recently played")
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Shuffle Mix", color = Color.White, fontWeight = FontWeight.SemiBold)
+                items(recentlyPlayed, key = { it.id }) { track ->
+                    RecentlyPlayedCard(
+                        track = track,
+                        onClick = { onPlayTrack(track) }
+                    )
                 }
             }
         }
 
-        // All Tracks text button
+        // Jump back in
+        if (recentTracks.isNotEmpty()) {
+            SectionTitle(text = "Jump back in")
+            recentTracks.take(4).forEach { track ->
+                JumpBackInRow(
+                    track = track,
+                    onPlay = { onPlayTrack(track) },
+                    onPlayNext = { onPlayNext(track) },
+                    onAddToQueue = { onAddToQueue(track) },
+                    onToggleMarkForDeletion = { onToggleMarkForDeletion(track) },
+                    onStartRadio = { onStartRadio(track) }
+                )
+            }
+        }
+
+        // All tracks shortcut
         if (onNavigateToLibraryTracks != null) {
             TextButton(
                 onClick = onNavigateToLibraryTracks,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp)
             ) {
                 Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
@@ -229,25 +294,18 @@ fun HomeScreen(
             }
         }
 
-        // Recent Tracks
+        // Recent Tracks (full list — preserves prior behavior)
         if (recentTracks.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Recent Tracks",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-
+            SectionTitle(text = "Recent tracks")
             recentTracks.forEachIndexed { index, track ->
-                val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
+                val rowBg = if (index % 2 == 0) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent
                 TrackListItemWithMenu(
                     track = track,
-                    onPlay = { viewModel.playTrack(track) },
-                    onPlayNext = { viewModel.playNext(track) },
-                    onAddToQueue = { viewModel.addToQueue(track) },
-                    onToggleMarkForDeletion = { viewModel.toggleMarkForDeletion(track) },
-                    onStartRadio = { viewModel.startRadio(track) },
+                    onPlay = { onPlayTrack(track) },
+                    onPlayNext = { onPlayNext(track) },
+                    onAddToQueue = { onAddToQueue(track) },
+                    onToggleMarkForDeletion = { onToggleMarkForDeletion(track) },
+                    onStartRadio = { onStartRadio(track) },
                     backgroundColor = rowBg
                 )
             }
@@ -265,7 +323,7 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = viewModel::syncNow) {
+                    OutlinedButton(onClick = onSyncNow) {
                         Icon(Icons.Default.Refresh, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Sync Library")
@@ -274,32 +332,175 @@ fun HomeScreen(
             }
         }
 
-        // Recently Played
-        if (recentlyPlayed.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
+        // Bottom padding to clear the floating mini-player + nav
+        Spacer(modifier = Modifier.height(220.dp))
+    }
+}
 
-            Text(
-                text = "Recently Played",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp)
+    )
+}
 
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+@Composable
+private fun ShuffleTile(
+    title: String,
+    sub: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tonal: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (tonal) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
+        contentColor = if (tonal) Color.White else MaterialTheme.colorScheme.onPrimary,
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (tonal) Color.White.copy(alpha = 0.12f)
+                        else Color(0xFF0D0A18).copy(alpha = 0.18f)
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                items(recentlyPlayed, key = { it.id }) { track ->
-                    RecentlyPlayedCard(
-                        track = track,
-                        onClick = { viewModel.playTrack(track) }
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = sub,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.alpha(0.78f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun JumpBackInRow(
+    track: Track,
+    onPlay: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onToggleMarkForDeletion: () -> Unit,
+    onStartRadio: () -> Unit,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .combinedClickable(
+                    onClick = onPlay,
+                    onLongClick = { showMenu = true }
+                )
+                .padding(8.dp)
+        ) {
+            CoverArt(
+                coverArtId = track.coverArt,
+                contentDescription = track.title,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (track.markedForDeletion) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${track.artist}${track.year?.let { " · $it" }.orEmpty()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            track.suffix?.let { com.zonik.app.ui.components.FormatBadge(it) }
+            Spacer(modifier = Modifier.width(4.dp))
+            Box {
+                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "More",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Play") },
+                        onClick = { showMenu = false; onPlay() },
+                        leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Play Next") },
+                        onClick = { showMenu = false; onPlayNext() },
+                        leadingIcon = { Icon(Icons.Default.QueuePlayNext, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Add to Queue") },
+                        onClick = { showMenu = false; onAddToQueue() },
+                        leadingIcon = { Icon(Icons.Default.AddToQueue, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Start Radio") },
+                        onClick = { showMenu = false; onStartRadio() },
+                        leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (track.markedForDeletion) "Unmark for Deletion" else "Mark for Deletion",
+                                color = if (!track.markedForDeletion) MaterialTheme.colorScheme.error
+                                        else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        onClick = { showMenu = false; onToggleMarkForDeletion() },
+                        leadingIcon = {
+                            Icon(
+                                if (track.markedForDeletion) Icons.Default.RestoreFromTrash else Icons.Default.DeleteOutline,
+                                contentDescription = null,
+                                tint = if (!track.markedForDeletion) MaterialTheme.colorScheme.error
+                                       else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     )
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-    }
     }
 }
 
@@ -390,41 +591,42 @@ private fun SyncBanner(syncState: SyncState, onDismiss: () -> Unit) {
 
 @Composable
 private fun RecentlyPlayedCard(track: Track, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
+    Column(
         modifier = modifier
-            .width(176.dp)
-            .tvFocusHighlight(ZonikShapes.cardShape)
-            .clickable(onClick = onClick),
-        shape = ZonikShapes.cardShape,
-        color = MaterialTheme.colorScheme.surfaceContainer
+            .width(144.dp)
+            .tvFocusHighlight(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Box {
             CoverArt(
                 coverArtId = track.coverArt,
                 contentDescription = track.title,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(ZonikShapes.coverArtShape)
+                    .size(144.dp)
+                    .clip(RoundedCornerShape(14.dp))
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = track.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = track.artist,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            track.suffix?.let { suffix ->
+                if (suffix.lowercase() in setOf("flac", "alac", "wav", "aiff")) {
+                    Box(modifier = Modifier.padding(6.dp)) {
+                        com.zonik.app.ui.components.FormatBadge(suffix)
+                    }
+                }
+            }
         }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = track.title,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = track.artist,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
