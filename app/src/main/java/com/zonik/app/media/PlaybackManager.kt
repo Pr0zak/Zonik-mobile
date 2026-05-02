@@ -114,8 +114,10 @@ class PlaybackManager @Inject constructor(
 
     // Scrobble tracking — scrobble once when track plays >50%
     private var scrobbledTrackId: String? = null
-    // Pending scrobbles that failed due to network — retried when network returns
-    private val pendingScrobbles = java.util.concurrent.ConcurrentLinkedQueue<String>()
+    // Pending scrobbles that failed due to network — retried when network returns.
+    // Each entry captures the trackId plus the playback timestamp (epoch ms) so the
+    // original listen time survives until the server accepts it.
+    private val pendingScrobbles = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, Long>>()
     // Throttle position saves to every 10 seconds
     @Volatile private var lastPositionSaveTime = 0L
 
@@ -535,13 +537,14 @@ class PlaybackManager @Inject constructor(
         if (duration <= 0) return
         if (positionMs > duration / 2) {
             scrobbledTrackId = track.id
+            val capturedTime = System.currentTimeMillis()
             scope.launch {
                 try {
-                    libraryRepository.scrobble(track.id)
+                    libraryRepository.scrobble(track.id, capturedTime)
                     DebugLog.d("Playback", "Scrobbled: ${track.title}")
                 } catch (e: Exception) {
                     DebugLog.w("Playback", "Scrobble queued (offline): ${track.title}")
-                    pendingScrobbles.add(track.id)
+                    pendingScrobbles.add(track.id to capturedTime)
                 }
             }
         }
@@ -649,11 +652,11 @@ class PlaybackManager @Inject constructor(
         if (pendingScrobbles.isEmpty()) return
         val flushed = mutableListOf<String>()
         while (pendingScrobbles.isNotEmpty()) {
-            val trackId = pendingScrobbles.peek() ?: break
+            val entry = pendingScrobbles.peek() ?: break
             try {
-                libraryRepository.scrobble(trackId)
+                libraryRepository.scrobble(entry.first, entry.second)
                 pendingScrobbles.poll()
-                flushed.add(trackId)
+                flushed.add(entry.first)
             } catch (_: Exception) {
                 break // Still offline, stop trying
             }

@@ -189,7 +189,9 @@ data class SubsonicTrack(
     val transcodedContentType: String? = null,
     val path: String? = null,
     val starred: String? = null,
-    val userRating: Int? = null
+    val userRating: Int? = null,
+    val playCount: Int = 0,
+    val played: String? = null
 ) {
     fun toDomain() = Track(
         id = id,
@@ -211,7 +213,9 @@ data class SubsonicTrack(
         transcodedContentType = transcodedContentType,
         path = path,
         starred = starred != null,
-        markedForDeletion = userRating == 1
+        markedForDeletion = userRating == 1,
+        playCount = playCount,
+        played = played
     )
 }
 
@@ -250,6 +254,24 @@ data class RandomSongsEnvelope(
 
 @Serializable
 data class RandomSongsData(
+    val song: List<SubsonicTrack> = emptyList()
+)
+
+@Serializable
+data class SongsByGenreResponse(
+    @SerialName("subsonic-response")
+    val response: SongsByGenreEnvelope
+)
+
+@Serializable
+data class SongsByGenreEnvelope(
+    val status: String,
+    val version: String,
+    val songsByGenre: SongsByGenreData? = null
+)
+
+@Serializable
+data class SongsByGenreData(
     val song: List<SubsonicTrack> = emptyList()
 )
 
@@ -374,4 +396,38 @@ data class StarResponse(
 data class ScrobbleResponse(
     @SerialName("subsonic-response")
     val response: SubsonicEnvelope<Unit>
+)
+
+@Serializable
+data class NowPlayingResponse(
+    @SerialName("subsonic-response")
+    val response: NowPlayingEnvelope
+)
+
+@Serializable
+data class NowPlayingEnvelope(
+    val status: String,
+    val version: String,
+    val nowPlaying: NowPlayingData? = null
+)
+
+@Serializable
+data class NowPlayingData(
+    val entry: List<NowPlayingEntry> = emptyList()
+)
+
+@Serializable
+data class NowPlayingEntry(
+    val id: String,
+    val title: String = "",
+    val artist: String = "",
+    val artistId: String? = null,
+    val album: String = "",
+    val albumId: String? = null,
+    val coverArt: String? = null,
+    val duration: Int = 0,
+    val username: String? = null,
+    val minutesAgo: Int = 0,
+    val playerId: Int? = null,
+    val playerName: String? = null
 )

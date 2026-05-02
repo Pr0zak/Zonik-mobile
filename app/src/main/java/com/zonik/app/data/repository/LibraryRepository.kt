@@ -262,9 +262,18 @@ class LibraryRepository @Inject constructor(
             database.albumDao().upsertAll(listOf(it.copy(starred = false)))
         }
     }
-    suspend fun scrobble(id: String) { api.scrobble(id) }
+    suspend fun scrobble(id: String, time: Long? = null) { api.scrobble(id, submission = true, time = time) }
     suspend fun scrobbleNowPlaying(id: String) { api.scrobble(id, submission = false) }
     suspend fun setRating(id: String, rating: Int) { api.setRating(id, rating) }
+
+    suspend fun getNowPlaying(): List<com.zonik.app.model.NowPlayingEntry> {
+        return try {
+            api.getNowPlaying().response.nowPlaying?.entry ?: emptyList()
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("Library", "getNowPlaying failed: ${e.message}")
+            emptyList()
+        }
+    }
 
     suspend fun getSimilarSongs(id: String, count: Int = 50): List<Track> {
         val response = api.getSimilarSongs2(id, count)
@@ -295,7 +304,7 @@ class LibraryRepository @Inject constructor(
         // 2. If <10 results, add same-genre tracks from server
         if (result.size < 10 && !genre.isNullOrBlank()) {
             try {
-                val genreTracks = api.getSongsByGenre(genre, 50).response.randomSongs?.song?.map { it.toDomain() } ?: emptyList()
+                val genreTracks = api.getSongsByGenre(genre, 50).response.songsByGenre?.song?.map { it.toDomain() } ?: emptyList()
                 for (t in genreTracks) {
                     if (t.id !in seen) { seen.add(t.id); result.add(t) }
                 }

@@ -1,7 +1,10 @@
 package com.zonik.app.data.api
 
 import com.zonik.app.model.*
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface SubsonicApi {
@@ -68,10 +71,12 @@ interface SubsonicApi {
         @Query("artistId") artistId: String? = null
     ): StarResponse
 
-    @GET("rest/scrobble.view")
+    @FormUrlEncoded
+    @POST("rest/scrobble.view")
     suspend fun scrobble(
-        @Query("id") id: String,
-        @Query("submission") submission: Boolean = true
+        @Field("id") id: String,
+        @Field("submission") submission: Boolean = true,
+        @Field("time") time: Long? = null
     ): ScrobbleResponse
 
     @GET("rest/setRating.view")
@@ -91,5 +96,8 @@ interface SubsonicApi {
         @Query("genre") genre: String,
         @Query("count") count: Int = 50,
         @Query("offset") offset: Int = 0
-    ): RandomSongsResponse
+    ): SongsByGenreResponse
+
+    @GET("rest/getNowPlaying.view")
+    suspend fun getNowPlaying(): NowPlayingResponse
 }
