@@ -49,7 +49,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import com.zonik.app.ui.theme.ZonikColors
 import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.ui.util.isTv
 import kotlinx.coroutines.launch
@@ -370,9 +369,9 @@ fun MainScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = miniPlayerBottomPadding)
             )
 
-            // Glass Navigation Bar
+            // Bottom navigation surface
             Surface(
-                color = ZonikColors.navBarBg,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 shape = ZonikShapes.navBarShape,
                 tonalElevation = 0.dp,
                 modifier = Modifier.fillMaxWidth()
