@@ -30,13 +30,6 @@ private class Particle(
     var pulseDecay: Float = 0f
 )
 
-// Glow ring expanding from center on bass hit
-private class GlowRing(
-    var radius: Float = 0f,
-    var alpha: Float = 0.6f,
-    var color: Color = Color.White
-)
-
 private fun createParticles(colors: List<Color>): List<Particle> {
     val shapes = ParticleShape.entries
     return List(30) { i ->
@@ -70,11 +63,9 @@ fun ParticleSystem(
     centerY: Float = 0.4f
 ) {
     val particles = remember(colors.hashCode()) { createParticles(colors) }
-    val glowRings = remember { MutableList(5) { GlowRing() } }
     var frameCounter by remember { mutableLongStateOf(0L) }
     var lastFrameTime by remember { mutableLongStateOf(System.nanoTime()) }
     var auroraPhase by remember { mutableLongStateOf(0L) }
-    var lastBassHit by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -109,29 +100,6 @@ fun ParticleSystem(
                 topLeft = Offset(w * band / 5f + xOffset, 0f),
                 size = androidx.compose.ui.geometry.Size(w / 4f, h)
             )
-        }
-
-        // ═══════════════════════════════════════════
-        // 2. Pulsing glow rings from center
-        // ═══════════════════════════════════════════
-        if (bassLevel > 0.4f && now - lastBassHit > 200_000_000L) {
-            lastBassHit = now
-            val ring = glowRings.minByOrNull { it.alpha } ?: glowRings[0]
-            ring.radius = 280f // start just inside album art edge, expand outward
-            ring.alpha = 0.15f + bassLevel * 0.1f // subtle start
-            ring.color = colors[(frameCounter % colors.size).toInt()]
-        }
-        glowRings.forEach { ring ->
-            if (ring.alpha > 0.01f) {
-                ring.radius += dt * 300f
-                ring.alpha *= 0.96f
-                drawCircle(
-                    color = ring.color.copy(alpha = ring.alpha),
-                    radius = ring.radius,
-                    center = Offset(cx, cy),
-                    style = Stroke(width = 3f)
-                )
-            }
         }
 
         // ═══════════════════════════════════════════

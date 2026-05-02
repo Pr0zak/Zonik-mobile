@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Upload
@@ -173,6 +175,32 @@ class TvViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 com.zonik.app.data.DebugLog.e("TvVM", "Shuffle favorites failed", e)
+            }
+        }
+    }
+
+    fun shuffleRecentlyAdded() {
+        viewModelScope.launch {
+            try {
+                val tracks = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    libraryRepository.getRecentlyAddedTracks(100).shuffled()
+                }
+                if (tracks.isNotEmpty()) playbackManager.playTracks(tracks)
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.e("TvVM", "Shuffle recently-added failed", e)
+            }
+        }
+    }
+
+    fun shuffleNewestByYear() {
+        viewModelScope.launch {
+            try {
+                val tracks = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    libraryRepository.getNewestByYearTracks(100).shuffled()
+                }
+                if (tracks.isNotEmpty()) playbackManager.playTracks(tracks)
+            } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.e("TvVM", "Shuffle newest-by-year failed", e)
             }
         }
     }
@@ -840,6 +868,58 @@ private fun TvHomeContent(
                     Icon(Icons.Default.Favorite, null, tint = ZonikColors.gold, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Shuffle Favorites", style = MaterialTheme.typography.titleLarge, color = ZonikColors.gold, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Recently Added + Release Date side by side
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .clip(ZonikShapes.buttonShape)
+                    .background(TvCardBackground, ZonikShapes.buttonShape)
+                    .border(1.dp, ZonikColors.gold.copy(alpha = 0.3f), ZonikShapes.buttonShape)
+                    .tvFocusHighlight(ZonikShapes.buttonShape)
+                    .clickable { viewModel.shuffleRecentlyAdded() }
+                    .focusable(),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.NewReleases, null, tint = ZonikColors.gold, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Recently Added", style = MaterialTheme.typography.titleLarge, color = ZonikColors.gold, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .clip(ZonikShapes.buttonShape)
+                    .background(TvCardBackground, ZonikShapes.buttonShape)
+                    .border(1.dp, ZonikColors.gold.copy(alpha = 0.3f), ZonikShapes.buttonShape)
+                    .tvFocusHighlight(ZonikShapes.buttonShape)
+                    .clickable { viewModel.shuffleNewestByYear() }
+                    .focusable(),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.CalendarMonth, null, tint = ZonikColors.gold, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("By Release Date", style = MaterialTheme.typography.titleLarge, color = ZonikColors.gold, fontWeight = FontWeight.Bold)
                 }
             }
         }
