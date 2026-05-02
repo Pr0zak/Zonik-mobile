@@ -71,7 +71,8 @@ interface SubsonicApi {
     @GET("rest/scrobble.view")
     suspend fun scrobble(
         @Query("id") id: String,
-        @Query("submission") submission: Boolean = true
+        @Query("submission") submission: Boolean = true,
+        @Query("time") time: Long? = null
     ): ScrobbleResponse
 
     @GET("rest/setRating.view")

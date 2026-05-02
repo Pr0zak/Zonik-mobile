@@ -262,7 +262,7 @@ class LibraryRepository @Inject constructor(
             database.albumDao().upsertAll(listOf(it.copy(starred = false)))
         }
     }
-    suspend fun scrobble(id: String) { api.scrobble(id) }
+    suspend fun scrobble(id: String, time: Long? = null) { api.scrobble(id, submission = true, time = time) }
     suspend fun scrobbleNowPlaying(id: String) { api.scrobble(id, submission = false) }
     suspend fun setRating(id: String, rating: Int) { api.setRating(id, rating) }
 
