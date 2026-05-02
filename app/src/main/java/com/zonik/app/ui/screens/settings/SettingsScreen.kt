@@ -38,12 +38,23 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    com.zonik.app.ui.theme.WithNeutralScheme {
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                windowInsets = WindowInsets.statusBars
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .height(64.dp)
+                    .padding(start = 16.dp, end = 4.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -60,7 +71,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1824))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
             ) {
                 val stats = uiState.libraryStats
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -104,7 +115,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1824))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
             ) {
                 Column {
                     BitrateDropdown(
@@ -150,7 +161,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1824))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
             ) {
                 Column {
                     SyncIntervalDropdown(
@@ -314,7 +325,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 shape = ZonikShapes.cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1824))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
             ) {
                 val context = LocalContext.current
                 val versionName = remember {
@@ -371,6 +382,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
     }
 }
 
@@ -580,7 +592,7 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1824))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {
         Column {
             val update = availableUpdate
@@ -897,7 +909,7 @@ private fun AutoTabOrderSection(viewModel: SettingsViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = ZonikShapes.cardShape,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1824))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {
         Column {
             ListItem(
@@ -1203,11 +1215,8 @@ private fun OfflineCacheSection(viewModel: SettingsViewModel) {
 @Composable
 private fun SettingsSectionHeader(title: String) {
     Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.titleSmall.copy(
-            letterSpacing = 1.5.sp,
-            fontWeight = FontWeight.Bold
-        ),
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 6.dp)
     )
