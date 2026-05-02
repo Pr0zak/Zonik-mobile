@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
@@ -33,6 +34,7 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.repository.LibraryRepository
+import com.zonik.app.data.repository.SyncManager
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Album
 import com.zonik.app.model.Artist
@@ -68,8 +70,15 @@ enum class AlbumSort(val label: String) {
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
-    private val playbackManager: PlaybackManager
+    private val playbackManager: PlaybackManager,
+    private val syncManager: SyncManager
 ) : ViewModel() {
+
+    val syncState = syncManager.syncState
+
+    fun syncNow() {
+        viewModelScope.launch { syncManager.fullSync() }
+    }
 
     val artists = libraryRepository.getArtists()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -332,6 +341,7 @@ fun LibraryScreen(
     val offlineTracks by viewModel.offlineTracks.collectAsState()
     val isDeleting by viewModel.isDeleting.collectAsState()
     val deleteResult by viewModel.deleteResult.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = LibraryTab.entries
@@ -359,46 +369,52 @@ fun LibraryScreen(
                 }
             }
 
-            when (tabs[selectedTab]) {
-                LibraryTab.ARTISTS -> ArtistsTab(
-                    artists = artists,
-                    onArtistClick = onNavigateToArtist
-                )
-                LibraryTab.ALBUMS -> AlbumsTab(
-                    albums = albums,
-                    onAlbumClick = onNavigateToAlbum,
-                    viewModel = viewModel
-                )
-                LibraryTab.TRACKS -> TracksTab(
-                    tracks = tracks,
-                    tracksRecentFirst = tracksRecentFirst,
-                    viewModel = viewModel
-                )
-                LibraryTab.FAVORITES -> FavoritesTab(
-                    favorites = favorites,
-                    isLoading = isLoadingFavorites,
-                    viewModel = viewModel
-                )
-                LibraryTab.GENRES -> GenresTab(
-                    genres = genres,
-                    isLoading = isLoadingGenres,
-                    onPlayGenre = viewModel::playGenre
-                )
-                LibraryTab.PLAYLISTS -> PlaylistsTab(
-                    playlists = playlists,
-                    isLoading = isLoadingPlaylists,
-                    onPlayPlaylist = viewModel::playPlaylist
-                )
-                LibraryTab.FLAGGED -> FlaggedTab(
-                    tracks = flaggedTracks,
-                    isDeleting = isDeleting,
-                    deleteResult = deleteResult,
-                    viewModel = viewModel
-                )
-                LibraryTab.OFFLINE -> OfflineTab(
-                    tracks = offlineTracks,
-                    viewModel = viewModel
-                )
+            PullToRefreshBox(
+                isRefreshing = syncState.isSyncing,
+                onRefresh = viewModel::syncNow,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when (tabs[selectedTab]) {
+                    LibraryTab.ARTISTS -> ArtistsTab(
+                        artists = artists,
+                        onArtistClick = onNavigateToArtist
+                    )
+                    LibraryTab.ALBUMS -> AlbumsTab(
+                        albums = albums,
+                        onAlbumClick = onNavigateToAlbum,
+                        viewModel = viewModel
+                    )
+                    LibraryTab.TRACKS -> TracksTab(
+                        tracks = tracks,
+                        tracksRecentFirst = tracksRecentFirst,
+                        viewModel = viewModel
+                    )
+                    LibraryTab.FAVORITES -> FavoritesTab(
+                        favorites = favorites,
+                        isLoading = isLoadingFavorites,
+                        viewModel = viewModel
+                    )
+                    LibraryTab.GENRES -> GenresTab(
+                        genres = genres,
+                        isLoading = isLoadingGenres,
+                        onPlayGenre = viewModel::playGenre
+                    )
+                    LibraryTab.PLAYLISTS -> PlaylistsTab(
+                        playlists = playlists,
+                        isLoading = isLoadingPlaylists,
+                        onPlayPlaylist = viewModel::playPlaylist
+                    )
+                    LibraryTab.FLAGGED -> FlaggedTab(
+                        tracks = flaggedTracks,
+                        isDeleting = isDeleting,
+                        deleteResult = deleteResult,
+                        viewModel = viewModel
+                    )
+                    LibraryTab.OFFLINE -> OfflineTab(
+                        tracks = offlineTracks,
+                        viewModel = viewModel
+                    )
+                }
             }
     }
 }

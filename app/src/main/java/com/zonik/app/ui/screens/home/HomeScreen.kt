@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -129,6 +130,11 @@ fun HomeScreen(
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
 
+    PullToRefreshBox(
+        isRefreshing = syncState.isSyncing,
+        onRefresh = viewModel::syncNow,
+        modifier = Modifier.fillMaxSize()
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -293,6 +299,7 @@ fun HomeScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
     }
 }
 
