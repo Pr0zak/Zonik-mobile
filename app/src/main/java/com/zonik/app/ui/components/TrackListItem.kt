@@ -14,8 +14,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.Color
-import com.zonik.app.ui.theme.ZonikColors
-import com.zonik.app.ui.theme.ZonikShapes
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -350,27 +348,23 @@ private fun DetailRow(label: String, value: String) {
 }
 
 @Composable
-private fun FormatBadge(suffix: String) {
-    val backgroundColor = when (suffix.lowercase()) {
-        "flac", "alac" -> ZonikColors.gold.copy(alpha = 0.15f)
-        "mp3", "aac", "ogg", "opus" -> Color(0xFF9E9E9E).copy(alpha = 0.12f)
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    val textColor = when (suffix.lowercase()) {
-        "flac", "alac" -> ZonikColors.gold
-        "mp3", "aac", "ogg", "opus" -> Color(0xFF9E9E9E)
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+fun FormatBadge(suffix: String) {
+    val isLossless = suffix.lowercase() in setOf("flac", "alac")
+    val tertiary = MaterialTheme.colorScheme.tertiary
+    val backgroundColor = if (isLossless) tertiary.copy(alpha = 0.15f)
+        else MaterialTheme.colorScheme.surfaceContainerHigh
+    val textColor = if (isLossless) tertiary
+        else MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         color = backgroundColor,
-        shape = ZonikShapes.badgeShape
+        shape = RoundedCornerShape(999.dp)
     ) {
         Text(
             text = suffix.uppercase(),
             style = MaterialTheme.typography.labelSmall,
             color = textColor,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
         )
     }
 }

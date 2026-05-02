@@ -349,10 +349,12 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = DownloadsTab.entries
 
+    com.zonik.app.ui.theme.WithNeutralScheme {
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("Downloads") },
+                title = { Text("Downloads", style = MaterialTheme.typography.titleLarge) },
                 windowInsets = WindowInsets.statusBars,
                 actions = {
                     if (selectedTab == 1) {
@@ -451,6 +453,7 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
                 )
             }
         }
+    }
     }
 }
 

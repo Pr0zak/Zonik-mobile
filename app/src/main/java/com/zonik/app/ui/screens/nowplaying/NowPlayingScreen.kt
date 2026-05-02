@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -49,8 +50,8 @@ import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
-import com.zonik.app.ui.theme.ZonikColors
 import com.zonik.app.ui.theme.ZonikShapes
+import com.zonik.app.ui.theme.WithAlbumScheme
 import com.zonik.app.ui.util.formatDurationMs
 import com.zonik.app.ui.util.formatFileSize
 import com.zonik.app.ui.util.formatDuration
@@ -333,6 +334,7 @@ fun NowPlayingScreen(
 
     val isTvDevice = com.zonik.app.ui.util.isTv()
 
+    WithAlbumScheme(coverArtId = track?.coverArt) {
     // Full screen with blurred background
     Box(
         modifier = Modifier
@@ -422,11 +424,11 @@ fun NowPlayingScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top bar — minimal, glass pill
+            // Top bar: ChevDown + center "PLAYING FROM ALBUM / album title" + spacer
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .height(64.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -434,25 +436,28 @@ fun NowPlayingScreen(
                     Icon(
                         Icons.Default.KeyboardArrowDown,
                         contentDescription = "Collapse",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
-                Surface(
-                    color = Color.White.copy(alpha = 0.08f),
-                    shape = RoundedCornerShape(20.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "NOW PLAYING",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            letterSpacing = 3.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        text = "PLAYING FROM ALBUM",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = track?.album ?: "",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                // Spacer to balance the top bar layout
                 Spacer(modifier = Modifier.size(48.dp))
             }
 
@@ -514,18 +519,19 @@ fun NowPlayingScreen(
                         if (track?.suffix != null) {
                             Spacer(modifier = Modifier.width(8.dp))
                             val isLossless = track.suffix?.lowercase() in listOf("flac", "alac")
+                            val tertiary = MaterialTheme.colorScheme.tertiary
                             Surface(
-                                color = if (isLossless) ZonikColors.gold.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(8.dp)
+                                color = if (isLossless) tertiary.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.10f),
+                                shape = RoundedCornerShape(999.dp)
                             ) {
                                 Text(
                                     text = listOfNotNull(
                                         track.suffix?.uppercase(),
                                         track.bitRate?.let { "${it}k" }
                                     ).joinToString(" "),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = if (isLossless) ZonikColors.gold else Color.White.copy(alpha = 0.7f),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = if (isLossless) tertiary else Color.White.copy(alpha = 0.75f),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
                         }
@@ -680,16 +686,14 @@ fun NowPlayingScreen(
                     )
                 }
 
-                // Play/Pause — gradient circle
+                // Play/Pause — palette primary with glow
+                val primary = MaterialTheme.colorScheme.primary
+                val onPrimary = MaterialTheme.colorScheme.onPrimary
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(76.dp)
                         .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(animatedAccent, animatedAccent.copy(alpha = 0.7f))
-                            )
-                        )
+                        .background(primary)
                         .clickable { viewModel.togglePlayPause() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -697,14 +701,14 @@ fun NowPlayingScreen(
                         CircularProgressIndicator(
                             modifier = Modifier.size(36.dp),
                             strokeWidth = 3.dp,
-                            color = Color.Black
+                            color = onPrimary
                         )
                     } else {
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = Color.Black,
-                            modifier = Modifier.size(44.dp)
+                            tint = onPrimary,
+                            modifier = Modifier.size(40.dp)
                         )
                     }
                 }
@@ -873,7 +877,7 @@ fun NowPlayingScreen(
         if (showQueue) {
             ModalBottomSheet(
                 onDismissRequest = { showQueue = false },
-                containerColor = Color(0xFF151320),
+                containerColor = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -885,23 +889,27 @@ fun NowPlayingScreen(
                             .padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "QUEUE",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                letterSpacing = 2.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
+                            Text(
+                                text = "UP NEXT",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "${queue.size} tracks",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            color = animatedAccent.copy(alpha = 0.15f),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
                                 text = "${queue.size}",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = animatedAccent,
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
@@ -964,12 +972,36 @@ fun NowPlayingScreen(
                     ) {
                         itemsIndexed(queue, key = { index, t -> "$index-${t.id}" }) { index, queueTrack ->
                             val isCurrent = queueTrack.id == track?.id
-                            val rowBg = if (index % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent
+                            val rowBg = when {
+                                isCurrent -> Brush.horizontalGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                        Color.Transparent
+                                    )
+                                )
+                                index % 2 == 1 -> Brush.horizontalGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.surfaceContainer,
+                                        MaterialTheme.colorScheme.surfaceContainer
+                                    )
+                                )
+                                else -> Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
+                            }
+                            val accent = MaterialTheme.colorScheme.primary
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(rowBg)
                                     .clickable { viewModel.skipToIndex(index) }
+                                    .drawBehind {
+                                        if (isCurrent) {
+                                            drawRect(
+                                                color = accent,
+                                                topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                                size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)
+                                            )
+                                        }
+                                    }
                             ) {
                                 ListItem(
                                     headlineContent = {
@@ -977,9 +1009,10 @@ fun NowPlayingScreen(
                                             text = queueTrack.title,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            color = if (isCurrent) animatedAccent else Color.White,
-                                            style = if (isCurrent) MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-                                                    else MaterialTheme.typography.bodyLarge
+                                            color = if (isCurrent) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.onSurface,
+                                            style = if (isCurrent) MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                                    else MaterialTheme.typography.titleSmall
                                         )
                                     },
                                     supportingContent = {
@@ -987,7 +1020,8 @@ fun NowPlayingScreen(
                                             text = "${queueTrack.artist} · ${queueTrack.album}",
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            color = Color.White.copy(alpha = 0.5f)
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     leadingContent = {
@@ -995,14 +1029,13 @@ fun NowPlayingScreen(
                                             coverArtId = queueTrack.coverArt,
                                             contentDescription = null,
                                             modifier = Modifier
-                                                .size(40.dp)
-                                                .clip(RoundedCornerShape(4.dp)),
+                                                .size(44.dp)
+                                                .clip(RoundedCornerShape(6.dp)),
                                             size = 100
                                         )
                                     },
                                     trailingContent = {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            // Offline status indicator
                                             val trackDownloadState = downloadStates[queueTrack.id]
                                             val isTrackOffline = queueTrack.id in offlineIds
                                             when {
@@ -1015,13 +1048,13 @@ fun NowPlayingScreen(
                                                 trackDownloadState == com.zonik.app.media.DownloadState.DOWNLOADING -> CircularProgressIndicator(
                                                     modifier = Modifier.size(14.dp),
                                                     strokeWidth = 2.dp,
-                                                    color = animatedAccent
+                                                    color = MaterialTheme.colorScheme.primary
                                                 )
                                                 trackDownloadState == com.zonik.app.media.DownloadState.QUEUED -> Icon(
                                                     Icons.Default.Schedule,
                                                     contentDescription = "Queued",
                                                     modifier = Modifier.size(14.dp),
-                                                    tint = Color.White.copy(alpha = 0.3f)
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                                 else -> {}
                                             }
@@ -1029,7 +1062,8 @@ fun NowPlayingScreen(
                                             Text(
                                                 text = "${index + 1}",
                                                 style = MaterialTheme.typography.labelMedium,
-                                                color = if (isCurrent) animatedAccent else Color.White.copy(alpha = 0.4f)
+                                                color = if (isCurrent) MaterialTheme.colorScheme.primary
+                                                        else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
                                     },
@@ -1041,6 +1075,7 @@ fun NowPlayingScreen(
                 }
             }
         }
+    }
     }
 }
 

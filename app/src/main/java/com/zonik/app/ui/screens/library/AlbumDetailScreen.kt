@@ -490,19 +490,20 @@ private fun TrackItem(
                     )
                     track.suffix?.let { suffix ->
                         val isLossless = suffix.lowercase() in listOf("flac", "alac", "wav", "aiff")
-                        val badgeBg = if (isLossless) ZonikColors.gold.copy(alpha = 0.15f)
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        val badgeText = if (isLossless) ZonikColors.gold
+                        val tertiary = MaterialTheme.colorScheme.tertiary
+                        val badgeBg = if (isLossless) tertiary.copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.surfaceContainerHigh
+                        val badgeText = if (isLossless) tertiary
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         Surface(
                             color = badgeBg,
-                            shape = RoundedCornerShape(4.dp)
+                            shape = RoundedCornerShape(999.dp)
                         ) {
                             Text(
                                 text = suffix.uppercase(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = badgeText,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                             )
                         }
                     }
