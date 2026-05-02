@@ -223,9 +223,13 @@ class ZonikMediaService : MediaLibraryService() {
                 val error = loadErrorInfo.exception
                 // Handle HTTP errors
                 if (error is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
-                    // 416 Range Not Satisfiable — retry (ExoPlayer will restart from byte 0)
+                    // 416 Range Not Satisfiable — clear stale cache and retry from start
                     if (error.responseCode == 416 && loadErrorInfo.errorCount <= 3) {
-                        com.zonik.app.data.DebugLog.d("MediaService", "416 Range error, retrying from start (attempt ${loadErrorInfo.errorCount})")
+                        val cacheKey = cacheKeyForUri(error.dataSpec.uri)
+                        if (cacheKey != null) {
+                            try { simpleCache.removeResource(cacheKey) } catch (_: Exception) {}
+                        }
+                        com.zonik.app.data.DebugLog.d("MediaService", "416 Range error — cleared cache for $cacheKey, retrying (attempt ${loadErrorInfo.errorCount})")
                         return 500L
                     }
                     // Give up on other 4xx (auth, not found)
