@@ -236,6 +236,13 @@ class ZonikMediaService : MediaLibraryService() {
                     // Give up on other 4xx (auth, not found)
                     if (error.responseCode in 400..499) return C.TIME_UNSET
                 }
+                // UnknownHostException — DNS failure (Tailscale flap, VPN drop). Cap low, floor delay high.
+                if (error is java.net.UnknownHostException || error?.cause is java.net.UnknownHostException) {
+                    if (loadErrorInfo.errorCount > 3) return C.TIME_UNSET
+                    val delay = minOf(4_000L * loadErrorInfo.errorCount, 16_000L)
+                    com.zonik.app.data.DebugLog.d("MediaService", "DNS failure — retry ${loadErrorInfo.errorCount}/3 in ${delay}ms")
+                    return delay
+                }
                 // Retry IO errors with exponential backoff up to 16s, max 10 retries
                 if (error is java.io.IOException && loadErrorInfo.errorCount <= 10) {
                     val delay = minOf(1000L * (1L shl (loadErrorInfo.errorCount - 1)), 16_000L)
