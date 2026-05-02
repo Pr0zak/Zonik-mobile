@@ -51,6 +51,7 @@ import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
 import com.zonik.app.ui.theme.ZonikShapes
+import com.zonik.app.ui.theme.WithAlbumScheme
 import com.zonik.app.ui.util.formatDurationMs
 import com.zonik.app.ui.util.formatFileSize
 import com.zonik.app.ui.util.formatDuration
@@ -333,6 +334,7 @@ fun NowPlayingScreen(
 
     val isTvDevice = com.zonik.app.ui.util.isTv()
 
+    WithAlbumScheme(coverArtId = track?.coverArt) {
     // Full screen with blurred background
     Box(
         modifier = Modifier
@@ -422,11 +424,11 @@ fun NowPlayingScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top bar — minimal, glass pill
+            // Top bar: ChevDown + center "PLAYING FROM ALBUM / album title" + spacer
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .height(64.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -434,25 +436,28 @@ fun NowPlayingScreen(
                     Icon(
                         Icons.Default.KeyboardArrowDown,
                         contentDescription = "Collapse",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
-                Surface(
-                    color = Color.White.copy(alpha = 0.08f),
-                    shape = RoundedCornerShape(20.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "NOW PLAYING",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            letterSpacing = 3.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        text = "PLAYING FROM ALBUM",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = track?.album ?: "",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                // Spacer to balance the top bar layout
                 Spacer(modifier = Modifier.size(48.dp))
             }
 
@@ -681,16 +686,14 @@ fun NowPlayingScreen(
                     )
                 }
 
-                // Play/Pause — gradient circle
+                // Play/Pause — palette primary with glow
+                val primary = MaterialTheme.colorScheme.primary
+                val onPrimary = MaterialTheme.colorScheme.onPrimary
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(76.dp)
                         .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(animatedAccent, animatedAccent.copy(alpha = 0.7f))
-                            )
-                        )
+                        .background(primary)
                         .clickable { viewModel.togglePlayPause() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -698,14 +701,14 @@ fun NowPlayingScreen(
                         CircularProgressIndicator(
                             modifier = Modifier.size(36.dp),
                             strokeWidth = 3.dp,
-                            color = Color.Black
+                            color = onPrimary
                         )
                     } else {
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = Color.Black,
-                            modifier = Modifier.size(44.dp)
+                            tint = onPrimary,
+                            modifier = Modifier.size(40.dp)
                         )
                     }
                 }
@@ -1072,6 +1075,7 @@ fun NowPlayingScreen(
                 }
             }
         }
+    }
     }
 }
 
