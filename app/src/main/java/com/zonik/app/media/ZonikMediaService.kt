@@ -307,8 +307,8 @@ class ZonikMediaService : MediaLibraryService() {
                 if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
                     val cause = error.cause
                     if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException && cause.responseCode == 416) {
-                        val trackId = player.currentMediaItem?.mediaId
-                        if (trackId != null) {
+                        val trackId = player.currentMediaItem?.mediaId?.removePrefix(TRACK_PREFIX)
+                        if (!trackId.isNullOrEmpty()) {
                             com.zonik.app.data.DebugLog.d("MediaService", "416 error — clearing cache for $trackId and retrying")
                             simpleCache.removeResource(trackId)
                         }
