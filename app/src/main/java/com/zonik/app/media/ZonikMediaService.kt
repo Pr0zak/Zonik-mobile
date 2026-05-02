@@ -67,6 +67,7 @@ class ZonikMediaService : MediaLibraryService() {
     private var cacheDataSourceFactory: CacheDataSource.Factory? = null
     private val preCachingInProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     @Volatile private var isPlayerBuffering = false
+    @Volatile private var bufferingStartTimeMs: Long = 0L
     @Volatile private var networkAvailable: Boolean = true
     private var connectivityManager: android.net.ConnectivityManager? = null
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
@@ -284,8 +285,14 @@ class ZonikMediaService : MediaLibraryService() {
             override fun onAvailable(network: android.net.Network) {
                 networkAvailable = true
                 mainHandler.post {
-                    com.zonik.app.data.DebugLog.d("MediaService", "Network available — checking player state")
-                    if (player.playbackState == androidx.media3.common.Player.STATE_IDLE && player.playerError != null) {
+                    val state = player.playbackState
+                    val bufferingFor = if (state == androidx.media3.common.Player.STATE_BUFFERING && bufferingStartTimeMs > 0) {
+                        System.currentTimeMillis() - bufferingStartTimeMs
+                    } else 0L
+                    val shouldResume = player.playerError != null
+                        || (state == androidx.media3.common.Player.STATE_BUFFERING && bufferingFor > 10_000L)
+                    com.zonik.app.data.DebugLog.d("MediaService", "Network available — state=$state error=${player.playerError != null} bufferingFor=${bufferingFor}ms resume=$shouldResume")
+                    if (shouldResume) {
                         com.zonik.app.data.DebugLog.d("MediaService", "Auto-resuming after network reconnect")
                         player.prepare()
                     }
@@ -354,7 +361,13 @@ class ZonikMediaService : MediaLibraryService() {
                     else -> "UNKNOWN"
                 }
                 com.zonik.app.data.DebugLog.d("MediaService", "ExoPlayer state: $state")
-                isPlayerBuffering = playbackState == androidx.media3.common.Player.STATE_BUFFERING
+                val nowBuffering = playbackState == androidx.media3.common.Player.STATE_BUFFERING
+                if (nowBuffering && !isPlayerBuffering) {
+                    bufferingStartTimeMs = System.currentTimeMillis()
+                } else if (!nowBuffering) {
+                    bufferingStartTimeMs = 0L
+                }
+                isPlayerBuffering = nowBuffering
                 // Cancel pre-caching when player is buffering to free bandwidth
                 if (isPlayerBuffering) {
                     preCacheJob?.cancel()
