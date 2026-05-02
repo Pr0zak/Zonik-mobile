@@ -93,4 +93,7 @@ interface SubsonicApi {
         @Query("count") count: Int = 50,
         @Query("offset") offset: Int = 0
     ): SongsByGenreResponse
+
+    @GET("rest/getNowPlaying.view")
+    suspend fun getNowPlaying(): NowPlayingResponse
 }

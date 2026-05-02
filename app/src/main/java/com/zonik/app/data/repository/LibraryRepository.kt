@@ -266,6 +266,15 @@ class LibraryRepository @Inject constructor(
     suspend fun scrobbleNowPlaying(id: String) { api.scrobble(id, submission = false) }
     suspend fun setRating(id: String, rating: Int) { api.setRating(id, rating) }
 
+    suspend fun getNowPlaying(): List<com.zonik.app.model.NowPlayingEntry> {
+        return try {
+            api.getNowPlaying().response.nowPlaying?.entry ?: emptyList()
+        } catch (e: Exception) {
+            com.zonik.app.data.DebugLog.w("Library", "getNowPlaying failed: ${e.message}")
+            emptyList()
+        }
+    }
+
     suspend fun getSimilarSongs(id: String, count: Int = 50): List<Track> {
         val response = api.getSimilarSongs2(id, count)
         return response.response.randomSongs?.song?.map { it.toDomain() } ?: emptyList()

@@ -397,3 +397,37 @@ data class ScrobbleResponse(
     @SerialName("subsonic-response")
     val response: SubsonicEnvelope<Unit>
 )
+
+@Serializable
+data class NowPlayingResponse(
+    @SerialName("subsonic-response")
+    val response: NowPlayingEnvelope
+)
+
+@Serializable
+data class NowPlayingEnvelope(
+    val status: String,
+    val version: String,
+    val nowPlaying: NowPlayingData? = null
+)
+
+@Serializable
+data class NowPlayingData(
+    val entry: List<NowPlayingEntry> = emptyList()
+)
+
+@Serializable
+data class NowPlayingEntry(
+    val id: String,
+    val title: String = "",
+    val artist: String = "",
+    val artistId: String? = null,
+    val album: String = "",
+    val albumId: String? = null,
+    val coverArt: String? = null,
+    val duration: Int = 0,
+    val username: String? = null,
+    val minutesAgo: Int = 0,
+    val playerId: Int? = null,
+    val playerName: String? = null
+)
