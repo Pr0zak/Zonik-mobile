@@ -183,19 +183,18 @@ This keeps the lossless/lossy visual distinction strong without using gold.
 
 ## Resolution
 
-Per-stage status will be filled in here as work proceeds.
-
 | Item | Stage | Status |
 |---|---|---|
-| Roboto Flex + M3 type ramp | 2a | Pending |
-| `buildSchemeFromPalette` + `LocalDynamicScheme` | 2b | Pending |
-| `rememberAlbumPalette` | 2c | Pending |
-| `NEUTRAL_SCHEME` | 2d | Pending |
-| Strip `ZonikColors.gold` (mobile screens only) | 2e | Pending |
-| Settings rewrite | 3.1 | Pending |
-| Search rewrite | 3.2 | Pending |
-| Queue (sheet) rewrite | 3.3 | Pending |
-| Library rewrite | 3.4 | Pending |
-| Home rewrite | 3.5 | Pending |
-| Now Playing rewrite | 3.6 | Pending |
-| Downloads retheme | 4 | Pending |
+| Roboto Flex + M3 type ramp | 2a | Resolved — `res/font/roboto_flex.ttf` (variable) bundled; `Type.kt` rebuilds the full M3 ramp on Roboto Flex. |
+| `buildSchemeFromPalette` + `LocalAlbumPalette` | 2b | Resolved — `DynamicScheme.kt` exposes `buildSchemeFromPalette`, `NEUTRAL_SCHEME`, and a `LocalAlbumPalette` CompositionLocal. |
+| `rememberAlbumPalette` | 2c | Resolved — `AlbumPaletteExtraction.kt` extracts via Coil + Palette with an LRU keyed by coverArtId. |
+| `NEUTRAL_SCHEME` | 2d | Resolved — bundled in `DynamicScheme.kt`. |
+| Strip `ZonikColors.gold` (mobile screens only) | 2e | Resolved — TrackListItem, AlbumDetail row, Now Playing format badge all switch to `MaterialTheme.colorScheme.tertiary`. TV screens left untouched (out of scope). |
+| Settings rewrite | 3.1 | Resolved — wrapped in `WithNeutralScheme`, custom 64 dp top app bar, `surfaceContainer` cards in place of `#1A1824`, M3 section headers. |
+| Search rewrite | 3.2 | Resolved — 56 dp pill bar, filter chips, "Top result" hero card, highlighted query, ResultRow / TrackRow with kind labels. |
+| Queue (sheet) rewrite | 3.3 | Resolved — sheet `surface` color, "UP NEXT" header, primaryContainer→transparent gradient on current row + 3 dp primary `drawBehind` accent stripe, surfaceContainer zebra striping. |
+| Library rewrite | 3.4 | Resolved — `WithNeutralScheme`, 64 dp top app bar, scheme.primary "Play All" button. 8 sub-tabs preserved. |
+| Home rewrite | 3.5 | Resolved — `WithAlbumScheme(featured cover)`, 64 dp top bar, "Good evening" headline, 2-up Shuffle Tile row, 144 dp Recently Played cards w/ format-badge overlay, Jump Back In rows w/ context menus, Extended FAB "Play". |
+| Now Playing rewrite | 3.6 | Resolved — `WithAlbumScheme(track cover)`, "PLAYING FROM ALBUM / album" centered top bar, 76 dp scheme.primary play button. |
+| Downloads retheme | 4 | Resolved — `WithNeutralScheme`, M3 type bar; layout untouched per spec. |
+| Default `ZonikTheme` to NEUTRAL_SCHEME + retheme MainScreen chrome | 4 | Resolved — root theme now points at NEUTRAL; mini-player + bottom nav use `surfaceContainerHigh`. |
