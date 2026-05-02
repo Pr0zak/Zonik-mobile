@@ -49,7 +49,6 @@ import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
 import com.zonik.app.model.Track
 import com.zonik.app.ui.components.CoverArt
-import com.zonik.app.ui.theme.ZonikColors
 import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.ui.util.formatDurationMs
 import com.zonik.app.ui.util.formatFileSize
@@ -514,18 +513,19 @@ fun NowPlayingScreen(
                         if (track?.suffix != null) {
                             Spacer(modifier = Modifier.width(8.dp))
                             val isLossless = track.suffix?.lowercase() in listOf("flac", "alac")
+                            val tertiary = MaterialTheme.colorScheme.tertiary
                             Surface(
-                                color = if (isLossless) ZonikColors.gold.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(8.dp)
+                                color = if (isLossless) tertiary.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.10f),
+                                shape = RoundedCornerShape(999.dp)
                             ) {
                                 Text(
                                     text = listOfNotNull(
                                         track.suffix?.uppercase(),
                                         track.bitRate?.let { "${it}k" }
                                     ).joinToString(" "),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = if (isLossless) ZonikColors.gold else Color.White.copy(alpha = 0.7f),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = if (isLossless) tertiary else Color.White.copy(alpha = 0.75f),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
                         }
