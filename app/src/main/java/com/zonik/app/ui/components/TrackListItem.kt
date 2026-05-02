@@ -66,10 +66,16 @@ fun TrackListItem(
                 )
             },
             supportingContent = {
-                val text = if (showAlbum && track.album.isNotEmpty()) {
-                    "${track.artist} \u00B7 ${track.album}"
-                } else {
-                    track.artist
+                val text = buildString {
+                    append(track.artist)
+                    if (showAlbum && track.album.isNotEmpty()) {
+                        append(" \u00B7 ")
+                        append(track.album)
+                    }
+                    track.year?.let {
+                        append(" \u00B7 ")
+                        append(it)
+                    }
                 }
                 Text(
                     text = text,
