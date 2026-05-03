@@ -16,6 +16,5 @@ sealed class MainTab(val route: String, val label: String) {
     data object Home : MainTab("home", "Home")
     data object Library : MainTab("library", "Library")
     data object Search : MainTab("search", "Find")
-    data object Downloads : MainTab("downloads", "Downloads")
     data object Settings : MainTab("settings", "Settings")
 }
