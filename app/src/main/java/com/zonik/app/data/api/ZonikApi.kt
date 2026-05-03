@@ -144,7 +144,11 @@ data class DownloadResult(
     @SerialName("sample_rate") val sampleRate: Int? = null,
     @SerialName("bit_depth") val bitDepth: Int? = null,
     val speed: Long? = null,
-    @SerialName("queue_length") val queueLength: Int? = null
+    @SerialName("queue_length") val queueLength: Int? = null,
+    @SerialName("slots_free") val slotsFree: Boolean? = null,
+    @SerialName("free_upload_slots") val freeUploadSlots: Int? = null,
+    @SerialName("upload_speed") val uploadSpeed: Long? = null,
+    @SerialName("score") val score: Double? = null
 ) {
     val displayName: String
         get() {
