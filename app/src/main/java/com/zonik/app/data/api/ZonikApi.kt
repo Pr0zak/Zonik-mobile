@@ -52,6 +52,11 @@ interface ZonikApi {
     @GET("api/jobs/{id}")
     suspend fun getJob(@Path("id") id: String): JobDetailResponse
 
+    @GET("api/jobs/counts")
+    suspend fun getJobCounts(
+        @Query("type") type: String = "download"
+    ): JobCountsResponse
+
     // --- Track Management ---
 
     @POST("api/tracks/bulk-delete")
@@ -207,6 +212,15 @@ data class JobInfo(
 @Serializable
 data class JobHistoryResponse(
     val items: List<JobInfo> = emptyList(),
+    val total: Int = 0
+)
+
+@Serializable
+data class JobCountsResponse(
+    val pending: Int = 0,
+    val running: Int = 0,
+    val completed: Int = 0,
+    val failed: Int = 0,
     val total: Int = 0
 )
 
