@@ -33,7 +33,6 @@ import com.zonik.app.media.PlaybackManager
 import com.zonik.app.ui.components.MiniPlayer
 import com.zonik.app.ui.navigation.MainTab
 import com.zonik.app.ui.navigation.Screen
-import com.zonik.app.ui.screens.downloads.DownloadsScreen
 import com.zonik.app.ui.screens.home.HomeScreen
 import com.zonik.app.ui.screens.library.AlbumDetailScreen
 import com.zonik.app.ui.screens.library.ArtistDetailScreen
@@ -271,7 +270,6 @@ private val tabs = listOf(
     TabItem(MainTab.Home, Icons.Filled.Home, MainTab.Home.label),
     TabItem(MainTab.Library, Icons.Filled.LibraryMusic, MainTab.Library.label),
     TabItem(MainTab.Search, Icons.Filled.Search, MainTab.Search.label),
-    TabItem(MainTab.Downloads, Icons.Filled.Download, MainTab.Downloads.label),
     TabItem(MainTab.Settings, Icons.Filled.Settings, MainTab.Settings.label)
 )
 
@@ -330,8 +328,7 @@ fun MainScreen(
                     rootNavController.navigate(Screen.ArtistDetail.createRoute(artistId))
                 }
             )
-            3 -> DownloadsScreen()
-            4 -> SettingsScreen(
+            3 -> SettingsScreen(
                 onDisconnected = {
                     rootNavController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
