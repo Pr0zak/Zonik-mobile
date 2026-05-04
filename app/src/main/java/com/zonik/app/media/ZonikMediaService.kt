@@ -56,6 +56,7 @@ class ZonikMediaService : MediaLibraryService() {
     @Inject lateinit var database: ZonikDatabase
     @Inject lateinit var simpleCache: SimpleCache
     @Inject lateinit var offlineCacheManager: OfflineCacheManager
+    @Inject lateinit var cachingDns: com.zonik.app.data.api.CachingDns
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var equalizer: android.media.audiofx.Equalizer? = null
@@ -138,6 +139,7 @@ class ZonikMediaService : MediaLibraryService() {
         // Use a clean OkHttpClient without auth interceptor — auth is baked into URLs
         val streamClient = okhttp3.OkHttpClient.Builder()
             .connectionPool(okhttp3.ConnectionPool(5, 30, java.util.concurrent.TimeUnit.SECONDS))
+            .dns(cachingDns)
             .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS) // 30s for transcode queue backpressure
             .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .addInterceptor { chain ->

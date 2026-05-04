@@ -50,7 +50,8 @@ object AppModule {
     fun provideOkHttpClient(
         @ApplicationContext context: Context,
         authInterceptor: SubsonicAuthInterceptor,
-        settingsRepository: SettingsRepository
+        settingsRepository: SettingsRepository,
+        cachingDns: com.zonik.app.data.api.CachingDns,
     ): OkHttpClient {
         val httpCache = okhttp3.Cache(File(context.cacheDir, "http_cache"), 50L * 1024 * 1024) // 50 MB
         // Dynamic base URL interceptor — rewrites every request to the current server URL
@@ -81,6 +82,7 @@ object AppModule {
 
         return OkHttpClient.Builder()
             .cache(httpCache)
+            .dns(cachingDns)
             .addInterceptor(dynamicBaseUrlInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(HttpLoggingInterceptor().apply {
@@ -96,7 +98,8 @@ object AppModule {
     @ZonikApiClient
     fun provideZonikApiClient(
         authInterceptor: SubsonicAuthInterceptor,
-        settingsRepository: SettingsRepository
+        settingsRepository: SettingsRepository,
+        cachingDns: com.zonik.app.data.api.CachingDns,
     ): OkHttpClient {
         val dynamicBaseUrlInterceptor = Interceptor { chain ->
             val serverUrl = runBlocking {
@@ -124,6 +127,7 @@ object AppModule {
         }
 
         return OkHttpClient.Builder()
+            .dns(cachingDns)
             .addInterceptor(dynamicBaseUrlInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(HttpLoggingInterceptor().apply {
