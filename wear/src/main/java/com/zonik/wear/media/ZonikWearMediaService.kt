@@ -33,6 +33,7 @@ import com.zonik.wear.data.repository.WearSettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
@@ -61,6 +62,15 @@ class ZonikWearMediaService : MediaLibraryService() {
     private var simpleCache: SimpleCache? = null
     private var mediaLibrarySession: MediaLibrarySession? = null
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // Scrobble tracking — fires regardless of UI state so the watch shows up
+    // on the server's /api/live page just like the phone does.
+    private val scrobbleMainScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val scrobbleIoScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    @Volatile private var scrobbledTrackId: String? = null
+    @Volatile private var nowPlayingPostedFor: String? = null
+    private var scrobblePollJob: kotlinx.coroutines.Job? = null
+    private val pendingScrobbles = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, Long>>()
 
     override fun onCreate() {
         super.onCreate()
@@ -101,6 +111,23 @@ class ZonikWearMediaService : MediaLibraryService() {
 
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, BrowseTreeCallback())
             .build()
+
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onMediaItemTransition(
+                mediaItem: MediaItem?,
+                reason: Int,
+            ) {
+                if (mediaItem != null) {
+                    // New track → ready to scrobble it once it crosses 50%.
+                    scrobbledTrackId = null
+                    postNowPlaying()
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) startScrobblePoll() else stopScrobblePoll()
+            }
+        })
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? =
@@ -115,6 +142,9 @@ class ZonikWearMediaService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        stopScrobblePoll()
+        scrobbleMainScope.cancel()
+        scrobbleIoScope.cancel()
         mediaLibrarySession?.run {
             player.release()
             release()
@@ -123,6 +153,71 @@ class ZonikWearMediaService : MediaLibraryService() {
         simpleCache?.release()
         simpleCache = null
         super.onDestroy()
+    }
+
+    // --- Scrobble ---------------------------------------------------------
+
+    private fun startScrobblePoll() {
+        if (scrobblePollJob?.isActive == true) return
+        scrobblePollJob = scrobbleMainScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5_000L)
+                checkScrobbleThreshold()
+            }
+        }
+    }
+
+    private fun stopScrobblePoll() {
+        scrobblePollJob?.cancel()
+        scrobblePollJob = null
+    }
+
+    /** Reads player state on the main thread; fires the scrobble on IO. */
+    private fun checkScrobbleThreshold() {
+        val player = mediaLibrarySession?.player ?: return
+        val mediaId = player.currentMediaItem?.mediaId ?: return
+        if (mediaId.isEmpty() || mediaId == scrobbledTrackId) return
+        val duration = player.duration
+        val position = player.currentPosition
+        if (duration <= 0 || position <= duration / 2) return
+        scrobbledTrackId = mediaId
+        val capturedTime = System.currentTimeMillis()
+        scrobbleIoScope.launch {
+            flushPendingScrobbles()
+            try {
+                library.scrobble(mediaId, capturedTime)
+                android.util.Log.d("WearScrobble", "Scrobbled: $mediaId")
+            } catch (e: Exception) {
+                pendingScrobbles.add(mediaId to capturedTime)
+                android.util.Log.w("WearScrobble", "Scrobble queued offline: ${e.message}")
+            }
+        }
+    }
+
+    private fun postNowPlaying() {
+        val player = mediaLibrarySession?.player ?: return
+        val mediaId = player.currentMediaItem?.mediaId ?: return
+        if (mediaId.isEmpty() || mediaId == nowPlayingPostedFor) return
+        nowPlayingPostedFor = mediaId
+        scrobbleIoScope.launch {
+            flushPendingScrobbles()
+            try {
+                library.scrobbleNowPlaying(mediaId)
+                android.util.Log.d("WearScrobble", "Now-playing posted: $mediaId")
+            } catch (_: Exception) { /* fire-and-forget */ }
+        }
+    }
+
+    private suspend fun flushPendingScrobbles() {
+        while (pendingScrobbles.isNotEmpty()) {
+            val entry = pendingScrobbles.peek() ?: break
+            try {
+                library.scrobble(entry.first, entry.second)
+                pendingScrobbles.poll()
+            } catch (_: Exception) {
+                return
+            }
+        }
     }
 
     // --- Browse tree -------------------------------------------------------

@@ -44,6 +44,16 @@ class WearLibraryRepository(
         return env.playlists?.playlist.orEmpty().map { it.toDomain() }
     }
 
+    /** Now-playing scrobble (Subsonic submission=false). Fire on track change. */
+    suspend fun scrobbleNowPlaying(trackId: String) {
+        api.scrobble(id = trackId, submission = false)
+    }
+
+    /** Completed-play scrobble (Subsonic submission=true). Fire once past 50%. */
+    suspend fun scrobble(trackId: String, timeMs: Long? = null) {
+        api.scrobble(id = trackId, submission = true, time = timeMs)
+    }
+
     /** Random songs across the whole library — for the Quick Mix button. */
     suspend fun getRandomSongs(size: Int = 50): List<Track> {
         val env = api.getRandomSongs(size = size).response

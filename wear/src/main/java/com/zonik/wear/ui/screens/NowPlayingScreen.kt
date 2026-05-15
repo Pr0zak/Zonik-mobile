@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -64,7 +63,6 @@ import com.zonik.wear.ui.components.WearCoverArt
 @Composable
 fun NowPlayingScreen(
     mediaManager: WearMediaManager,
-    onBrowseClick: () -> Unit,
     onQueueClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
@@ -145,7 +143,6 @@ fun NowPlayingScreen(
 
                 if (!hasTrack && connectionState == ConnectionState.Connected) {
                     EmptyState(
-                        onBrowseClick = onBrowseClick,
                         onSettingsClick = onSettingsClick,
                         onQuickMixClick = {
                             scope.launch {
@@ -202,7 +199,6 @@ fun NowPlayingScreen(
                         )
                         Spacer(Modifier.height(12.dp))
                         SecondaryRow(
-                            onBrowseClick = onBrowseClick,
                             onQueueClick = onQueueClick,
                             onSettingsClick = onSettingsClick,
                         )
@@ -221,7 +217,6 @@ fun NowPlayingScreen(
 
 @Composable
 private fun EmptyState(
-    onBrowseClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onQuickMixClick: () -> Unit,
 ) {
@@ -240,16 +235,6 @@ private fun EmptyState(
         Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.size(6.dp))
         Text("Quick Mix")
-    }
-    Spacer(Modifier.height(4.dp))
-    Button(
-        onClick = onBrowseClick,
-        colors = ButtonDefaults.filledTonalButtonColors(),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Icon(Icons.Outlined.LibraryMusic, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.size(6.dp))
-        Text("Browse")
     }
     Spacer(Modifier.height(4.dp))
     Button(
@@ -315,7 +300,6 @@ private fun TransportRow(
 
 @Composable
 private fun SecondaryRow(
-    onBrowseClick: () -> Unit,
     onQueueClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
@@ -327,13 +311,6 @@ private fun SecondaryRow(
             Icon(
                 Icons.AutoMirrored.Filled.QueueMusic,
                 contentDescription = "Queue",
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        FilledTonalIconButton(onClick = onBrowseClick, modifier = Modifier.size(44.dp)) {
-            Icon(
-                Icons.Outlined.LibraryMusic,
-                contentDescription = "Browse",
                 modifier = Modifier.size(20.dp),
             )
         }
