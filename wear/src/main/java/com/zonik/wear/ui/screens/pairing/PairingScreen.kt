@@ -36,7 +36,6 @@ import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.TimeText
 
 @Composable
 fun PairingScreen(
@@ -52,11 +51,10 @@ fun PairingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(12.dp),
+            .padding(horizontal = 14.dp, vertical = 22.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        TimeText()
         when (val s = state) {
             is PairingState.EnterUrl -> EnterUrl(s, viewModel)
             is PairingState.Requesting -> Requesting()
