@@ -15,6 +15,7 @@ import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.zonik.wear.MainActivity
+import com.zonik.wear.media.ZonikWearMediaService
 
 class TrackComplicationService : SuspendingComplicationDataSourceService() {
 
@@ -85,9 +86,12 @@ class TrackComplicationService : SuspendingComplicationDataSourceService() {
 
     private suspend fun getCurrentTrackInfo(): TrackInfo {
         return try {
+            // Local bind to the wear MediaService — only resolves while the
+            // service is running. When the user isn't actively playing, the
+            // complication degrades to a "tap to open Zonik" surface.
             val sessionToken = SessionToken(
                 this,
-                ComponentName("com.zonik.app", "com.zonik.app.media.ZonikMediaService")
+                ComponentName(this, ZonikWearMediaService::class.java),
             )
             val future = MediaBrowser.Builder(this, sessionToken).buildAsync()
             val browser = kotlinx.coroutines.suspendCancellableCoroutine { cont ->

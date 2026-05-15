@@ -3,6 +3,7 @@ package com.zonik.wear.tile
 import android.content.ComponentName
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
+import com.zonik.wear.media.ZonikWearMediaService
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders
 import androidx.wear.protolayout.DimensionBuilders
@@ -162,9 +163,13 @@ class NowPlayingTileService : TileService() {
 
     private suspend fun getCurrentTrackInfo(): TrackInfo {
         return try {
+            // Bind to our own MediaService — same process, so this only succeeds
+            // when the service is already running (i.e. user has launched the
+            // wear app at least once this session). When it's not running we
+            // gracefully fall back to a "Zonik" tile.
             val sessionToken = SessionToken(
                 this,
-                ComponentName("com.zonik.app", "com.zonik.app.media.ZonikMediaService")
+                ComponentName(this, ZonikWearMediaService::class.java),
             )
             val future = MediaBrowser.Builder(this, sessionToken).buildAsync()
             val browser = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
