@@ -10,7 +10,10 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.zonik.wear"
+        // Same applicationId as the phone app — Wear Data Layer only routes
+        // messages between paired phone/watch when applicationId matches.
+        // Distinct devices, so no install conflict.
+        applicationId = "com.zonik.app"
         minSdk = 30
         targetSdk = 34
         versionCode = 1

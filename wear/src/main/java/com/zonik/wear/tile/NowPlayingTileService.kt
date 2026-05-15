@@ -70,7 +70,10 @@ class NowPlayingTileService : TileService() {
                 ActionBuilders.LaunchAction.Builder()
                     .setAndroidActivity(
                         ActionBuilders.AndroidActivity.Builder()
-                            .setPackageName("com.zonik.wear")
+                            // applicationId is now com.zonik.app (matches phone for
+                            // Wear Data Layer). The class lives under namespace
+                            // com.zonik.wear though.
+                            .setPackageName("com.zonik.app")
                             .setClassName("com.zonik.wear.MainActivity")
                             .build()
                     )
