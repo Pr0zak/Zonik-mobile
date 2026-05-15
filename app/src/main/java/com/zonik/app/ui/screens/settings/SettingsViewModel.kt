@@ -76,10 +76,12 @@ class SettingsViewModel @Inject constructor(
 
     fun pairWatch() {
         viewModelScope.launch {
+            com.zonik.app.data.DebugLog.d("WearPair", "pairWatch() invoked")
             _wearPairStatus.value = "Looking for watch…"
             try {
                 val config = settingsRepository.serverConfig.first()
                 if (config == null) {
+                    com.zonik.app.data.DebugLog.w("WearPair", "No server config")
                     _wearPairStatus.value = "Log in first"
                     return@launch
                 }
@@ -87,12 +89,19 @@ class SettingsViewModel @Inject constructor(
                 val nodes: List<com.google.android.gms.wearable.Node> = try {
                     nodeClient.connectedNodes.await()
                 } catch (e: Exception) {
+                    com.zonik.app.data.DebugLog.e("WearPair", "connectedNodes failed: ${e.message}", e)
                     _wearPairStatus.value = "Couldn't reach watch: ${e.message}"
                     return@launch
                 }
+                com.zonik.app.data.DebugLog.d(
+                    "WearPair",
+                    "Connected nodes: ${nodes.size} (" +
+                        nodes.joinToString { "${it.displayName}/${it.id}/nearby=${it.isNearby}" } + ")"
+                )
                 val reachable = nodes.filter { it.isNearby }
                 val target = reachable.firstOrNull() ?: nodes.firstOrNull()
                 if (target == null) {
+                    com.zonik.app.data.DebugLog.w("WearPair", "No paired watch found")
                     _wearPairStatus.value = "No watch paired (open the Wear OS app first)"
                     return@launch
                 }
@@ -105,9 +114,15 @@ class SettingsViewModel @Inject constructor(
                     )
                 ).toByteArray(Charsets.UTF_8)
                 val messageClient = com.google.android.gms.wearable.Wearable.getMessageClient(appContext)
+                com.zonik.app.data.DebugLog.d(
+                    "WearPair",
+                    "Sending ${payload.size}B to ${target.displayName} (${target.id})",
+                )
                 messageClient.sendMessage(target.id, "/zonik/pair", payload).await()
+                com.zonik.app.data.DebugLog.d("WearPair", "sendMessage acked")
                 _wearPairStatus.value = "Sent to ${target.displayName}"
             } catch (e: Exception) {
+                com.zonik.app.data.DebugLog.e("WearPair", "pairWatch failed: ${e.message}", e)
                 _wearPairStatus.value = "Send failed: ${e.message}"
             }
         }
