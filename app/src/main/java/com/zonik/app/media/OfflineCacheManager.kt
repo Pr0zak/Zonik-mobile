@@ -108,15 +108,19 @@ class OfflineCacheManager @Inject constructor(
             val jobs = mutableListOf<Job>()
 
             while (downloadQueue.isNotEmpty()) {
-                val trackId = downloadQueue.poll() ?: break
+                // Acquire BEFORE polling so the loop blocks while maxConcurrent
+                // downloads are in flight. Without this the loop drains the
+                // whole queue into coroutines before any disk write happens
+                // and the storage-limit check below never sees the growing
+                // directory.
+                semaphore.acquire()
 
-                // Check storage limit (0 = no limit)
                 val limitMb = settingsRepository.offlineStorageLimitMb.first()
                 val usedMb = getStorageUsedBytes() / (1024 * 1024)
                 if (limitMb > 0 && usedMb >= limitMb) {
                     DebugLog.w("OfflineCache", "Storage limit reached (${usedMb}MB / ${limitMb}MB), stopping")
-                    updateState(trackId, DownloadState.FAILED)
-                    // Drain remaining queue
+                    semaphore.release()
+                    // Mark every remaining item as failed and stop pulling.
                     while (downloadQueue.isNotEmpty()) {
                         val remaining = downloadQueue.poll() ?: break
                         updateState(remaining, DownloadState.FAILED)
@@ -124,8 +128,13 @@ class OfflineCacheManager @Inject constructor(
                     break
                 }
 
+                val trackId = downloadQueue.poll()
+                if (trackId == null) {
+                    semaphore.release()
+                    break
+                }
+
                 jobs += launch {
-                    semaphore.acquire()
                     try {
                         downloadSingleTrack(trackId)
                     } finally {

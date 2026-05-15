@@ -1021,7 +1021,7 @@ private fun OfflineCacheSection(viewModel: SettingsViewModel) {
 
                 // Storage limit dropdown
                 var expanded by remember { mutableStateOf(false) }
-                val limitOptions = listOf(2048, 5120, 10240, 20480, 51200, 0)
+                val limitOptions = listOf(256, 512, 1024, 2048, 5120, 10240, 20480, 51200, 0)
                 val limitLabel = when {
                     offlineStorageLimitMb == 0 -> "No limit"
                     offlineStorageLimitMb < 1024 -> "${offlineStorageLimitMb} MB"
