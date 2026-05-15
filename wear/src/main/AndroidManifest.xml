@@ -50,6 +50,15 @@
         </service>
 
         <service
+            android:name=".data.pair.PairingDataListener"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/zonik/pair" />
+            </intent-filter>
+        </service>
+
+        <service
             android:name=".tile.NowPlayingTileService"
             android:exported="true"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">

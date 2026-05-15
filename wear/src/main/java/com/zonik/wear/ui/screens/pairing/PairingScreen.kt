@@ -1,6 +1,7 @@
 package com.zonik.wear.ui.screens.pairing
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -66,11 +67,49 @@ fun PairingScreen(
 
 @Composable
 private fun EnterUrl(state: PairingState.EnterUrl, viewModel: PairingViewModel) {
+    var manualEntryOpen by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf(state.url) }
-    Text(
-        text = "Zonik",
-        style = MaterialTheme.typography.title2,
-    )
+
+    if (!manualEntryOpen) {
+        // Default path — wait for the phone app to push ServerConfig over
+        // the Wear Data Layer. WearNavHost's serverConfig observer routes
+        // us out automatically as soon as PairingDataListener saves it.
+        Text(
+            text = "Zonik",
+            style = MaterialTheme.typography.title2,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Open Zonik on your phone → Settings → Wear OS → Send",
+            style = MaterialTheme.typography.caption2,
+            color = MaterialTheme.colors.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (state.error != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = state.error,
+                style = MaterialTheme.typography.caption2,
+                color = MaterialTheme.colors.error,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "or enter URL manually",
+            style = MaterialTheme.typography.caption3,
+            color = MaterialTheme.colors.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { manualEntryOpen = true },
+            textAlign = TextAlign.Center,
+        )
+        return
+    }
+
+    // Manual fallback — kept for setups without a paired phone, or if
+    // BT is off and the user wants to use the code flow.
     Text(
         text = "Server URL",
         style = MaterialTheme.typography.caption1,

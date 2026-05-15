@@ -16,6 +16,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 data class LibraryStats(
@@ -59,6 +60,7 @@ data class SettingsUiState(
 @androidx.annotation.OptIn(UnstableApi::class)
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: Context,
     private val settingsRepository: SettingsRepository,
     private val libraryRepository: LibraryRepository,
     private val updateChecker: UpdateChecker,
@@ -68,6 +70,55 @@ class SettingsViewModel @Inject constructor(
     private val playbackManager: PlaybackManager,
     private val offlineCacheManager: com.zonik.app.media.OfflineCacheManager
 ) : ViewModel() {
+
+    private val _wearPairStatus = MutableStateFlow<String?>(null)
+    val wearPairStatus: StateFlow<String?> = _wearPairStatus.asStateFlow()
+
+    fun pairWatch() {
+        viewModelScope.launch {
+            _wearPairStatus.value = "Looking for watch…"
+            try {
+                val config = settingsRepository.serverConfig.first()
+                if (config == null) {
+                    _wearPairStatus.value = "Log in first"
+                    return@launch
+                }
+                val nodeClient = com.google.android.gms.wearable.Wearable.getNodeClient(appContext)
+                val nodes: List<com.google.android.gms.wearable.Node> = try {
+                    nodeClient.connectedNodes.await()
+                } catch (e: Exception) {
+                    _wearPairStatus.value = "Couldn't reach watch: ${e.message}"
+                    return@launch
+                }
+                val reachable = nodes.filter { it.isNearby }
+                val target = reachable.firstOrNull() ?: nodes.firstOrNull()
+                if (target == null) {
+                    _wearPairStatus.value = "No watch paired (open the Wear OS app first)"
+                    return@launch
+                }
+                val payload = kotlinx.serialization.json.Json.encodeToString(
+                    WirePairPayload.serializer(),
+                    WirePairPayload(
+                        url = config.url,
+                        username = config.username,
+                        apiKey = config.apiKey,
+                    )
+                ).toByteArray(Charsets.UTF_8)
+                val messageClient = com.google.android.gms.wearable.Wearable.getMessageClient(appContext)
+                messageClient.sendMessage(target.id, "/zonik/pair", payload).await()
+                _wearPairStatus.value = "Sent to ${target.displayName}"
+            } catch (e: Exception) {
+                _wearPairStatus.value = "Send failed: ${e.message}"
+            }
+        }
+    }
+
+    @kotlinx.serialization.Serializable
+    private data class WirePairPayload(
+        val url: String,
+        val username: String,
+        val apiKey: String,
+    )
 
     private val _isUploadingLogsToServer = MutableStateFlow(false)
     val isUploadingLogsToServer: StateFlow<Boolean> = _isUploadingLogsToServer.asStateFlow()

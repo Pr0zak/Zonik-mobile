@@ -29,6 +29,7 @@ wear-compose = "1.4.0"
 horologist = "0.6.20"
 wear-tiles = "1.4.1"
 wear-watchface-complications = "1.2.1"
+play-services-wearable = "18.2.0"
 
 [libraries]
 # AndroidX Core
@@ -104,6 +105,8 @@ work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref
 
 # Cast
 google-cast = { group = "com.google.android.gms", name = "play-services-cast-framework", version.ref = "cast" }
+play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "play-services-wearable" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
 androidx-mediarouter = { group = "androidx.mediarouter", name = "mediarouter", version.ref = "mediarouter" }
 
 # Browser (CustomTabs)

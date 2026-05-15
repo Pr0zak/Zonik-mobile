@@ -114,4 +114,7 @@ dependencies {
 
     // Complications
     implementation(libs.wear.watchface.complications)
+
+    // Wear Data Layer — receive ServerConfig from a paired phone
+    implementation(libs.play.services.wearable)
 }

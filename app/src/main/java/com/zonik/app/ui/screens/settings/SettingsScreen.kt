@@ -314,6 +314,10 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "Android Auto")
             AutoTabOrderSection(viewModel = viewModel)
 
+            // Wear OS section — push ServerConfig to a paired watch
+            SettingsSectionHeader(title = "Wear OS")
+            WearPairSection(viewModel = viewModel)
+
             // Debug logs section
             SettingsSectionHeader(title = "Debug")
             DebugLogsSection(viewModel = viewModel)
@@ -670,6 +674,46 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun WearPairSection(viewModel: SettingsViewModel) {
+    val status by viewModel.wearPairStatus.collectAsState()
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = ZonikShapes.cardShape,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C2A))
+    ) {
+        Column {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text("Pair Wear watch") },
+                supportingContent = {
+                    Text(
+                        status ?: "Push this phone's server config to a paired watch over Bluetooth"
+                    )
+                },
+                leadingContent = {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.Default.Watch, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                },
+                trailingContent = {
+                    Button(onClick = viewModel::pairWatch) {
+                        Text("Send")
+                    }
+                }
+            )
         }
     }
 }
