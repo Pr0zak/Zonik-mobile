@@ -17,6 +17,8 @@ import com.zonik.wear.ui.screens.NowPlayingScreen
 import com.zonik.wear.ui.screens.QueueScreen
 import com.zonik.wear.ui.screens.pairing.PairingScreen
 import com.zonik.wear.ui.screens.pairing.PairingViewModel
+import com.zonik.wear.ui.screens.settings.WearSettingsScreen
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 
 object WearRoutes {
@@ -25,6 +27,7 @@ object WearRoutes {
     const val BROWSE = "browse"
     const val BROWSE_CHILDREN = "browse_children/{parentId}"
     const val QUEUE = "queue"
+    const val SETTINGS = "settings"
 
     fun browseChildren(parentId: String) = "browse_children/$parentId"
 }
@@ -37,6 +40,24 @@ fun WearNavHost(mediaManager: WearMediaManager) {
     val serverConfig by app.settings.serverConfig.collectAsStateWithLifecycle(initialValue = null)
     // Once we have a ServerConfig the pairing screen is no longer relevant.
     val startDestination = if (serverConfig == null) WearRoutes.PAIRING else WearRoutes.NOW_PLAYING
+
+    // React to runtime config changes — re-pair from Settings sends us back
+    // to the pairing screen; a successful pair takes us out of it.
+    LaunchedEffect(serverConfig) {
+        val current = navController.currentDestination?.route
+        when {
+            serverConfig == null && current != WearRoutes.PAIRING -> {
+                navController.navigate(WearRoutes.PAIRING) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+            serverConfig != null && current == WearRoutes.PAIRING -> {
+                navController.navigate(WearRoutes.NOW_PLAYING) {
+                    popUpTo(WearRoutes.PAIRING) { inclusive = true }
+                }
+            }
+        }
+    }
 
     SwipeDismissableNavHost(
         navController = navController,
@@ -58,7 +79,8 @@ fun WearNavHost(mediaManager: WearMediaManager) {
             NowPlayingScreen(
                 mediaManager = mediaManager,
                 onBrowseClick = { navController.navigate(WearRoutes.BROWSE) },
-                onQueueClick = { navController.navigate(WearRoutes.QUEUE) }
+                onQueueClick = { navController.navigate(WearRoutes.QUEUE) },
+                onSettingsClick = { navController.navigate(WearRoutes.SETTINGS) },
             )
         }
 
@@ -87,6 +109,18 @@ fun WearNavHost(mediaManager: WearMediaManager) {
 
         composable(WearRoutes.QUEUE) {
             QueueScreen(mediaManager = mediaManager)
+        }
+
+        composable(WearRoutes.SETTINGS) {
+            WearSettingsScreen(
+                onRePair = {
+                    // Config is already cleared; the LaunchedEffect above
+                    // will route us back to PAIRING. We also pop the
+                    // settings entry off the back stack so swipe-dismiss
+                    // doesn't land back here.
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }

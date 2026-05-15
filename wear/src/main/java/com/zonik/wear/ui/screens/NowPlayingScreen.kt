@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -55,7 +56,8 @@ import com.zonik.wear.ui.components.WearCoverArt
 fun NowPlayingScreen(
     mediaManager: WearMediaManager,
     onBrowseClick: () -> Unit,
-    onQueueClick: () -> Unit
+    onQueueClick: () -> Unit,
+    onSettingsClick: () -> Unit,
 ) {
     val connectionState by mediaManager.connectionState.collectAsState()
     val currentItem by mediaManager.currentMediaItem.collectAsState()
@@ -268,6 +270,17 @@ fun NowPlayingScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                             contentDescription = "Queue",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    CompactButton(
+                        onClick = onSettingsClick,
+                        colors = ButtonDefaults.secondaryButtonColors()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = "Settings",
                             modifier = Modifier.size(16.dp)
                         )
                     }
