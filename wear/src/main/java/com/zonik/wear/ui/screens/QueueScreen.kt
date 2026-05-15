@@ -17,18 +17,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.Icon
-import androidx.wear.compose.material.ListHeader
-import androidx.wear.compose.material.MaterialTheme
-import androidx.wear.compose.material.Text
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.Text
 import com.zonik.wear.media.WearMediaManager
 import kotlinx.coroutines.launch
 
@@ -39,91 +40,80 @@ fun QueueScreen(mediaManager: WearMediaManager) {
 
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
-    val coroutineScope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
-    // Auto-scroll to current track
     LaunchedEffect(currentIndex) {
-        if (currentIndex >= 0) {
-            // +1 to account for the header item
-            listState.scrollToItem(currentIndex + 1)
-        }
+        if (currentIndex >= 0) listState.scrollToItem(currentIndex + 1)
     }
 
-    ScalingLazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .onRotaryScrollEvent { event ->
-                coroutineScope.launch {
-                    listState.scrollBy(event.verticalScrollPixels)
+    ScreenScaffold(scrollState = listState) { contentPadding ->
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
                 }
-                true
-            }
-            .focusRequester(focusRequester)
-            .focusable(),
-        state = listState
-    ) {
-        item {
-            ListHeader {
-                Text(
-                    text = "Queue (${queue.size})",
-                    color = MaterialTheme.colors.primary
-                )
-            }
-        }
-
-        if (queue.isEmpty()) {
+                .focusRequester(focusRequester)
+                .focusable(),
+            contentPadding = contentPadding,
+        ) {
             item {
-                Text(
-                    "Queue is empty",
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                )
+                ListHeader {
+                    Text("Queue (${queue.size})", color = MaterialTheme.colorScheme.primary)
+                }
             }
-        } else {
-            itemsIndexed(queue, key = { index, item -> "${index}_${item.mediaId}" }) { index, item ->
-                val isCurrent = index == currentIndex
-                val meta = item.mediaMetadata
 
-                Chip(
-                    onClick = { mediaManager.skipToIndex(index) },
-                    label = {
-                        Text(
-                            text = meta.title?.toString() ?: "Track ${index + 1}",
-                            maxLines = 1,
-                            color = if (isCurrent) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface
+            if (queue.isEmpty()) {
+                item {
+                    Text(
+                        "Queue is empty",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                itemsIndexed(queue, key = { index, item -> "${index}_${item.mediaId}" }) { index, item ->
+                    val isCurrent = index == currentIndex
+                    val meta = item.mediaMetadata
+                    val title = meta.title?.toString() ?: "Track ${index + 1}"
+                    val artistText = meta.artist?.toString()
+
+                    if (isCurrent) {
+                        Button(
+                            onClick = { mediaManager.skipToIndex(index) },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            label = { Text(title, maxLines = 1) },
+                            secondaryLabel = artistText?.let { { Text(it, maxLines = 1) } },
+                            colors = ButtonDefaults.buttonColors(),
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                    },
-                    secondaryLabel = meta.artist?.toString()?.let { artist ->
-                        {
-                            Text(
-                                text = artist,
-                                maxLines = 1,
-                                color = if (isCurrent)
-                                    MaterialTheme.colors.primary.copy(alpha = 0.7f)
-                                else
-                                    MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = if (isCurrent) Icons.Default.PlayArrow else Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = if (isCurrent) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    colors = if (isCurrent) {
-                        ChipDefaults.gradientBackgroundChipColors()
                     } else {
-                        ChipDefaults.secondaryChipColors()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                        FilledTonalButton(
+                            onClick = { mediaManager.skipToIndex(index) },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            label = { Text(title, maxLines = 1) },
+                            secondaryLabel = artistText?.let { { Text(it, maxLines = 1) } },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
         }
     }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 }

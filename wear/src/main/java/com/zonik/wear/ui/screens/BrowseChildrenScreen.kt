@@ -24,12 +24,12 @@ import androidx.media3.common.MediaItem
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.Icon
-import androidx.wear.compose.material.ListHeader
-import androidx.wear.compose.material.MaterialTheme
-import androidx.wear.compose.material.Text
+import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.Text
 import com.zonik.wear.media.ConnectionState
 import com.zonik.wear.media.WearMediaManager
 import com.zonik.wear.ui.components.ConnectionBanner
@@ -42,7 +42,7 @@ import kotlinx.coroutines.withContext
 fun BrowseChildrenScreen(
     mediaManager: WearMediaManager,
     parentId: String,
-    onNodeClick: (String) -> Unit
+    onNodeClick: (String) -> Unit,
 ) {
     val connectionState by mediaManager.connectionState.collectAsState()
     var children by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
@@ -51,15 +51,12 @@ fun BrowseChildrenScreen(
 
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
-    val coroutineScope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(parentId, connectionState) {
         if (connectionState == ConnectionState.Connected) {
             isLoading = true
-            children = withContext(Dispatchers.IO) {
-                mediaManager.getChildren(parentId)
-            }
-            // Derive parent title from parentId
+            children = withContext(Dispatchers.IO) { mediaManager.getChildren(parentId) }
             parentTitle = parentId
                 .removePrefix("artist:")
                 .removePrefix("album:")
@@ -70,101 +67,90 @@ fun BrowseChildrenScreen(
         }
     }
 
-    ScalingLazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .onRotaryScrollEvent { event ->
-                coroutineScope.launch {
-                    listState.scrollBy(event.verticalScrollPixels)
+    ScreenScaffold(scrollState = listState) { contentPadding ->
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
                 }
-                true
-            }
-            .focusRequester(focusRequester)
-            .focusable(),
-        state = listState
-    ) {
-        item {
-            ConnectionBanner(state = connectionState)
-        }
+                .focusRequester(focusRequester)
+                .focusable(),
+            contentPadding = contentPadding,
+        ) {
+            item { ConnectionBanner(state = connectionState) }
 
-        item {
-            ListHeader {
-                Text(
-                    text = parentTitle,
-                    color = MaterialTheme.colors.primary,
-                    maxLines = 1
-                )
-            }
-        }
-
-        if (isLoading) {
             item {
-                Text(
-                    "Loading...",
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                )
+                ListHeader {
+                    Text(
+                        text = parentTitle,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                    )
+                }
             }
-        } else if (children.isEmpty()) {
-            item {
-                Text(
-                    "No items",
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                )
-            }
-        } else {
-            items(children, key = { it.mediaId }) { item ->
-                val meta = item.mediaMetadata
-                val isBrowsable = meta.isBrowsable == true
-                val hasArt = meta.artworkUri != null
 
-                Chip(
-                    onClick = {
-                        if (isBrowsable) {
-                            onNodeClick(item.mediaId)
-                        } else {
-                            // Tapping a track inside an album/playlist queues the
-                            // whole list and starts from the tapped index — the
-                            // MediaItems we received from getChildren already carry
-                            // playable URIs from ZonikWearMediaService.
-                            val playableContext = children.filter { it.mediaMetadata.isPlayable == true }
-                            val startIdx = playableContext.indexOfFirst { it.mediaId == item.mediaId }
-                                .coerceAtLeast(0)
-                            mediaManager.playMediaItems(playableContext, startIdx)
-                        }
-                    },
-                    label = {
-                        Text(
-                            text = meta.title?.toString() ?: item.mediaId,
-                            maxLines = 1
-                        )
-                    },
-                    secondaryLabel = (meta.subtitle ?: meta.artist)?.toString()?.let { sub ->
-                        { Text(text = sub, maxLines = 1) }
-                    },
-                    icon = if (hasArt) {
-                        {
-                            WearCoverArt(
-                                mediaItem = item,
-                                size = 32.dp
+            if (isLoading) {
+                item {
+                    Text(
+                        "Loading…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else if (children.isEmpty()) {
+                item {
+                    Text(
+                        "No items",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                items(children, key = { it.mediaId }) { item ->
+                    val meta = item.mediaMetadata
+                    val isBrowsable = meta.isBrowsable == true
+                    val hasArt = meta.artworkUri != null
+
+                    FilledTonalButton(
+                        onClick = {
+                            if (isBrowsable) {
+                                onNodeClick(item.mediaId)
+                            } else {
+                                val playableContext = children.filter { it.mediaMetadata.isPlayable == true }
+                                val startIdx = playableContext.indexOfFirst { it.mediaId == item.mediaId }
+                                    .coerceAtLeast(0)
+                                mediaManager.playMediaItems(playableContext, startIdx)
+                            }
+                        },
+                        icon = when {
+                            hasArt -> { -> WearCoverArt(mediaItem = item, size = 32.dp) }
+                            !isBrowsable -> { ->
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            else -> null
+                        },
+                        label = {
+                            Text(
+                                text = meta.title?.toString() ?: item.mediaId,
+                                maxLines = 1,
                             )
-                        }
-                    } else if (!isBrowsable) {
-                        {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    } else null,
-                    colors = ChipDefaults.secondaryChipColors(),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                        },
+                        secondaryLabel = (meta.subtitle ?: meta.artist)?.toString()?.let { sub ->
+                            { Text(text = sub, maxLines = 1) }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 }

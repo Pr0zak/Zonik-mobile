@@ -2,12 +2,13 @@ package com.zonik.wear.ui.screens
 
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.automirrored.filled.FeaturedPlayList
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.runtime.Composable
@@ -28,12 +29,12 @@ import androidx.media3.common.MediaItem
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.Icon
-import androidx.wear.compose.material.ListHeader
-import androidx.wear.compose.material.MaterialTheme
-import androidx.wear.compose.material.Text
+import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.Text
 import com.zonik.wear.media.ConnectionState
 import com.zonik.wear.media.WearMediaManager
 import com.zonik.wear.ui.components.ConnectionBanner
@@ -44,7 +45,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun BrowseScreen(
     mediaManager: WearMediaManager,
-    onNodeClick: (String) -> Unit
+    onNodeClick: (String) -> Unit,
 ) {
     val connectionState by mediaManager.connectionState.collectAsState()
     var rootChildren by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
@@ -52,89 +53,71 @@ fun BrowseScreen(
 
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
-    val coroutineScope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(connectionState) {
         if (connectionState == ConnectionState.Connected) {
             isLoading = true
-            rootChildren = withContext(Dispatchers.IO) {
-                mediaManager.getChildren("root")
-            }
+            rootChildren = withContext(Dispatchers.IO) { mediaManager.getChildren("root") }
             isLoading = false
         }
     }
 
-    ScalingLazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .onRotaryScrollEvent { event ->
-                coroutineScope.launch {
-                    listState.scrollBy(event.verticalScrollPixels)
+    ScreenScaffold(scrollState = listState) { contentPadding ->
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
                 }
-                true
-            }
-            .focusRequester(focusRequester)
-            .focusable(),
-        state = listState
-    ) {
-        item {
-            ConnectionBanner(state = connectionState)
-        }
-
-        item {
-            ListHeader {
-                Text("Browse", color = MaterialTheme.colors.primary)
-            }
-        }
-
-        if (isLoading && connectionState == ConnectionState.Connected) {
+                .focusRequester(focusRequester)
+                .focusable(),
+            contentPadding = contentPadding,
+        ) {
             item {
-                Text(
-                    "Loading...",
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                )
+                ConnectionBanner(state = connectionState)
             }
-        } else {
-            items(rootChildren, key = { it.mediaId }) { item ->
-                val icon = iconForBrowseNode(item.mediaId)
-                Chip(
-                    onClick = {
-                        val meta = item.mediaMetadata
-                        if (meta.isBrowsable == true) {
-                            onNodeClick(item.mediaId)
-                        } else {
-                            // Playable item (e.g. shuffle mix) — play it
-                            mediaManager.playFromMediaId(item.mediaId)
-                        }
-                    },
-                    label = {
-                        Text(
-                            text = item.mediaMetadata.title?.toString() ?: item.mediaId,
-                            maxLines = 1
-                        )
-                    },
-                    secondaryLabel = item.mediaMetadata.subtitle?.toString()?.let { subtitle ->
-                        { Text(text = subtitle, maxLines = 1) }
-                    },
-                    icon = icon?.let { iv ->
-                        {
-                            Icon(
-                                imageVector = iv,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
+
+            item {
+                ListHeader { Text("Browse", color = MaterialTheme.colorScheme.primary) }
+            }
+
+            if (isLoading && connectionState == ConnectionState.Connected) {
+                item {
+                    Text(
+                        "Loading…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                items(rootChildren, key = { it.mediaId }) { item ->
+                    val meta = item.mediaMetadata
+                    val icon = iconForBrowseNode(item.mediaId)
+                    FilledTonalButton(
+                        onClick = {
+                            if (meta.isBrowsable == true) onNodeClick(item.mediaId)
+                            else mediaManager.playFromMediaId(item.mediaId)
+                        },
+                        icon = icon?.let { iv ->
+                            { Icon(imageVector = iv, contentDescription = null, modifier = Modifier.size(20.dp)) }
+                        },
+                        label = {
+                            Text(
+                                text = meta.title?.toString() ?: item.mediaId,
+                                maxLines = 1,
                             )
-                        }
-                    },
-                    colors = ChipDefaults.secondaryChipColors(),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 }
 
 private fun iconForBrowseNode(mediaId: String): ImageVector? = when (mediaId) {

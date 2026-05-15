@@ -74,8 +74,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
 
-    // Wear Compose
-    implementation(libs.wear.compose.material)
+    // Wear Compose — Material 3 for Pixel Watch 3 design language
+    implementation(libs.wear.compose.material3)
     implementation(libs.wear.compose.foundation)
     implementation(libs.wear.compose.navigation)
 

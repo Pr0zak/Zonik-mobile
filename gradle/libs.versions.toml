@@ -25,7 +25,7 @@ core-ktx = "1.15.0"
 core-splashscreen = "1.0.1"
 appcompat = "1.7.0"
 tv-material = "1.0.0"
-wear-compose = "1.4.0"
+wear-compose = "1.6.1"
 horologist = "0.6.20"
 wear-tiles = "1.4.1"
 wear-watchface-complications = "1.2.1"
@@ -119,6 +119,7 @@ security-crypto = { group = "androidx.security", name = "security-crypto", versi
 wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wear-compose" }
 wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wear-compose" }
 wear-compose-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wear-compose" }
+wear-compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "wear-compose" }
 horologist-compose-layout = { group = "com.google.android.horologist", name = "horologist-compose-layout", version.ref = "horologist" }
 horologist-compose-material = { group = "com.google.android.horologist", name = "horologist-compose-material", version.ref = "horologist" }
 horologist-media-ui = { group = "com.google.android.horologist", name = "horologist-media-ui", version.ref = "horologist" }

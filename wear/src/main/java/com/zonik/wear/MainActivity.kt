@@ -43,7 +43,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ZonikWearTheme {
-                WearNavHost(mediaManager = mediaManager)
+                androidx.wear.compose.material3.AppScaffold {
+                    WearNavHost(mediaManager = mediaManager)
+                }
             }
         }
     }
