@@ -47,6 +47,9 @@ import androidx.wear.compose.material.CompactButton
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zonik.wear.WearApp
 import com.zonik.wear.media.ConnectionState
 import com.zonik.wear.media.WearMediaManager
 import com.zonik.wear.ui.components.ConnectionBanner
@@ -59,6 +62,8 @@ fun NowPlayingScreen(
     onQueueClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
+    val app = LocalContext.current.applicationContext as WearApp
+    val hasInternet by app.networkMonitor.hasInternet.collectAsStateWithLifecycle()
     val connectionState by mediaManager.connectionState.collectAsState()
     val currentItem by mediaManager.currentMediaItem.collectAsState()
     val isPlaying by mediaManager.isPlaying.collectAsState()
@@ -119,6 +124,19 @@ fun NowPlayingScreen(
         ) {
             // Connection banner
             ConnectionBanner(state = connectionState)
+
+            // No Wi-Fi / no LTE — surface it before the user wonders why
+            // streams hang. Bluetooth-tether-only doesn't qualify here.
+            if (!hasInternet) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Connect to Wi-Fi or LTE to stream",
+                    fontSize = 10.sp,
+                    color = Color(0xFFE57373),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             if (!hasTrack && connectionState == ConnectionState.Connected) {
                 // No track playing — show browse prompt

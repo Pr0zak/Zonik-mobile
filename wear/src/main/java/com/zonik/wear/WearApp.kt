@@ -2,6 +2,7 @@ package com.zonik.wear
 
 import android.app.Application
 import com.zonik.core.api.ServerConfigProvider
+import com.zonik.wear.data.NetworkMonitor
 import com.zonik.wear.data.api.WearNetwork
 import com.zonik.wear.data.repository.WearLibraryRepository
 import com.zonik.wear.data.repository.WearSettingsRepository
@@ -23,11 +24,16 @@ class WearApp : Application() {
 
     val library: WearLibraryRepository by lazy { WearLibraryRepository(subsonicApi, settings) }
 
+    val networkMonitor: NetworkMonitor by lazy { NetworkMonitor(this) }
+
     lateinit var mediaManager: WearMediaManager
         private set
 
     override fun onCreate() {
         super.onCreate()
         mediaManager = WearMediaManager(this)
+        // Eager-init so the StateFlow is hot by the time the first composable
+        // collects it — saves an awkward "Unknown" flash on cold launch.
+        networkMonitor
     }
 }
