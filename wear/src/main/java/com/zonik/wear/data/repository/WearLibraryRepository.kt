@@ -44,6 +44,46 @@ class WearLibraryRepository(
         return env.playlists?.playlist.orEmpty().map { it.toDomain() }
     }
 
+    /** Random songs across the whole library — for the Quick Mix button. */
+    suspend fun getRandomSongs(size: Int = 50): List<Track> {
+        val env = api.getRandomSongs(size = size).response
+        return env.randomSongs?.song.orEmpty().map { it.toDomain() }
+    }
+
+    /**
+     * Build a fully-formed playable MediaItem for a track. Used by features
+     * that queue tracks outside of the BrowseTreeCallback path (Quick Mix,
+     * "play similar", etc.).
+     */
+    suspend fun buildPlayableMediaItem(
+        track: Track,
+        maxBitRate: Int? = null,
+    ): androidx.media3.common.MediaItem? {
+        val streamUrl = buildStreamUrl(track.id, maxBitRate) ?: return null
+        val artworkUri = track.coverArt?.let { buildCoverArtUrl(it, size = 200) }
+            ?.let { android.net.Uri.parse(it) }
+        val metadata = androidx.media3.common.MediaMetadata.Builder()
+            .setTitle(track.title)
+            .setArtist(track.artist)
+            .setAlbumTitle(track.album)
+            .setTrackNumber(track.track)
+            .setArtworkUri(artworkUri)
+            .setIsBrowsable(false)
+            .setIsPlayable(true)
+            .setMediaType(androidx.media3.common.MediaMetadata.MEDIA_TYPE_MUSIC)
+            .build()
+        return androidx.media3.common.MediaItem.Builder()
+            .setMediaId(track.id)
+            .setUri(streamUrl)
+            .setRequestMetadata(
+                androidx.media3.common.MediaItem.RequestMetadata.Builder()
+                    .setMediaUri(android.net.Uri.parse(streamUrl))
+                    .build()
+            )
+            .setMediaMetadata(metadata)
+            .build()
+    }
+
     suspend fun getPlaylistTracks(playlistId: String): List<Track> {
         val env = api.getPlaylist(playlistId).response
         return env.playlist?.entry.orEmpty().map { it.toDomain() }

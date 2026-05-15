@@ -19,7 +19,9 @@ class MainActivity : ComponentActivity() {
 
         val app = application as WearApp
         mediaManager = app.mediaManager
-        mediaManager.connect()
+        // WearApp.onCreate already called connect() — don't re-trigger here,
+        // and DON'T call disconnect on destroy. The MediaController is
+        // app-scoped so it survives screen-off / ambient / activity restart.
 
         // Phase 1.2 probe — proves the wear data layer wires up against the
         // configured Zonik server. Replaced by real UI in Phase 3.
@@ -50,10 +52,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        mediaManager.disconnect()
-    }
+    // No onDestroy override — the MediaController lives on the WearApp.
+    // Leaving it bound across activity restarts means the user comes back to
+    // a working browser instead of waiting for a re-bind.
 
     private companion object {
         const val TAG = "WearMain"

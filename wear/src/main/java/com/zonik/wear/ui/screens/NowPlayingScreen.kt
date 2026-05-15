@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
@@ -26,6 +27,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -76,6 +81,7 @@ fun NowPlayingScreen(
 
     val focusRequester = remember { FocusRequester() }
     val view = LocalView.current
+    val scope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
         mediaManager.setPollingInterval(200L)
@@ -136,7 +142,23 @@ fun NowPlayingScreen(
                 }
 
                 if (!hasTrack && connectionState == ConnectionState.Connected) {
-                    EmptyState(onBrowseClick = onBrowseClick, onSettingsClick = onSettingsClick)
+                    EmptyState(
+                        onBrowseClick = onBrowseClick,
+                        onSettingsClick = onSettingsClick,
+                        onQuickMixClick = {
+                            scope.launch {
+                                try {
+                                    val items = withContext(Dispatchers.IO) {
+                                        app.library.getRandomSongs(size = 50)
+                                            .mapNotNull { app.library.buildPlayableMediaItem(it) }
+                                    }
+                                    if (items.isNotEmpty()) mediaManager.playMediaItems(items, 0)
+                                } catch (e: Exception) {
+                                    android.util.Log.w("NowPlayingScreen", "Quick Mix failed: ${e.message}", e)
+                                }
+                            }
+                        },
+                    )
                 } else if (hasTrack) {
                     WearCoverArt(mediaItem = currentItem, size = 72.dp)
 
@@ -193,7 +215,11 @@ fun NowPlayingScreen(
 }
 
 @Composable
-private fun EmptyState(onBrowseClick: () -> Unit, onSettingsClick: () -> Unit) {
+private fun EmptyState(
+    onBrowseClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onQuickMixClick: () -> Unit,
+) {
     Text(
         text = "Zonik",
         style = MaterialTheme.typography.titleLarge,
@@ -202,13 +228,23 @@ private fun EmptyState(onBrowseClick: () -> Unit, onSettingsClick: () -> Unit) {
     )
     Spacer(Modifier.height(10.dp))
     Button(
-        onClick = onBrowseClick,
+        onClick = onQuickMixClick,
         colors = ButtonDefaults.buttonColors(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(6.dp))
+        Text("Quick Mix")
+    }
+    Spacer(Modifier.height(4.dp))
+    Button(
+        onClick = onBrowseClick,
+        colors = ButtonDefaults.filledTonalButtonColors(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(Icons.Outlined.LibraryMusic, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.size(6.dp))
-        Text("Browse music")
+        Text("Browse")
     }
     Spacer(Modifier.height(4.dp))
     Button(

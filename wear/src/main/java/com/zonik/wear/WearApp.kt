@@ -32,6 +32,10 @@ class WearApp : Application() {
     override fun onCreate() {
         super.onCreate()
         mediaManager = WearMediaManager(this)
+        // App-scoped MediaController bind. Keeping the connection out of the
+        // Activity lifecycle means rotating / ambient / pausing won't tear
+        // down an in-progress bind ("Task was cancelled" symptoms).
+        mediaManager.connect()
         // Eager-init so the StateFlow is hot by the time the first composable
         // collects it — saves an awkward "Unknown" flash on cold launch.
         networkMonitor
