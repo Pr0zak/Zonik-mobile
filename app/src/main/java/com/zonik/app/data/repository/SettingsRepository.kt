@@ -96,17 +96,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    val githubToken: Flow<String?> = dataStore.data.map { prefs ->
-        prefs[GITHUB_TOKEN]
-    }
-
-    suspend fun setGithubToken(token: String?) {
-        dataStore.edit { prefs ->
-            if (token != null) prefs[GITHUB_TOKEN] = token
-            else prefs.remove(GITHUB_TOKEN)
-        }
-    }
-
     val audioCacheSizeMb: Flow<Int> = dataStore.data.map { prefs ->
         prefs[AUDIO_CACHE_SIZE_MB] ?: 500
     }
@@ -171,7 +160,6 @@ class SettingsRepository @Inject constructor(
         private val WIFI_ONLY = booleanPreferencesKey("wifi_only")
         private val SCROBBLING_ENABLED = booleanPreferencesKey("scrobbling_enabled")
         private val LASTFM_SESSION_KEY = stringPreferencesKey("lastfm_session_key")
-        private val GITHUB_TOKEN = stringPreferencesKey("github_token")
         private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         private val ADAPTIVE_BITRATE = booleanPreferencesKey("adaptive_bitrate")
         private val AUDIO_CACHE_SIZE_MB = intPreferencesKey("audio_cache_size_mb")

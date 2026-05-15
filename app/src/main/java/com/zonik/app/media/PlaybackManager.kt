@@ -112,13 +112,8 @@ class PlaybackManager @Inject constructor(
     private val _playbackRequested = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val playbackRequested: Flow<Unit> = _playbackRequested
 
-    // Scrobble tracking — scrobble once when track plays >50%
-    private var scrobbledTrackId: String? = null
-    // Pending scrobbles that failed due to network — retried when network returns.
-    // Each entry captures the trackId plus the playback timestamp (epoch ms) so the
-    // original listen time survives until the server accepts it.
-    private val pendingScrobbles = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, Long>>()
-    // Throttle position saves to every 10 seconds
+    // Throttle position saves to every 10 seconds. Scrobbles + now-playing are
+    // handled in ZonikMediaService so they fire whether or not the UI is visible.
     @Volatile private var lastPositionSaveTime = 0L
 
     suspend fun connect() {
@@ -511,11 +506,11 @@ class PlaybackManager @Inject constructor(
     fun getCurrentPosition(): Long {
         if (castManager.isCasting.value) {
             val pos = castManager.getCurrentPosition()
-            checkScrobble(pos)
+            maybePersistPosition()
             return pos
         }
         val pos = controller?.currentPosition ?: 0L
-        checkScrobble(pos)
+        maybePersistPosition()
         return pos
     }
 
@@ -524,29 +519,13 @@ class PlaybackManager @Inject constructor(
         return controller?.duration ?: 0L
     }
 
-    private fun checkScrobble(positionMs: Long) {
-        val track = _currentTrack.value ?: return
-        // Periodically save position for resume (every 10s)
+    private fun maybePersistPosition() {
+        if (_currentTrack.value == null) return
+        // Periodically save position for resume (every 10s).
         val now = System.currentTimeMillis()
         if (now - lastPositionSaveTime > 10_000) {
             lastPositionSaveTime = now
             savePositionNow()
-        }
-        if (track.id == scrobbledTrackId) return
-        val duration = getDuration()
-        if (duration <= 0) return
-        if (positionMs > duration / 2) {
-            scrobbledTrackId = track.id
-            val capturedTime = System.currentTimeMillis()
-            scope.launch {
-                try {
-                    libraryRepository.scrobble(track.id, capturedTime)
-                    DebugLog.d("Playback", "Scrobbled: ${track.title}")
-                } catch (e: Exception) {
-                    DebugLog.w("Playback", "Scrobble queued (offline): ${track.title}")
-                    pendingScrobbles.add(track.id to capturedTime)
-                }
-            }
         }
     }
 
@@ -636,34 +615,10 @@ class PlaybackManager @Inject constructor(
     private fun setCurrentTrack(track: Track) {
         DebugLog.d("Playback", "Now playing: ${track.title} by ${track.artist}")
         _currentTrack.value = track
-        scrobbledTrackId = null
         addToRecentlyPlayed(track)
         persistPlaybackState()
-        // Send "now playing" scrobble to server + flush any pending scrobbles
-        scope.launch {
-            flushPendingScrobbles()
-            try {
-                libraryRepository.scrobbleNowPlaying(track.id)
-            } catch (_: Exception) { }
-        }
-    }
-
-    private suspend fun flushPendingScrobbles() {
-        if (pendingScrobbles.isEmpty()) return
-        val flushed = mutableListOf<String>()
-        while (pendingScrobbles.isNotEmpty()) {
-            val entry = pendingScrobbles.peek() ?: break
-            try {
-                libraryRepository.scrobble(entry.first, entry.second)
-                pendingScrobbles.poll()
-                flushed.add(entry.first)
-            } catch (_: Exception) {
-                break // Still offline, stop trying
-            }
-        }
-        if (flushed.isNotEmpty()) {
-            DebugLog.d("Playback", "Flushed ${flushed.size} pending scrobbles")
-        }
+        // ZonikMediaService posts now-playing + scrobbles via its own Player.Listener,
+        // so it fires whether or not the UI is visible (incl. Android Auto).
     }
 
     private fun persistPlaybackState() {

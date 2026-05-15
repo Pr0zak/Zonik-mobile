@@ -69,35 +69,11 @@ class SettingsViewModel @Inject constructor(
     private val offlineCacheManager: com.zonik.app.media.OfflineCacheManager
 ) : ViewModel() {
 
-    val githubToken = settingsRepository.githubToken
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    private val _logUploadUrl = MutableStateFlow<String?>(null)
-    val logUploadUrl: StateFlow<String?> = _logUploadUrl.asStateFlow()
-
-    private val _isUploadingLogs = MutableStateFlow(false)
-    val isUploadingLogs: StateFlow<Boolean> = _isUploadingLogs.asStateFlow()
-
     private val _isUploadingLogsToServer = MutableStateFlow(false)
     val isUploadingLogsToServer: StateFlow<Boolean> = _isUploadingLogsToServer.asStateFlow()
 
     private val _serverUploadResult = MutableStateFlow<String?>(null)
     val serverUploadResult: StateFlow<String?> = _serverUploadResult.asStateFlow()
-
-    fun setGithubToken(token: String) {
-        viewModelScope.launch {
-            settingsRepository.setGithubToken(token.ifBlank { null })
-        }
-    }
-
-    fun uploadLogs() {
-        viewModelScope.launch {
-            val token = githubToken.value ?: return@launch
-            _isUploadingLogs.value = true
-            _logUploadUrl.value = logUploader.uploadLogs(token)
-            _isUploadingLogs.value = false
-        }
-    }
 
     fun uploadLogsToServer() {
         viewModelScope.launch {

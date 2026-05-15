@@ -678,12 +678,8 @@ private fun UpdateSection(viewModel: SettingsViewModel) {
 private fun DebugLogsSection(viewModel: SettingsViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var copied by remember { mutableStateOf(false) }
-    val githubToken by viewModel.githubToken.collectAsState()
-    val isUploading by viewModel.isUploadingLogs.collectAsState()
-    val uploadUrl by viewModel.logUploadUrl.collectAsState()
     val isUploadingToServer by viewModel.isUploadingLogsToServer.collectAsState()
     val serverUploadResult by viewModel.serverUploadResult.collectAsState()
-    var showTokenDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -752,84 +748,6 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
             }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            if (githubToken == null) {
-                ListItem(
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    headlineContent = {
-                        OutlinedButton(onClick = { showTokenDialog = true }) {
-                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Set GitHub Token")
-                        }
-                    },
-                    supportingContent = {
-                        Text("Required for log upload. Create a token with 'gist' scope at GitHub Settings > Developer > Personal access tokens")
-                    }
-                )
-            } else {
-                ListItem(
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    headlineContent = {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Button(
-                                onClick = viewModel::uploadLogs,
-                                enabled = !isUploading
-                            ) {
-                                if (isUploading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                } else {
-                                    Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (isUploading) "Uploading..." else "Upload Logs")
-                            }
-                            TextButton(onClick = { showTokenDialog = true }) {
-                                Text("Token")
-                            }
-                        }
-                    }
-                )
-
-                if (uploadUrl != null) {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text("Logs uploaded") },
-                        supportingContent = {
-                            Text(
-                                text = uploadUrl!!,
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        },
-                        trailingContent = {
-                            IconButton(onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("Log URL", uploadUrl))
-                            }) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy URL")
-                            }
-                        }
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             ListItem(
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = {
@@ -856,42 +774,6 @@ private fun DebugLogsSection(viewModel: SettingsViewModel) {
         }
     }
 
-    if (showTokenDialog) {
-        var tokenInput by remember { mutableStateOf(githubToken ?: "") }
-        AlertDialog(
-            onDismissRequest = { showTokenDialog = false },
-            title = { Text("GitHub Token") },
-            text = {
-                Column {
-                    Text(
-                        "Create a Personal Access Token at GitHub with 'gist' scope. Logs are uploaded as private gists.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = tokenInput,
-                        onValueChange = { tokenInput = it },
-                        label = { Text("Token") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.setGithubToken(tokenInput)
-                    showTokenDialog = false
-                }) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTokenDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 }
 
 @Composable

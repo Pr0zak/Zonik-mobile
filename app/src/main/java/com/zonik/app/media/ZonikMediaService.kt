@@ -17,6 +17,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -74,6 +75,14 @@ class ZonikMediaService : MediaLibraryService() {
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
     private val starredTrackIds = mutableSetOf<String>()
     private val markedForDeletionIds = mutableSetOf<String>()
+    // Scrobble tracking — fires regardless of UI state so Android Auto plays count.
+    @Volatile private var scrobblePlayer: androidx.media3.exoplayer.ExoPlayer? = null
+    private val scrobbleMainScope = CoroutineScope(Dispatchers.Main + kotlinx.coroutines.SupervisorJob())
+    private val scrobbleIoScope = CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+    @Volatile private var scrobbledTrackId: String? = null
+    @Volatile private var nowPlayingPostedFor: String? = null
+    private var scrobblePollJob: Job? = null
+    private val pendingScrobbles = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, Long>>()
     private val toggleStarCommand = SessionCommand(ACTION_TOGGLE_STAR, Bundle.EMPTY)
     private val toggleDeleteCommand = SessionCommand(ACTION_TOGGLE_DELETE, Bundle.EMPTY)
     private val playTracksCommand = SessionCommand(ACTION_PLAY_TRACKS, Bundle.EMPTY)
@@ -279,6 +288,9 @@ class ZonikMediaService : MediaLibraryService() {
         sharedAudioSessionId = player.audioSessionId
         com.zonik.app.data.DebugLog.d("MediaService", "Audio session ID: ${player.audioSessionId}")
 
+        // Make the player visible to the scrobble helpers — needs main-thread reads.
+        scrobblePlayer = player
+
         // Network connectivity callback for auto-resume after connection loss
         val cm = getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
         networkAvailable = cm.activeNetwork != null
@@ -352,6 +364,15 @@ class ZonikMediaService : MediaLibraryService() {
                     || reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
                     preCacheUpcoming(player)
                 }
+                // New track is current — clear the "already scrobbled" flag and post now-playing.
+                if (trackId.isNotEmpty() && trackId != scrobbledTrackId) {
+                    scrobbledTrackId = null
+                }
+                postNowPlaying()
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) startScrobblePoll() else stopScrobblePoll()
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -441,6 +462,10 @@ class ZonikMediaService : MediaLibraryService() {
 
     override fun onDestroy() {
         savePlaybackState(mediaLibrarySession?.player)
+        stopScrobblePoll()
+        scrobbleMainScope.cancel()
+        scrobbleIoScope.cancel()
+        scrobblePlayer = null
         // Unregister network callback
         networkCallback?.let { cb ->
             try { connectivityManager?.unregisterNetworkCallback(cb) } catch (_: Exception) {}
@@ -455,6 +480,70 @@ class ZonikMediaService : MediaLibraryService() {
         }
         mediaLibrarySession = null
         super.onDestroy()
+    }
+
+    private fun startScrobblePoll() {
+        if (scrobblePollJob?.isActive == true) return
+        scrobblePollJob = scrobbleMainScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5_000L)
+                checkScrobbleThreshold()
+            }
+        }
+    }
+
+    private fun stopScrobblePoll() {
+        scrobblePollJob?.cancel()
+        scrobblePollJob = null
+    }
+
+    // Reads player state on the main thread; fires the server scrobble on IO.
+    private fun checkScrobbleThreshold() {
+        val player = scrobblePlayer ?: return
+        val mediaId = player.currentMediaItem?.mediaId ?: return
+        val trackId = mediaId.removePrefix(TRACK_PREFIX)
+        if (trackId.isEmpty() || trackId == scrobbledTrackId) return
+        val duration = player.duration
+        val position = player.currentPosition
+        if (duration <= 0 || position <= duration / 2) return
+        scrobbledTrackId = trackId
+        val capturedTime = System.currentTimeMillis()
+        scrobbleIoScope.launch {
+            flushPendingScrobbles()
+            try {
+                libraryRepository.scrobble(trackId, capturedTime)
+                com.zonik.app.data.DebugLog.d("MediaService", "Scrobbled: $trackId")
+            } catch (e: Exception) {
+                pendingScrobbles.add(trackId to capturedTime)
+                com.zonik.app.data.DebugLog.w("MediaService", "Scrobble queued offline: ${e.message}")
+            }
+        }
+    }
+
+    private fun postNowPlaying() {
+        val player = scrobblePlayer ?: return
+        val mediaId = player.currentMediaItem?.mediaId ?: return
+        val trackId = mediaId.removePrefix(TRACK_PREFIX)
+        if (trackId.isEmpty() || trackId == nowPlayingPostedFor) return
+        nowPlayingPostedFor = trackId
+        scrobbleIoScope.launch {
+            flushPendingScrobbles()
+            try {
+                libraryRepository.scrobbleNowPlaying(trackId)
+            } catch (_: Exception) { }
+        }
+    }
+
+    private suspend fun flushPendingScrobbles() {
+        while (pendingScrobbles.isNotEmpty()) {
+            val entry = pendingScrobbles.peek() ?: break
+            try {
+                libraryRepository.scrobble(entry.first, entry.second)
+                pendingScrobbles.poll()
+            } catch (_: Exception) {
+                return
+            }
+        }
     }
 
     private fun savePlaybackState(player: androidx.media3.common.Player?) {
