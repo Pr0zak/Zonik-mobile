@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -53,9 +54,21 @@ android {
 }
 
 dependencies {
+    implementation(project(":core"))
+
     // AndroidX Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+
+    // DataStore (server config persistence)
+    implementation(libs.datastore.preferences)
+
+    // Retrofit (depends on transitively via :core, but we need it explicitly for Retrofit.Builder)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.serialization)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
 
     // Wear Compose
     implementation(libs.wear.compose.material)
