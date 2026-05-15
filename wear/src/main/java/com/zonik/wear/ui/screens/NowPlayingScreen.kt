@@ -2,6 +2,8 @@ package com.zonik.wear.ui.screens
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -160,49 +162,52 @@ fun NowPlayingScreen(
                         },
                     )
                 } else if (hasTrack) {
-                    WearCoverArt(mediaItem = currentItem, size = 72.dp)
-
-                    Spacer(Modifier.height(6.dp))
-
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    if (artist.isNotBlank()) {
+                    // Vertically scrollable so the secondary row is reachable on
+                    // round screens where everything centered would clip at the edge.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        WearCoverArt(mediaItem = currentItem, size = 80.dp)
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            text = artist,
-                            style = MaterialTheme.typography.bodySmall,
+                            text = title,
+                            style = MaterialTheme.typography.titleSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        if (artist.isNotBlank()) {
+                            Text(
+                                text = artist,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        TransportRow(
+                            isPlaying = isPlaying,
+                            isBuffering = isBuffering,
+                            onPlayPause = mediaManager::togglePlayPause,
+                            onPrevious = mediaManager::skipPrevious,
+                            onNext = mediaManager::skipNext,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        SecondaryRow(
+                            onBrowseClick = onBrowseClick,
+                            onQueueClick = onQueueClick,
+                            onSettingsClick = onSettingsClick,
+                        )
+                        Spacer(Modifier.height(20.dp))
                     }
-
-                    Spacer(Modifier.height(10.dp))
-
-                    TransportRow(
-                        isPlaying = isPlaying,
-                        isBuffering = isBuffering,
-                        onPlayPause = mediaManager::togglePlayPause,
-                        onPrevious = mediaManager::skipPrevious,
-                        onNext = mediaManager::skipNext,
-                    )
-
-                    Spacer(Modifier.height(6.dp))
-
-                    SecondaryRow(
-                        onBrowseClick = onBrowseClick,
-                        onQueueClick = onQueueClick,
-                        onSettingsClick = onSettingsClick,
-                    )
                 }
             }
         }
@@ -267,35 +272,43 @@ private fun TransportRow(
     onNext: () -> Unit,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FilledTonalIconButton(
             onClick = onPrevious,
-            modifier = Modifier.size(36.dp),
+            modifier = Modifier.size(48.dp),
         ) {
-            Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(20.dp))
+            Icon(
+                Icons.Default.SkipPrevious,
+                contentDescription = "Previous",
+                modifier = Modifier.size(24.dp),
+            )
         }
         FilledIconButton(
             onClick = onPlayPause,
-            modifier = Modifier.size(52.dp),
+            modifier = Modifier.size(64.dp),
             colors = IconButtonDefaults.filledIconButtonColors(),
         ) {
             if (isBuffering) {
-                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
             } else {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (isPlaying) "Pause" else "Play",
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(34.dp),
                 )
             }
         }
         FilledTonalIconButton(
             onClick = onNext,
-            modifier = Modifier.size(36.dp),
+            modifier = Modifier.size(48.dp),
         ) {
-            Icon(Icons.Default.SkipNext, contentDescription = "Next", modifier = Modifier.size(20.dp))
+            Icon(
+                Icons.Default.SkipNext,
+                contentDescription = "Next",
+                modifier = Modifier.size(24.dp),
+            )
         }
     }
 }
@@ -307,17 +320,29 @@ private fun SecondaryRow(
     onSettingsClick: () -> Unit,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBrowseClick, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.Outlined.LibraryMusic, contentDescription = "Browse", modifier = Modifier.size(16.dp))
+        FilledTonalIconButton(onClick = onQueueClick, modifier = Modifier.size(44.dp)) {
+            Icon(
+                Icons.AutoMirrored.Filled.QueueMusic,
+                contentDescription = "Queue",
+                modifier = Modifier.size(20.dp),
+            )
         }
-        IconButton(onClick = onQueueClick, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = "Queue", modifier = Modifier.size(16.dp))
+        FilledTonalIconButton(onClick = onBrowseClick, modifier = Modifier.size(44.dp)) {
+            Icon(
+                Icons.Outlined.LibraryMusic,
+                contentDescription = "Browse",
+                modifier = Modifier.size(20.dp),
+            )
         }
-        IconButton(onClick = onSettingsClick, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.Outlined.Settings, contentDescription = "Settings", modifier = Modifier.size(16.dp))
+        FilledTonalIconButton(onClick = onSettingsClick, modifier = Modifier.size(44.dp)) {
+            Icon(
+                Icons.Outlined.Settings,
+                contentDescription = "Settings",
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
