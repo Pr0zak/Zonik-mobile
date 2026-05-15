@@ -91,8 +91,11 @@ dependencies {
     // Lifecycle
     implementation(libs.lifecycle.runtime.compose)
 
-    // Media3 Session (client only — connects to phone's service)
+    // Media3 — full local playback stack on the watch
     implementation(libs.media3.session)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.datasource)
+    implementation(libs.media3.datasource.okhttp)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)

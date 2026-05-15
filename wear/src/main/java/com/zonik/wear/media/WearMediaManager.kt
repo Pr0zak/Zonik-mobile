@@ -87,31 +87,15 @@ class WearMediaManager(private val context: Context) {
 
     fun connect() {
         if (_connectionState.value == ConnectionState.Connecting) return
+        autoReconnect = true
         _connectionState.value = ConnectionState.Connecting
 
-        // The wear app currently expects the phone-side ZonikMediaService to
-        // be reachable cross-process via MediaBrowser. That only resolves
-        // when both apps run on the same device — on a standalone watch the
-        // phone package isn't installed, so SessionToken's ComponentName
-        // lookup throws IllegalArgumentException at app launch.
-        //
-        // Catch it so the UI surfaces a Disconnected state instead of FC-ing
-        // every time the user opens Zonik from the launcher. Real Wear OS
-        // support needs either a watch-native MediaService or a Wear Data
-        // Layer bridge to the phone — see roadmap.
-        val sessionToken = try {
-            SessionToken(
-                context,
-                ComponentName("com.zonik.app", "com.zonik.app.media.ZonikMediaService")
-            )
-        } catch (e: Exception) {
-            android.util.Log.w(
-                "WearMediaManager",
-                "Phone-side MediaService unavailable on this device: ${e.message}"
-            )
-            _connectionState.value = ConnectionState.Disconnected
-            return
-        }
+        // Local bind to our own MediaLibraryService — Subsonic-fed ExoPlayer
+        // running in the wear process. No more cross-package SessionToken.
+        val sessionToken = SessionToken(
+            context,
+            ComponentName(context, ZonikWearMediaService::class.java),
+        )
 
         val future = MediaBrowser.Builder(context, sessionToken).buildAsync()
         browserFuture = future
@@ -124,6 +108,7 @@ class WearMediaManager(private val context: Context) {
                 syncState(b)
                 updatePositionPolling()
             } catch (e: Exception) {
+                android.util.Log.w("WearMediaManager", "Local bind failed: ${e.message}")
                 _connectionState.value = ConnectionState.Disconnected
                 scheduleReconnect()
             }
