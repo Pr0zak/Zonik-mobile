@@ -122,8 +122,14 @@ fun BrowseChildrenScreen(
                         if (isBrowsable) {
                             onNodeClick(item.mediaId)
                         } else {
-                            // Play this item via browse-and-play
-                            mediaManager.playFromMediaId(item.mediaId)
+                            // Tapping a track inside an album/playlist queues the
+                            // whole list and starts from the tapped index — the
+                            // MediaItems we received from getChildren already carry
+                            // playable URIs from ZonikWearMediaService.
+                            val playableContext = children.filter { it.mediaMetadata.isPlayable == true }
+                            val startIdx = playableContext.indexOfFirst { it.mediaId == item.mediaId }
+                                .coerceAtLeast(0)
+                            mediaManager.playMediaItems(playableContext, startIdx)
                         }
                     },
                     label = {

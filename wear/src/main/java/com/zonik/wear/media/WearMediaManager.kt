@@ -257,4 +257,18 @@ class WearMediaManager(private val context: Context) {
         b.prepare()
         b.play()
     }
+
+    /**
+     * Queue a list of fully-formed MediaItems (with URIs) and start playback
+     * at the given index. Use this for "tap a track in an album to start
+     * the album from that point".
+     */
+    fun playMediaItems(items: List<MediaItem>, startIndex: Int = 0) {
+        val b = browser ?: return
+        if (items.isEmpty()) return
+        val safeIndex = startIndex.coerceIn(0, items.size - 1)
+        b.setMediaItems(items, safeIndex, 0L)
+        b.prepare()
+        b.play()
+    }
 }
