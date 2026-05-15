@@ -3,7 +3,7 @@ package com.zonik.app.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
-import com.zonik.app.model.ServerConfig
+import com.zonik.core.model.ServerConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

@@ -21,5 +21,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Zonik"
+include(":core")
 include(":app")
 include(":wear")

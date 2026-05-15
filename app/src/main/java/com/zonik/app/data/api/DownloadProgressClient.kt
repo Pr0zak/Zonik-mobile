@@ -2,7 +2,7 @@ package com.zonik.app.data.api
 
 import com.zonik.app.data.DebugLog
 import com.zonik.app.data.repository.SettingsRepository
-import com.zonik.app.util.md5
+import com.zonik.core.util.md5
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

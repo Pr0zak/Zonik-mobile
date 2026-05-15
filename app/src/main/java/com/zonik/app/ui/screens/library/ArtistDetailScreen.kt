@@ -17,8 +17,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.repository.LibraryRepository
-import com.zonik.app.model.Album
-import com.zonik.app.model.Artist
+import com.zonik.core.model.Album
+import com.zonik.core.model.Artist
 import com.zonik.app.ui.components.CoverArt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

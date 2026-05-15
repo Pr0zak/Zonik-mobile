@@ -1,4 +1,4 @@
-package com.zonik.app.model
+package com.zonik.core.model
 
 import kotlinx.serialization.Serializable
 

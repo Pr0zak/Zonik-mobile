@@ -1,6 +1,6 @@
-package com.zonik.app.data.api
+package com.zonik.core.api
 
-import com.zonik.app.model.*
+import com.zonik.core.model.*
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
@@ -55,7 +55,7 @@ interface SubsonicApi {
     suspend fun getPlaylist(@Query("id") id: String): PlaylistDetailResponse
 
     @GET("rest/getStarred2.view")
-    suspend fun getStarred2(): com.zonik.app.model.Starred2Response
+    suspend fun getStarred2(): Starred2Response
 
     @GET("rest/star.view")
     suspend fun star(

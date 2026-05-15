@@ -35,11 +35,11 @@ import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SyncManager
 import com.zonik.app.media.PlaybackManager
-import com.zonik.app.model.Album
-import com.zonik.app.model.Artist
-import com.zonik.app.model.Genre
-import com.zonik.app.model.Playlist
-import com.zonik.app.model.Track
+import com.zonik.core.model.Album
+import com.zonik.core.model.Artist
+import com.zonik.core.model.Genre
+import com.zonik.core.model.Playlist
+import com.zonik.core.model.Track
 import com.zonik.app.ui.components.CoverArt
 import com.zonik.app.ui.components.TrackDetailsSheet
 import dagger.hilt.android.lifecycle.HiltViewModel

@@ -16,7 +16,7 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import com.zonik.app.util.md5
+import com.zonik.core.util.md5
 
 /**
  * ContentProvider that serves cover art images from the Subsonic server.

@@ -19,8 +19,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
-import com.zonik.app.model.ServerConfig
-import com.zonik.app.model.Track
+import com.zonik.core.model.ServerConfig
+import com.zonik.core.model.Track
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import com.zonik.app.util.md5
+import com.zonik.core.util.md5
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine

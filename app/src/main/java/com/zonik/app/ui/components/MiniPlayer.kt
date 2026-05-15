@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import com.zonik.app.media.PlaybackManager
-import com.zonik.app.model.Track
+import com.zonik.core.model.Track
 import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.ui.util.tvFocusHighlight
 import dagger.hilt.android.lifecycle.HiltViewModel

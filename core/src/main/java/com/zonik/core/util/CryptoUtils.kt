@@ -1,4 +1,4 @@
-package com.zonik.app.util
+package com.zonik.core.util
 
 import java.security.MessageDigest
 

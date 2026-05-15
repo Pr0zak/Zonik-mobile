@@ -4,7 +4,7 @@ import android.content.Context
 import com.zonik.app.data.DebugLog
 import com.zonik.app.data.db.ZonikDatabase
 import com.zonik.app.data.repository.SettingsRepository
-import com.zonik.app.util.md5
+import com.zonik.core.util.md5
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow

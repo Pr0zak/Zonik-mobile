@@ -180,7 +180,7 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.eqBandLevels,
         settingsRepository.visualizerEnabled
     ) { values ->
-        val serverConfig = values[0] as com.zonik.app.model.ServerConfig?
+        val serverConfig = values[0] as com.zonik.core.model.ServerConfig?
         val isLoggedIn = values[1] as Boolean
         val syncInterval = values[2] as Int
         val wifiOnly = values[3] as Boolean

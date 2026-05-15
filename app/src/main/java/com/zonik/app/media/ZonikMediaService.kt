@@ -34,17 +34,17 @@ import com.zonik.app.R
 import com.zonik.app.data.db.ZonikDatabase
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SettingsRepository
-import com.zonik.app.model.Album
-import com.zonik.app.model.Artist
-import com.zonik.app.model.Genre
-import com.zonik.app.model.Playlist
-import com.zonik.app.model.Track
+import com.zonik.core.model.Album
+import com.zonik.core.model.Artist
+import com.zonik.core.model.Genre
+import com.zonik.core.model.Playlist
+import com.zonik.core.model.Track
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
-import com.zonik.app.util.md5
+import com.zonik.core.util.md5
 import javax.inject.Inject
 
 @OptIn(UnstableApi::class)

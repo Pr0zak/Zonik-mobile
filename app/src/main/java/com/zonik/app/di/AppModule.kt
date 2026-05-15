@@ -1,8 +1,9 @@
 package com.zonik.app.di
 
 import android.content.Context
-import com.zonik.app.data.api.SubsonicApi
-import com.zonik.app.data.api.SubsonicAuthInterceptor
+import com.zonik.core.api.ServerConfigProvider
+import com.zonik.core.api.SubsonicApi
+import com.zonik.core.api.SubsonicAuthInterceptor
 import com.zonik.app.data.api.ZonikApi
 import com.zonik.app.data.db.ZonikDatabase
 import com.zonik.app.data.repository.SettingsRepository
@@ -44,6 +45,20 @@ object AppModule {
         coerceInputValues = true
         isLenient = true
     }
+
+    @Provides
+    @Singleton
+    fun provideServerConfigProvider(
+        settingsRepository: SettingsRepository
+    ): ServerConfigProvider = ServerConfigProvider {
+        settingsRepository.serverConfig.first()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSubsonicAuthInterceptor(
+        configProvider: ServerConfigProvider
+    ): SubsonicAuthInterceptor = SubsonicAuthInterceptor(configProvider, clientName = "ZonikApp")
 
     @Provides
     @Singleton

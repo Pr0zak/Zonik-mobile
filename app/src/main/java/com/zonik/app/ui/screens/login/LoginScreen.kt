@@ -20,8 +20,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.DebugLog
 import com.zonik.app.data.repository.SettingsRepository
-import com.zonik.app.model.PingResponse
-import com.zonik.app.model.ServerConfig
+import com.zonik.core.model.PingResponse
+import com.zonik.core.model.ServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

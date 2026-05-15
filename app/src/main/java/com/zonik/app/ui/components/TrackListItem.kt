@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.zonik.app.model.Track
+import com.zonik.core.model.Track
 import com.zonik.app.ui.util.formatDuration
 import com.zonik.app.ui.util.formatFileSize
 import com.zonik.app.ui.util.tvFocusHighlight

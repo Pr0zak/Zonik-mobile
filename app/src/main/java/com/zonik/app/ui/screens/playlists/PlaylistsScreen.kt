@@ -23,8 +23,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
-import com.zonik.app.model.Playlist
-import com.zonik.app.model.Track
+import com.zonik.core.model.Playlist
+import com.zonik.core.model.Track
 import com.zonik.app.ui.util.formatDuration
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

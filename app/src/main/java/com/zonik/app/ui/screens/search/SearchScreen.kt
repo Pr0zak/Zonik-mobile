@@ -36,9 +36,9 @@ import com.zonik.app.data.api.*
 import com.zonik.app.data.db.ZonikDatabase
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
-import com.zonik.app.model.Album
-import com.zonik.app.model.Artist
-import com.zonik.app.model.Track
+import com.zonik.core.model.Album
+import com.zonik.core.model.Artist
+import com.zonik.core.model.Track
 import com.zonik.app.ui.components.CoverArt
 import com.zonik.app.ui.theme.WithNeutralScheme
 import com.zonik.app.ui.util.formatDuration

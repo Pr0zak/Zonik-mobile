@@ -62,6 +62,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":core"))
+
     // AndroidX Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

@@ -33,7 +33,7 @@ import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.data.repository.SyncManager
 import com.zonik.app.data.repository.SyncState
 import com.zonik.app.media.PlaybackManager
-import com.zonik.app.model.Track
+import com.zonik.core.model.Track
 import com.zonik.app.ui.components.CoverArt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay

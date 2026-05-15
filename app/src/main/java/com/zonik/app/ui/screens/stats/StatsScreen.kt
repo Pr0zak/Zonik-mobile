@@ -23,8 +23,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zonik.app.data.db.StatCount
 import com.zonik.app.data.repository.LibraryRepository
-import com.zonik.app.model.Album
-import com.zonik.app.model.Artist
+import com.zonik.core.model.Album
+import com.zonik.core.model.Artist
 import com.zonik.app.ui.components.CoverArt
 import com.zonik.app.ui.util.formatLargeDuration
 import com.zonik.app.ui.util.formatLargeFileSize

@@ -2,10 +2,10 @@ package com.zonik.app.data.repository
 
 import androidx.room.withTransaction
 import com.zonik.app.data.api.BulkDeleteTracksRequest
-import com.zonik.app.data.api.SubsonicApi
+import com.zonik.core.api.SubsonicApi
 import com.zonik.app.data.api.ZonikApi
 import com.zonik.app.data.db.*
-import com.zonik.app.model.*
+import com.zonik.core.model.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -272,7 +272,7 @@ class LibraryRepository @Inject constructor(
     suspend fun scrobbleNowPlaying(id: String) { api.scrobble(id, submission = false) }
     suspend fun setRating(id: String, rating: Int) { api.setRating(id, rating) }
 
-    suspend fun getNowPlaying(): List<com.zonik.app.model.NowPlayingEntry> {
+    suspend fun getNowPlaying(): List<com.zonik.core.model.NowPlayingEntry> {
         return try {
             api.getNowPlaying().response.nowPlaying?.entry ?: emptyList()
         } catch (e: Exception) {

@@ -2,9 +2,9 @@ package com.zonik.app.data.db
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.zonik.app.model.Album
-import com.zonik.app.model.Artist
-import com.zonik.app.model.Track
+import com.zonik.core.model.Album
+import com.zonik.core.model.Artist
+import com.zonik.core.model.Track
 
 @Entity(tableName = "artists")
 data class ArtistEntity(

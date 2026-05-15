@@ -48,7 +48,7 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.zonik.app.data.repository.LibraryRepository
 import com.zonik.app.media.PlaybackManager
-import com.zonik.app.model.Track
+import com.zonik.core.model.Track
 import com.zonik.app.ui.components.CoverArt
 import com.zonik.app.ui.theme.ZonikShapes
 import com.zonik.app.ui.theme.WithAlbumScheme
