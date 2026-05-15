@@ -15,10 +15,25 @@ android {
         applicationId = "com.zonik.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 198
-        versionName = "1.4.4"
+        versionCode = 199
+        versionName = "1.4.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // If a project-local keystore is present (decoded by CI from the
+    // DEBUG_KEYSTORE_BASE64 secret), use it for debug signing so every
+    // CI build uses the same signing cert and APKs install in place.
+    // Local builds without the file fall back to AGP's default debug keystore.
+    signingConfigs {
+        getByName("debug") {
+            rootProject.file("ci-debug.keystore").takeIf { it.exists() }?.let {
+                storeFile = it
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {

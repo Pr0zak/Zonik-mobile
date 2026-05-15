@@ -56,8 +56,17 @@ jobs:
             echo "::error::DEBUG_KEYSTORE_BASE64 secret is not set. APKs would be signed with a one-shot ephemeral keystore and users couldn't update in place."
             exit 1
           fi
-          mkdir -p "$HOME/.android"
-          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$HOME/.android/debug.keystore"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > ci-debug.keystore
+          ks_size=$(stat -c%s ci-debug.keystore)
+          echo "ci-debug.keystore size: $ks_size bytes"
+          if [ "$ks_size" -lt 1024 ]; then
+            echo "::error::Decoded keystore is suspiciously small ($ks_size bytes). Secret is probably corrupt."
+            exit 1
+          fi
+          # Verify the keystore actually loads with the expected alias — fail
+          # loudly here rather than silently shipping APKs signed with a Gradle
+          # auto-generated keystore (different per run → won't install over).
+          keytool -list -keystore ci-debug.keystore -storetype PKCS12 -storepass android -alias androiddebugkey
 
       - name: Cache Gradle
         uses: actions/cache@v4
