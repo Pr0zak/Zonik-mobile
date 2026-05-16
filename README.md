@@ -1,3 +1,13 @@
+> [!IMPORTANT]
+> **This repository is archived.** Mobile development moved into the main Zonik monorepo on 2026-05-15.
+>
+> **New home:** https://github.com/Pr0zak/Zonik — Android/Wear sources under [`mobile/`](https://github.com/Pr0zak/Zonik/tree/main/mobile)
+> **New releases:** [Pr0zak/Zonik releases](https://github.com/Pr0zak/Zonik/releases) — tagged `app-vX.Y.Z`
+>
+> Existing releases on this repo (`v1.X.Y`, including v1.8.0) remain downloadable.
+
+---
+
 <p align="center">
   <img src="cast/icon.png" width="128" height="128" alt="Zonik Logo">
 </p>
